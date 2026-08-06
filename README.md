@@ -15,7 +15,7 @@ Coleção pessoal de skills para omp (agentes de coding).
 
 Copie cada pasta de skill para o diretório de skills de usuário do omp:
 
-    ~/.agents/skills/<nome-da-skill>/
+    ~/.omp/agent/skills/<nome-da-skill>/
 
 e reinicie a sessão (descoberta ocorre no startup).
 
@@ -23,6 +23,6 @@ e reinicie a sessão (descoberta ocorre no startup).
 
 - `release-bootstrap`: gh CLI autenticado; repo no GitHub (público para rulesets no plano free).
 - `deep-review`: git (e `gh` autenticado para revisão de PRs). Usa o agente `deep-reviewer` desta skill: copie `deep-review/agents/deep-reviewer.md` para `<repo>/.omp/agents/` ou `~/.omp/agent/agents/`.
-- `ship`: repo já bootstrapped pela release-bootstrap; git; gh autenticado; Node >= 18. Requer também a skill `deep-review` + agente `deep-reviewer` instalados (gate). Integração TDD opcional via `skill://tdd-orchestrator`.
-- `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos; integram-se ao fluxo ship (alinhamento obrigatório, diagnóstico para correções de bug, resolução de conflitos no merge/PR).
+- `ship`: repo já bootstrapped pela release-bootstrap; git; gh autenticado; Node >= 18. Requer também a skill `deep-review` + agente `deep-reviewer` instalados (gate) e as skills `alignment`, `bug-diagnosis`, `conflict-resolution` (alinhamento obrigatório, diagnóstico para correções de bug, resolução de conflitos no merge/PR). Integração TDD opcional via `skill://tdd-orchestrator`.
+- `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos.
 - `alignment`, `bug-diagnosis` e `conflict-resolution` são adaptações (traduzidas e sem as dependências do ecossistema original) das skills `grilling`, `diagnosing-bugs` e `resolving-merge-conflicts` de github.com/mattpocock/skills (MIT).

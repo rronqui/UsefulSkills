@@ -167,4 +167,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
 - Skill companheira: `ship` opera o fluxo no dia a dia (issue → branch → gate de
   revisão → PR com auto-merge → release → deploy local); instale-a junto e deixe o
   `ship.config.json` preenchido. A skill `ship` requer também a skill `deep-review`
-  e o agente `deep-reviewer.md` instalados (gate de revisão obrigatório antes do PR).
+  e o agente `deep-reviewer.md` instalados (gate de revisão obrigatório antes do PR)
+  e as skills `alignment`, `bug-diagnosis`, `conflict-resolution` (alinhamento
+  obrigatório antes do roteamento, diagnóstico para correções de bug e resolução de
+  conflitos no merge/PR).
