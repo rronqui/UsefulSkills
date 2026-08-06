@@ -16,6 +16,7 @@ seguem o protocolo abaixo.
 - `ship.config.json` na raiz do repo (crie com `bin/ship.mjs setup` e preencha).
 - Skill `deep-review` (`skill://deep-review`) e o agente `deep-reviewer.md`
   instalados (`<repo>/.omp/agents/` ou `~/.omp/agent/agents/`).
+- Skills alignment, bug-diagnosis e conflict-resolution instaladas.
 
 ## Manifesto — ship.config.json
 
@@ -40,7 +41,14 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 ## Protocolo de entrega (agente)
 
 1. **Intake**: rode `new`. Se o usuário já forneceu issue/branch, pule.
-2. **Roteamento da implementação**:
+2. **Alinhamento (obrigatório para pedidos de implementação ou correção)**: leia
+   `skill://alignment` e conduza a entrevista de alinhamento sobre o pedido:
+   mudança trivial → rodada rápida (até 3 perguntas); comportamental → até a
+   fronteira esvaziar; pedido totalmente especificado → declare o fechamento
+   rápido com o motivo (nunca pule em silêncio). Pedidos que NÃO são
+   implementação/correção (merge de release, deploy, revisão isolada) pulam este
+   passo. O resultado do alinhamento dirige o roteamento do passo 3.
+3. **Roteamento da implementação**:
    - **Trivial** (docs, texto, config, cosmético sem mudança de comportamento):
      implemente diretamente.
    - **Comportamental** (lógica, comportamento de UI, API, dados): leia
@@ -51,17 +59,24 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
      - Fase 0 passo 10 (ok do plano): apresente ao usuário e aguarde.
      - Entrega final passo 5: com `delivery: external` registrado, o passo encerra
        sozinho (`merge_status: SKIPPED`, sem pergunta). Prossiga para o gate de
-       revisão (passo 3) e rode `bin/ship.mjs ship "descrição"` para publicar via PR.
+       revisão (passo 4) e rode `bin/ship.mjs ship "descrição"` para publicar via PR.
        O ruleset do repo bloqueia push direto; merge local na default é sempre
        errado neste fluxo.
-3. **Gate de revisão (obrigatório)**: com a implementação concluída (e suíte verde,
+   - **Correção de bug** (branch `fix/#N` ou usuário reporta algo
+     quebrado/falhando/lento): leia `skill://bug-diagnosis` e execute-a como a
+     própria disciplina de implementação — o loop completo até a Fase 6 (feedback
+     loop vermelho → minimizar → hipotetizar → instrumentar → fix com teste de
+     regressão → limpeza/registro). Ela SUBSTITUI o roteamento trivial/comportamental
+     para correções de bug: NÃO re-rota o fix; após a Fase 6 prossiga direto para o
+     gate de revisão (passo 4).
+4. **Gate de revisão (obrigatório)**: com a implementação concluída (e suíte verde,
    no caso TDD), leia `skill://deep-review` e execute-a em modo **branch base** com
    base = branch default do repo (informe-a como chamador; NUNCA pergunte ao usuário
    nem use outro modo). Depois:
    - **Triagem**: classifique cada achado como válido ou falso positivo com
      justificativa concreta (caminho de código/condição de disparo). Só P0/P1
      válidos bloqueiam.
-   - Sem P0/P1 válido → siga ao passo 4.
+   - Sem P0/P1 válido → siga ao passo 5.
    - Com P0/P1 válido → corrija os válidos (mudança comportamental: atualize os
      testes junto), rode a suíte de testes do projeto até verde, commite com
      `git add -A` e mensagem `<tipo>: correções da revisão (rodada K) (#N)` (nunca
@@ -69,22 +84,29 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
      de **2 rodadas**.
    - Ainda com P0/P1 válido após a 2ª rodada → PARE e pergunte ao usuário com
      3 opções: (a) corrigir os achados restantes mesmo assim, (b) shipar com os
-     achados documentados na evidência do passo 4, (c) abandonar. Registre a
+     achados documentados na evidência do passo 5, (c) abandonar. Registre a
      escolha na evidência. Nunca shipar por conta própria nesse estado.
    - Achados P2/P3 (de qualquer rodada) são não bloqueantes: guarde-os para a
-     evidência do passo 4.
-4. **PR**: grave a evidência do gate em `.git/ship-review-evidence.md` (veredito
+     evidência do passo 5.
+5. **PR**: grave a evidência do gate em `.git/ship-review-evidence.md` (veredito
    consolidado, contagem de achados por prioridade, triagem de falsos positivos,
    P2/P3 não bloqueantes com localização, decisão de escalation se houve; inclua
-   também a saída do validator se houve TDD). Rode
+   também a saída do validator se houve TDD; inclua a hipótese confirmada do
+   diagnóstico e achados de arquitetura se o caminho foi correção de bug
+   (skill://bug-diagnosis)). Rode
    `bin/ship.mjs ship "descrição curta" --body-file .git/ship-review-evidence.md`
    — descrição one-line (vira título); o corpo leva `Closes #N` + descrição +
    evidência. O auto-merge é habilitado pelo motor; se indisponível, aguarde o CI
    e mergue manualmente.
-5. **Release**: NÃO mergue automaticamente o PR de release do release-please. Quando
+
+   Se o PR entrar em conflito com a base antes do merge: na branch do PR rode
+   `git fetch origin` e depois `git merge origin/<default>`, resolva seguindo
+   `skill://conflict-resolution`, commite e dê push; o auto-merge retoma com o CI
+   verde.
+6. **Release**: NÃO mergue automaticamente o PR de release do release-please. Quando
    o usuário quiser lançar: `gh pr merge <nº do PR de release> --squash` e aguarde a
    tag.
-6. **Deploy**: rode `deploy` e confira a saída (backup, versão servida).
+7. **Deploy**: rode `deploy` e confira a saída (backup, versão servida).
 
 ## Armadilhas
 
@@ -101,3 +123,9 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 - Commits de correção do gate são manuais; `ship.mjs ship` roda UMA vez, no final.
   No caminho TDD a árvore chega limpa ao ship — o motor publica os commits locais
   não publicados, é esperado.
+- Alinhamento é proporcional mas nunca pulado em silêncio para pedidos de
+ implementação/correção: trivial roda confirmação rápida; pedido já especificado
+ exige declaração explícita do fechamento. Deploy/release/revisão isolada não
+ passam pelo alinhamento.
+- Diagnóstico de bug exige feedback loop vermelho ANTES de qualquer hipótese;
+ pular para hipótese sem loop é a falha que a disciplina previne.
