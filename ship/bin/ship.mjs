@@ -41,7 +41,7 @@ function usage() {
   console.log(`Uso:
   ship.mjs setup
   ship.mjs new (--bug <título> | --feat <título>) [--desc <texto>]
-  ship.mjs ship <descrição>
+  ship.mjs ship <descrição> [--body-file <arquivo>]
   ship.mjs deploy`);
   process.exit(1);
 }
@@ -100,6 +100,12 @@ function cmdNew(argv) {
 
 // ---------- ship ----------
 function cmdShip(argv) {
+  const bodyFile = flagValue(argv, "--body-file");
+  const flagIndex = argv.indexOf("--body-file");
+  if (flagIndex !== -1) {
+    if (!bodyFile) usage();
+    argv = argv.filter((_, i) => i !== flagIndex && i !== flagIndex + 1);
+  }
   const description = argv.join(" ").trim();
   if (!description) usage();
   const branch = git(["branch", "--show-current"]);
@@ -109,17 +115,31 @@ function cmdShip(argv) {
     process.exit(1);
   }
   const [, type, n] = m;
+  let bodyExtra = "";
+  if (bodyFile) {
+    const bodyPath = path.resolve(root, bodyFile);
+    if (!existsSync(bodyPath)) {
+      console.error(`--body-file: arquivo não encontrado: ${bodyFile}`);
+      process.exit(1);
+    }
+    bodyExtra = `\n\n${readFileSync(bodyPath, "utf8").trim()}`;
+  }
   git(["add", "-A"]);
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
-    console.error("Nada para commitar.");
-    process.exit(1);
+    const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
+    if (!unpublished) {
+      console.error("Nada para commitar.");
+      process.exit(1);
+    }
+    console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
+  } else {
+    git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
-  git(["commit", "-m", `${type}: ${description} (#${n})`]);
   git(["push", "-u", "origin", branch]);
   const prUrl = gh([
     "pr", "create",
     "--title", `${type}: ${description}`,
-    "--body", `Closes #${n}\n\n${description}`,
+    "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
   ]);
   console.log(`PR ${prUrl}`);
   const auto = spawnSync("gh", ["pr", "merge", "--auto", "--squash"], { cwd: root, encoding: "utf8" });

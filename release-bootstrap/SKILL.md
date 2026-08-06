@@ -131,8 +131,9 @@ As fases seguintes usam ESSE levantamento, não suposições.
 
 ## FASE 6 — Documentação e dogfood
 
-- README: política SemVer; fluxo issue → branch (`fix/#N`, `feat/#N`) → PR (`Closes #N`)
-  → merge; Conventional Commits; papel do release-please; o secret
+- README: política SemVer; fluxo issue → branch (`fix/#N`, `feat/#N`) →
+  implementação → revisão (skill `deep-review`, gate obrigatório antes do PR) → PR
+  (`Closes #N`) → merge; Conventional Commits; papel do release-please; o secret
   `RELEASE_PLEASE_TOKEN` e por que existe; como atualizar a instalação local após release.
 - Templates de issue (bug, feature) e template de PR exigindo issue vinculada.
 - DOGFOOD: implemente as Fases 2–5 via o próprio fluxo (branch `feat/…`, PR, CI verde,
@@ -163,6 +164,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
   versão visível), e limitações inerentes (hooks contornáveis com `--no-verify`; deploy na
   máquina do dono fora do alcance do CI hospedado; enforcement server-side inexistente em
   repo privado no plano free).
-- Skill companheira: `ship` opera o fluxo no dia a dia (issue → branch → PR com
-  auto-merge → release → deploy local); instale-a junto e deixe o `ship.config.json`
-  preenchido.
+- Skill companheira: `ship` opera o fluxo no dia a dia (issue → branch → gate de
+  revisão → PR com auto-merge → release → deploy local); instale-a junto e deixe o
+  `ship.config.json` preenchido. A skill `ship` requer também a skill `deep-review`
+  e o agente `deep-reviewer.md` instalados (gate de revisão obrigatório antes do PR).
