@@ -168,11 +168,13 @@ async function deploy() {
     const dest = path.join(backupDir, `${path.basename(cfg.dbPath)}-${ts}`);
     copyFileSync(path.join(root, cfg.dbPath), dest);
     console.log(`Backup: ${dest}`);
+  } else if (cfg.dbPath) {
+    console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   }
   try {
     git(["pull", "--ff-only"]);
   } catch {
-    console.error("git pull --ff-only falhou — main local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.");
+    console.error(`git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`);
     process.exit(1);
   }
   const changed = git(["diff", "--name-only", oldHead, "HEAD"]).split("\n");
@@ -189,26 +191,33 @@ async function deploy() {
     process.exit(1);
   }
   if (cfg.versionCheckUrl) {
-    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
-    let ok = false;
-    for (let attempt = 0; attempt < 5 && !ok; attempt++) {
-      try {
-        let html = await (await fetch(cfg.versionCheckUrl)).text();
-        html = html.replace(/<!--[\s\S]*?-->/g, "");
-        const anchor = html.indexOf("Versão da aplicação");
-        if (anchor !== -1) html = html.slice(anchor);
-        const served = (html.match(/v(\d+\.\d+\.\d+)/) || [])[1];
-        console.log(
-          served === pkg.version
-            ? `Versão servida confere: v${served}`
-            : `AVISO: versão servida v${served ?? "?"} ≠ package.json v${pkg.version}`,
-        );
-        ok = true;
-      } catch {
-        if (attempt < 4) await new Promise((r) => setTimeout(r, 2000));
-      }
+    let pkg = null;
+    try {
+      pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+    } catch {
+      console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
-    if (!ok) console.warn(`Não consegui checar versão em ${cfg.versionCheckUrl} após 5 tentativas.`);
+    if (pkg) {
+      let ok = false;
+      for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+        try {
+          let html = await (await fetch(cfg.versionCheckUrl)).text();
+          html = html.replace(/<!--[\s\S]*?-->/g, "");
+          const anchor = html.indexOf("Versão da aplicação");
+          if (anchor !== -1) html = html.slice(anchor);
+          const served = (html.match(/v(\d+\.\d+\.\d+)/) || [])[1];
+          console.log(
+            served === pkg.version
+              ? `Versão servida confere: v${served}`
+              : `AVISO: versão servida v${served ?? "?"} ≠ package.json v${pkg.version}`,
+          );
+          ok = true;
+        } catch {
+          if (attempt < 4) await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+      if (!ok) console.warn(`Não consegui checar versão em ${cfg.versionCheckUrl} após 5 tentativas.`);
+    }
   }
   console.log("Deploy concluído.");
 }
