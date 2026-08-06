@@ -25,8 +25,8 @@ seguem o protocolo abaixo.
 | dbPath | Banco local para backup no deploy (null se não houver) |
 | buildCommand | Build de produção (null = pular) |
 | stopCommand | Para o servidor (null = pular) |
-| startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui) |
-| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML e procura `v(X.Y.Z)` a partir do texto âncora `Versão da aplicação` (se presente na página), senão a primeira ocorrência |
+| startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui); DEVE retornar (wrapper/daemonizador como pm2/npm script) — um servidor foreground bloqueia o deploy |
+| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z)` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a `version` do `package.json` na raiz (ausente/inválido → aviso e checagem pulada) |
 
 ## Subcomandos do motor
 
@@ -36,7 +36,7 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 |---|---|
 | `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Issue + branch `fix/#N-slug` / `feat/#N-slug` a partir da default atualizada |
 | `bin/ship.mjs ship "descrição"` | Commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR `Closes #N`, auto-merge squash; `--body-file <arquivo>` anexa o conteúdo do arquivo ao corpo do PR |
-| `bin/ship.mjs deploy` | Backup do dbPath → pull --ff-only → aviso se schema mudou → build → restart → confere versão servida |
+| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se schema mudou → build → restart → confere versão servida |
 
 ## Protocolo de entrega (agente)
 

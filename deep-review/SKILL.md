@@ -26,7 +26,8 @@ Esta skill usa SEMPRE o agente `deep-reviewer` desta própria skill —
 can1357/oh-my-pi, renomeada para evitar colisão). Ela define:
 
 - Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`;
-  pode spawnar `scout`; roda no modelo `@slow`;
+  pode spawnar `scout`; roda no modelo definido no frontmatter do agente
+  (`openai-codex/gpt-5.6-luna`);
 - Schema de saída: veredito (`overall_correctness` enum correct/incorrect,
   `explanation`, `confidence`) + achados opcionais (`findings`: title, body,
   priority, confidence, file_path, line_start, line_end) preenchidos via seções
@@ -207,7 +208,7 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `body`: um parágrafo — bug, condição de disparo, impacto; tom neutro; blocos de
   sugestão de código apenas quando forem substituição concreta (whitespace exato, sem
   comentário em volta);
-- `priority`: P0–P3 (aceito também como número 0–3);
+- `priority`: número 0–3 (0 = P0 bloqueia o release; 3 = nice-to-have);
 - `confidence`: 0.0–1.0 de que é bug real;
 - `file_path`: arquivo afetado (não vazio);
 - `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas que SOBREPOE o diff.
@@ -238,7 +239,7 @@ Com os resultados de todos os revisores:
 ## Armadilhas
 
 - Número de revisores segue a tabela da FASE 2 — não invente fan-out maior; 1 revisor
-- Revisor lê APENAS os arquivos atribuídos; sobreposição de escopo entre revisores
+  é o esperado para diffs pequenos.
 - Nunca inclua diff inteiro inline acima dos limites (50.000 caracteres ou 20
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
 - Revisor lê APENOS os arquivos atribuídos; sobreposição de escopo entre revisores

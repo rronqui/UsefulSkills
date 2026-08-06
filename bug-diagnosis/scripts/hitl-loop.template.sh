@@ -39,6 +39,7 @@ capture ERROR_MSG "Paste the error message (or 'none'):"
 
 # --- edit above ---------------------------------------------------------
 
+# Keep the KEY=VALUE block below in sync with every `capture` call above.
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
 printf 'ERROR_MSG=%s\n' "$ERROR_MSG"

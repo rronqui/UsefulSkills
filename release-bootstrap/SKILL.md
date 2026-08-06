@@ -144,7 +144,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
     "dbPath": "<caminho do banco local ou null>",
     "buildCommand": "<comando de build ou null>",
     "stopCommand": "<comando de stop ou null>",
-    "startCommand": "<comando de start com rebuild ou null>",
+    "startCommand": "<comando de start ou null>",
     "versionCheckUrl": "<URL para checar a versão servida ou null>"
   }
   ```

@@ -131,6 +131,11 @@ final vira um único grep. Logs não marcados sobrevivem; marcados morrem.
 errados. Em vez disso: estabeleça medição de baseline (harness de timing, profiler,
 plano de query) e depois bissecione. Meça primeiro, corrija depois.
 
+**Hipóteses exauridas.** Se TODAS as hipóteses da Fase 3 forem refutadas pela
+instrumentação, volte à Fase 3 com novas hipóteses informadas pelo que os probes
+revelaram — cada refutação estreita o espaço de busca. Não declare diagnóstico
+inconclusivo enquanto houver variável não testada.
+
 ## Fase 5 — Corrigir + teste de regressão
 
 Escreva o teste de regressão **antes do fix** — mas apenas se houver **costura

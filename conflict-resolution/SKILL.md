@@ -17,6 +17,11 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
    trade-off. **Não** invente comportamento novo. Sempre resolva; **nunca**
    `--abort`.
 
+   Se, após esgotar as fontes primárias, um hunk for genuinamente não resolúvel
+   (intenções irrecuperáveis, ou incompatíveis sem critério de desempate), PARE e
+   reporte ao chamador com o estado exato (arquivos, hunks, o que tentou). Isso é
+   reportar, não abortar: a operação permanece como está e quem chamou decide.
+
 4. Descubra os **checks automatizados** do projeto e rode-os — tipicamente
    typecheck, depois testes, depois build/format. Corrija o que o merge quebrou.
    (Em repo da solução ship/release-bootstrap: os comandos do CI e/ou do manifesto
@@ -27,7 +32,8 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
 
 **Integração com a solução UsefulSkills:**
 - Merge local do `tdd-orchestrator` (Entrega final, caminho "merge local"): em
-  conflito, execute esta skill antes de reportar.
+  conflito, execute esta skill antes de reportar (reportar é o último recurso,
+  ver passo 3).
 - PR da skill `ship` em conflito com a base antes do merge: na BRANCH do PR rode
   `git fetch origin` e depois `git merge origin/<branch default>`, resolva por esta
   skill, commite e dê push — o auto-merge retoma quando o CI ficar verde. Nunca

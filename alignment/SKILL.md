@@ -47,4 +47,7 @@ cada uma e aguarde.
 
 A sessão termina quando a fronteira está vazia: todo ramo da árvore de decisões
 visitado, nada assumido em silêncio. Não aja sobre o resultado até o usuário
-confirmar que o entendimento compartilhado foi alcançado.
+confirmar que o entendimento compartilhado foi alcançado. Quando invocada pelo
+protocolo da skill ship, a confirmação ocorre na própria entrevista: cada rodada
+fecha decisões COM o usuário, e a declaração de fechamento (fronteira vazia) é o
+sinal para prosseguir ao roteamento.
