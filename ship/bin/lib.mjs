@@ -1,5 +1,7 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
 
 export function slugify(title) {
   return title
@@ -43,4 +45,19 @@ export function resolveSchemaWatch(value) {
   if (value === undefined || value === null) return ["src/lib/db.ts"];
   if (Array.isArray(value)) return value.filter((p) => typeof p === "string");
   return ["src/lib/db.ts"];
+}
+
+// Etapa de backup do deploy. Sem dbPath → null; arquivo ausente → null (o chamador
+// emite o aviso). Cria o diretório de backup se necessário e copia o arquivo;
+// retorna o destino escrito. backupDir absoluto é honrado via path.resolve.
+export function performBackup(cfg, root) {
+  if (!cfg.dbPath) return null;
+  const src = path.join(root, cfg.dbPath);
+  if (!existsSync(src)) return null;
+  const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
+  mkdirSync(dir, { recursive: true });
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+  const dest = path.join(dir, `${path.basename(cfg.dbPath)}-${ts}`);
+  copyFileSync(src, dest);
+  return dest;
 }

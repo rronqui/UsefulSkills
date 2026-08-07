@@ -2,9 +2,9 @@
 // ship.mjs — motor determinístico do fluxo de releases (skill "ship").
 // Subcomandos: setup | new | ship | deploy. Requer: git, gh autenticado, Node >= 18.
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractIssueNumber, extractServedVersion, flagValue, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
@@ -158,17 +158,9 @@ async function deploy() {
     process.exit(1);
   }
   const oldHead = git(["rev-parse", "HEAD"]);
-  if (cfg.dbPath && existsSync(path.join(root, cfg.dbPath))) {
-    // backupDir opcional no manifesto; default: <dirname(dbPath)>/backup.
-    // path.resolve honra absolutos; relativos resolvem contra a raiz do repo.
-    const backupDir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
-    const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    const dest = path.join(backupDir, `${path.basename(cfg.dbPath)}-${ts}`);
-    copyFileSync(path.join(root, cfg.dbPath), dest);
-    console.log(`Backup: ${dest}`);
-  } else if (cfg.dbPath) {
-    console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
-  }
+  const backupDest = performBackup(cfg, root);
+  if (backupDest) console.log(`Backup: ${backupDest}`);
+  else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   try {
     git(["pull", "--ff-only"]);
   } catch {

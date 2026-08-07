@@ -143,7 +143,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
   {
     "dbPath": "<caminho do banco local ou null>",
     "backupDir": "<diretório do backup ou omitir — default: <dirname(dbPath)>/backup>",
-    "schemaWatchPaths": ["<caminho(s) de schema/migração, omitir se não houver>"],
+    "schemaWatchPaths": ["<caminho(s) de schema/migração>; omitir → default legado [\"src/lib/db.ts\"]; [] desliga o aviso"],
     "buildCommand": "<comando de build ou null>",
     "stopCommand": "<comando de stop ou null>",
     "startCommand": "<comando de start ou null>",

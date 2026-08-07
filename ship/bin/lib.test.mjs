@@ -1,6 +1,9 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
 import { describe, it, expect } from "vitest";
-import { extractIssueNumber, extractServedVersion, flagValue, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("slugify", () => {
   it("minúsculas, hífen no lugar de separadores", () => {
@@ -72,5 +75,38 @@ describe("resolveSchemaWatch", () => {
   });
   it("elementos não-string são filtrados", () => {
     expect(resolveSchemaWatch(["a", 1, null])).toEqual(["a"]);
+  });
+});
+
+describe("performBackup", () => {
+  it("cria o diretório de backup default quando não existe e copia o db", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    mkdirSync(join(root, "data"));
+    writeFileSync(join(root, "data", "app.db"), "v1");
+    try {
+      const dest = performBackup({ dbPath: "data/app.db" }, root);
+      expect(dest).toBe(join(root, "data", "backup", `app.db-${dest.split("-").pop()}`));
+      expect(existsSync(dest)).toBe(true);
+      expect(readFileSync(dest, "utf8")).toBe("v1");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("honra backupDir relativo customizado", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    writeFileSync(join(root, "db.sqlite"), "x");
+    try {
+      const dest = performBackup({ dbPath: "db.sqlite", backupDir: "outro/lugar" }, root);
+      expect(dest.startsWith(join(root, "outro", "lugar"))).toBe(true);
+      expect(existsSync(dest)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("sem dbPath ou arquivo ausente → null (chamador avisa)", () => {
+    expect(performBackup({}, "/nao-importa")).toBeNull();
+    expect(performBackup({ dbPath: "nao-existe.db" }, mkdtempSync(join(tmpdir(), "bkp-")))).toBeNull();
   });
 });
