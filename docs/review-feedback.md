@@ -12,3 +12,5 @@
 - 2026-08-07 [P2] retrocompat-defaults: generalizar um campo do manifesto exige manter o comportamento anterior como default do campo omitido (schema watch sem o campo voltava a nunca avisar) (arquivo: ship/bin/ship.mjs)
 - 2026-08-07 [P2] path-join-absolute: path.join(root, absoluto) anexa em vez de honrar o absoluto — use path.resolve para caminhos configuráveis (arquivo: ship/bin/ship.mjs)
 - 2026-08-07 [P2] installer-type-conflict: sync de arquivos precisa de stat guard — diretório no destino onde deveria haver arquivo é drift reportável, nunca EISDIR/crash (arquivo: install.mjs)
+- 2026-08-07 [P1] extract-to-lib-integrity: ao mover lógica para lib.mjs, todo passo com efeito colateral (mkdirSync do backup) precisa ir junto e ganhar teste próprio — a extração derrubou a criação do diretório e o deploy falharia com ENOENT no primeiro backup (arquivo: ship/bin/ship.mjs)
+- 2026-08-07 [P2] doc-runtime-parity: o template do manifesto deve documentar a semântica exata do campo no código (schemaWatchPaths omitido → default legado; só [] desliga o aviso) (arquivo: release-bootstrap/SKILL.md)
