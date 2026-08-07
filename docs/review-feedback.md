@@ -16,3 +16,5 @@
 - 2026-08-07 [P2] doc-runtime-parity: o template do manifesto deve documentar a semântica exata do campo no código (schemaWatchPaths omitido → default legado; só [] desliga o aviso) (arquivo: release-bootstrap/SKILL.md)
 - 2026-08-07 [P2] installer-extras: --check precisa varrer o destino dos agentes por arquivos fora do inventário — extras ignorados deixam check sair 0 com drift real (arquivo: install.mjs)
 - 2026-08-07 [P2] installer-root-type: o guard de tipo precisa cobrir também a RAIZ do destino (arquivo no lugar do diretório da skill) — walk/readdirSync no arquivo dá ENOTDIR e derruba o --check (arquivo: install.mjs)
+- 2026-08-07 [P2] installer-agents-root: o guard de tipo precisa cobrir também a raiz do destino dos AGENTES — bloco novo de scan chamava readdirSync sem o guard e reintroduzia o ENOTDIR (arquivo: install.mjs)
+- 2026-08-07 [P2] test-home-isolation: testes de CLI que isolam home precisam sobrescrever HOME e USERPROFILE (os.homedir lê HOME no POSIX — CI ubuntu bateria na instalação real) (arquivo: scripts/install.test.mjs)

@@ -127,53 +127,66 @@ for (const name of SKILLS) {
   console.log(`skill ${name.padEnd(18)} ${status.padEnd(8)} ${detail}`);
 }
 
-for (const [skill, subdir, file] of AGENTS) {
-  const src = path.join(root, skill, subdir, file);
-  const dest = path.join(agentsDest, file);
-  const base = `${skill}/${file}`;
-  if (!existsSync(src)) {
-    console.log(`agent ${base.padEnd(40)} FALTA na origem`);
-    drift = true;
-    continue;
-  }
-  let st = null;
-  try {
-    st = statSync(dest);
-  } catch {
-    // destino ausente
-  }
-  if (st && st.isDirectory()) {
-    console.log(`agent ${base.padEnd(40)} drift    conflito de tipo (diretório no destino)`);
-    drift = true;
-    continue;
-  }
-  if (!st) {
-    if (!check) {
-      mkdirSync(agentsDest, { recursive: true });
-      cpSync(src, dest);
-    }
-    console.log(`agent ${base.padEnd(40)} ${check ? "drift    ausente" : "created  instalado"}`);
-    drift = drift || check;
-    continue;
-  }
-  const same = sha256(src) === sha256(dest);
-  if (!same) {
-    if (!check) cpSync(src, dest);
-    console.log(`agent ${base.padEnd(40)} ${check ? "drift    divergente" : "updated  atualizado"}`);
-    drift = drift || check;
-  } else {
-    console.log(`agent ${base.padEnd(40)} equal`);
-  }
+// Conflito de tipo na raiz do destino dos agentes (arquivo onde deveria haver
+// diretório): reporta drift e pula sync/scan — readdirSync/mkdirSync dariam ENOTDIR.
+let agentsDestStat = null;
+try {
+  agentsDestStat = statSync(agentsDest);
+} catch {
+  // destino ausente
 }
-
-// --check: arquivos extras no destino dos agentes também são drift (reportados,
-// nunca removidos — o modo normal não destrói arquivos do usuário).
-if (check && existsSync(agentsDest)) {
-  const expected = new Set(AGENTS.map(([, , file]) => file));
-  for (const entry of readdirSync(agentsDest)) {
-    if (!expected.has(entry)) {
-      console.log(`agent (extra) ${entry.padEnd(32)} drift    arquivo fora do inventário`);
+if (agentsDestStat && !agentsDestStat.isDirectory()) {
+  console.log("agent (raiz)           drift    conflito de tipo (arquivo onde deveria haver diretório) — remova manualmente");
+  drift = true;
+} else {
+  for (const [skill, subdir, file] of AGENTS) {
+    const src = path.join(root, skill, subdir, file);
+    const dest = path.join(agentsDest, file);
+    const base = `${skill}/${file}`;
+    if (!existsSync(src)) {
+      console.log(`agent ${base.padEnd(40)} FALTA na origem`);
       drift = true;
+      continue;
+    }
+    let st = null;
+    try {
+      st = statSync(dest);
+    } catch {
+      // destino ausente
+    }
+    if (st && st.isDirectory()) {
+      console.log(`agent ${base.padEnd(40)} drift    conflito de tipo (diretório no destino)`);
+      drift = true;
+      continue;
+    }
+    if (!st) {
+      if (!check) {
+        mkdirSync(agentsDest, { recursive: true });
+        cpSync(src, dest);
+      }
+      console.log(`agent ${base.padEnd(40)} ${check ? "drift    ausente" : "created  instalado"}`);
+      drift = drift || check;
+      continue;
+    }
+    const same = sha256(src) === sha256(dest);
+    if (!same) {
+      if (!check) cpSync(src, dest);
+      console.log(`agent ${base.padEnd(40)} ${check ? "drift    divergente" : "updated  atualizado"}`);
+      drift = drift || check;
+    } else {
+      console.log(`agent ${base.padEnd(40)} equal`);
+    }
+  }
+
+  // --check: arquivos extras no destino dos agentes também são drift (reportados,
+  // nunca removidos — o modo normal não destrói arquivos do usuário).
+  if (check && existsSync(agentsDest)) {
+    const expected = new Set(AGENTS.map(([, , file]) => file));
+    for (const entry of readdirSync(agentsDest)) {
+      if (!expected.has(entry)) {
+        console.log(`agent (extra) ${entry.padEnd(32)} drift    arquivo fora do inventário`);
+        drift = true;
+      }
     }
   }
 }
