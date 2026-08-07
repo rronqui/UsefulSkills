@@ -31,32 +31,25 @@ Você é o **agente orquestrador**. Seu trabalho **não é escrever código de p
 
 > **Pré-requisito — subagentes (regra atômica).**
 >
-> Exija os **8** arquivos `.md` em **um único escopo**: o default do harness
-> efetivamente usado neste ambiente:
+> Exija os **8** agentes disponíveis ao runtime em **pelo menos um** dos escopos
+> reconhecidos pelo omp:
 >
-> - `~/.omp/agent/agents/`
-> - Windows: `%USERPROFILE%\.omp\agent\agents\`
+> - projeto: `./.omp/agents/` (Windows: `%cd%\.omp\agents\`)
+> - usuário: `~/.omp/agent/agents/` (Windows: `%USERPROFILE%\.omp\agent\agents\`)
 >
-> Basenames obrigatórios (com ou sem `.md`), **todos nesse diretório**:
+> Precedência do runtime (verificada): **projeto vence usuário** em colisão de
+> nome. Basenames obrigatórios (com ou sem `.md`):
 > `test-author`, `backend-developer`, `frontend-developer`, `refactorer`,
 > `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`.
 >
 > **Checagem:**
-> 1. Listar `~/.omp/agent/agents/`.
-> 2. Confirmar os 8 basenames presentes **nesse único path**.
-> 3. Se faltar qualquer um: **pare e avise**. Não continue a Fase 0.
+> 1. Para cada um dos 8 basenames, confirme presença em projeto OU usuário.
+> 2. Todos resolvidos (mesmo que vindos de escopos diferentes) → prossiga.
+> 3. Qualquer um ausente nos DOIS escopos: **pare e avise**. Não continue a Fase 0.
 >
 > **Proibido na checagem:**
-> - agregar/somar arquivos entre `~/.omp/agent/agents/` e `./.omp/agents/`
-> - tratar `./.omp/agents/` como fallback ou segundo escopo validado
-> - mutar o disco para “consertar” a ausência (inclui qualquer
+> - mutar o disco para "consertar" a ausência (inclui qualquer
 >   `omp agents unpack` / `unpack --user` / `unpack --project`)
-> - assumir `$OMP_HOME` ou precedência runtime projeto↔user
->
-> **Fora da checagem (só documentação do harness):**
-> `omp agents unpack --project` grava em `./.omp/agents/`. Isso é destino de
-> *export*, não escopo de validação desta skill, enquanto a resolução/runtime
-> de agentes de projeto não estiver confirmada.
 >
 > Skill: `~/.omp/agent/skills/tdd-orchestrator/SKILL.md`
 > (URI: `skill://tdd-orchestrator`).
@@ -267,19 +260,26 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 ## Formato de delegação — usando a ferramenta `task` do OMP
 
 Subagentes rodam em contexto isolado. **Referencie, não cole.**
-Para delegar, use a ferramenta `task` do OMP — o subagente é invocado pelo campo `agent` com o nome correspondente. Seja claro e específico no assignment.
+Para delegar, use a ferramenta `task` do OMP — o subagente é invocado pelo campo `agent` **de cada item** com o nome correspondente. Seja claro e específico nas instruções.
 
-Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar informações gerais do batch e o campo `assignment` para instruções específicas de cada tarefa:
+**Wire fields reais da chamada batch** (confirmados no runtime do omp):
+`{ context, tasks: [{ name?, agent?, task, outputSchema?, schemaMode?, isolated? }] }`.
+Não existe `agent` no topo da chamada batch; cada item carrega o seu.
+Não existem os campos `id`/`description`/`assignment` no wire — item sem `task`
+é REJEITADO na validação. `name` é o identificador estável do subagente
+(registry/IRC, habilita follow-up via `hub`); nomes devem ser únicos na chamada
+(case-insensitive) — use `<T-NNN>-<FASE>`. `isolated` é **por item**.
+
+Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar informações gerais do batch e o campo `task` para as instruções completas de cada subagente:
 
 ```json
 {
-  "agent": "<nome-do-agente>",
   "context": "Feature: <feature> | Stack: <stack> | Contrato: <caminho>+<versão>",
   "tasks": [
     {
-      "id": "<T-NNN>-<FASE>",
-      "description": "<resumo curto>",
-      "assignment": "OBJETIVO: resultado único e fechado, em uma frase inequívoca.\nCONTEXTO: feature (<feature>); tarefa (T-NNN), onda, fase atual (incluindo se é revisão: RED_REVISION, GREEN_FIX, etc.); stack/padrões; contrato por caminho+versão;\n  referências por caminho+seção (./specs/<feature>/spec.md › 'X'; .../plan.md › 'Y'); ./specs/<feature>/tasks.md; progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: lista verificável (IDs AC-NNN) vinda da matriz.\nRESTRIÇÕES: allowed_write_globs permitidos; o que NÃO tocar (testes se não for test-author; código se for test-author; Spec Kit; progresso); não commitar; não alterar contrato.\nEVIDÊNCIAS NECESSÁRIAS: comandos a rodar e resultado esperado.\nENTREGÁVEL: no formato de saída obrigatório do agente.\nDEFINIÇÃO DE DONE: condição objetiva da fase."
+      "name": "<T-NNN>-<FASE>",
+      "agent": "<nome-do-agente>",
+      "task": "OBJETIVO: resultado único e fechado, em uma frase inequívoca.\nCONTEXTO: feature (<feature>); tarefa (T-NNN), onda, fase atual (incluindo se é revisão: RED_REVISION, GREEN_FIX, etc.); stack/padrões; contrato por caminho+versão;\n  referências por caminho+seção (./specs/<feature>/spec.md › 'X'; .../plan.md › 'Y'); ./specs/<feature>/tasks.md; progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: lista verificável (IDs AC-NNN) vinda da matriz.\nRESTRIÇÕES: allowed_write_globs permitidos; o que NÃO tocar (testes se não for test-author; código se for test-author; Spec Kit; progresso); não commitar; não alterar contrato.\nEVIDÊNCIAS NECESSÁRIAS: comandos a rodar e resultado esperado.\nENTREGÁVEL: no formato de saída obrigatório do agente.\nDEFINIÇÃO DE DONE: condição objetiva da fase."
     }
   ]
 }
@@ -289,13 +289,12 @@ Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar in
 
 ```json
 {
-  "agent": "test-author",
   "context": "Feature: specs001-mdc-core | Stack: TypeScript/Node | Contrato: ./specs/specs001-mdc-core/contracts/interface-contract.md v0.1.0",
   "tasks": [
     {
-      "id": "T001-RED",
-      "description": "Escrever testes RED para autenticação de sessão",
-      "assignment": "OBJETIVO: Escrever testes que falham cobrindo todos os critérios de aceite da tarefa T-001 (autenticação de sessão).\nCONTEXTO: feature specs001-mdc-core; tarefa T-001; onda 1; fase RED; stack TypeScript/Node; contrato ./specs/specs001-mdc-core/contracts/interface-contract.md v0.1.0;\n  referências: ./specs/specs001-mdc-core/spec.md › 'Critérios de Aceite'; ./specs/specs001-mdc-core/tasks.md;\n  progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: AC-001 (login com credenciais válidas retorna token), AC-002 (login com credenciais inválidas retorna 401), AC-003 (token expirado retorna 403).\nRESTRIÇÕES: allowed_write_globs ['tests/**', 'src/**/*.test.ts']; NÃO tocar código de produção, Spec Kit, progresso; não commitar.\nEVIDÊNCIAS NECESSÁRIAS: rodar 'npm test' e mostrar falha por asserção (não por import/setup).\nENTREGÁVEL: formato de saída obrigatório do test-author.\nDEFINIÇÃO DE DONE: testes escritos, falhando pelo motivo certo, mapeamento AC→teste preenchido."
+      "name": "T-001-RED",
+      "agent": "test-author",
+      "task": "OBJETIVO: Escrever testes que falham cobrindo todos os critérios de aceite da tarefa T-001 (autenticação de sessão).\nCONTEXTO: feature specs001-mdc-core; tarefa T-001; onda 1; fase RED; stack TypeScript/Node; contrato ./specs/specs001-mdc-core/contracts/interface-contract.md v0.1.0;\n  referências: ./specs/specs001-mdc-core/spec.md › 'Critérios de Aceite'; ./specs/specs001-mdc-core/tasks.md;\n  progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: AC-001 (login com credenciais válidas retorna token), AC-002 (login com credenciais inválidas retorna 401), AC-003 (token expirado retorna 403).\nRESTRIÇÕES: allowed_write_globs ['tests/**', 'src/**/*.test.ts']; NÃO tocar código de produção, Spec Kit, progresso; não commitar.\nEVIDÊNCIAS NECESSÁRIAS: rodar 'npm test' e mostrar falha por asserção (não por import/setup).\nENTREGÁVEL: formato de saída obrigatório do test-author.\nDEFINIÇÃO DE DONE: testes escritos, falhando pelo motivo certo, mapeamento AC→teste preenchido."
     }
   ]
 }
@@ -307,23 +306,22 @@ Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar in
 {
   "context": "Feature: specs001-mdc-core | Onda 1",
   "tasks": [
-    { "id": "T001-GREEN", "agent": "backend-developer", "description": "Implementar autenticação", "assignment": "..." },
-    { "id": "T002-GREEN", "agent": "frontend-developer", "description": "Implementar tela de login", "assignment": "..." }
+    { "name": "T-001-GREEN", "agent": "backend-developer", "task": "Implementar autenticação..." },
+    { "name": "T-002-GREEN", "agent": "frontend-developer", "task": "Implementar tela de login..." }
   ]
 }
 ```
 
 **Paralelismo isolado — tarefas que podem conflitar em arquivos compartilhados:**
 
-Use `isolated: true` quando tarefas paralelas editam arquivos sobreponíveis (ex.: barrels, index, tipos compartilhados, configs). O OMP cria um worktree copy-on-write para cada task e faz merge automático ao final.
+Use `isolated: true` **em cada item** quando tarefas paralelas editam arquivos sobreponíveis (ex.: barrels, index, tipos compartilhados, configs). O OMP cria um worktree copy-on-write para cada task e faz merge automático ao final.
 
 ```json
 {
-  "isolated": true,
   "context": "Feature: specs001-mdc-core | Onda 2 | T-003 e T-004 podem tocar src/index.ts",
   "tasks": [
-    { "id": "T003-GREEN", "agent": "backend-developer", "description": "Implementar endpoint /api/users", "assignment": "..." },
-    { "id": "T004-GREEN", "agent": "frontend-developer", "description": "Implementar componente UserList", "assignment": "..." }
+    { "name": "T-003-GREEN", "agent": "backend-developer", "isolated": true, "task": "Implementar endpoint /api/users..." },
+    { "name": "T-004-GREEN", "agent": "frontend-developer", "isolated": true, "task": "Implementar componente UserList..." }
   ]
 }
 ```
@@ -332,32 +330,33 @@ Use `isolated: true` quando tarefas paralelas editam arquivos sobreponíveis (ex
 
 ```json
 {
-  "isolated": true,
   "context": "Feature: specs001-mdc-core | Onda 1 | Stack: TypeScript/Node/React | Contrato: ./specs/specs001-mdc-core/contracts/interface-contract.md v0.1.0 | progresso: .omp/state/tdd/progress.json",
   "tasks": [
     {
-      "id": "T001-RED",
+      "name": "T-001-RED",
       "agent": "test-author",
-      "description": "Testes RED para autenticação de sessão",
-      "assignment": "OBJETIVO: Escrever testes que falham cobrindo AC-001, AC-002, AC-003.\nCONTEXTO: tarefa T-001; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-001 (login válido → token), AC-002 (login inválido → 401), AC-003 (token expirado → 403).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
+      "isolated": true,
+      "task": "OBJETIVO: Escrever testes que falham cobrindo AC-001, AC-002, AC-003.\nCONTEXTO: tarefa T-001; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-001 (login válido → token), AC-002 (login inválido → 401), AC-003 (token expirado → 403).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     },
     {
-      "id": "T002-RED",
+      "name": "T-002-RED",
       "agent": "test-author",
-      "description": "Testes RED para CRUD de usuários",
-      "assignment": "OBJETIVO: Escrever testes que falham cobrindo AC-004, AC-005, AC-006.\nCONTEXTO: tarefa T-002; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-004 (criar usuário), AC-005 (listar usuários), AC-006 (deletar usuário).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
+      "isolated": true,
+      "task": "OBJETIVO: Escrever testes que falham cobrindo AC-004, AC-005, AC-006.\nCONTEXTO: tarefa T-002; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-004 (criar usuário), AC-005 (listar usuários), AC-006 (deletar usuário).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     },
     {
-      "id": "T003-RED",
+      "name": "T-003-RED",
       "agent": "test-author",
-      "description": "Testes RED para middleware de autorização",
-      "assignment": "OBJETIVO: Escrever testes que falham cobrindo AC-007, AC-008.\nCONTEXTO: tarefa T-003; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-007 (rota protegida sem token → 401), AC-008 (rota protegida com token válido → 200).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
+      "isolated": true,
+      "task": "OBJETIVO: Escrever testes que falham cobrindo AC-007, AC-008.\nCONTEXTO: tarefa T-003; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-007 (rota protegida sem token → 401), AC-008 (rota protegida com token válido → 200).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     }
   ]
 }
 ```
 
 > **Quando usar `isolated: true`:** Tarefas da mesma onda com `allowed_write_globs` sobreponíveis (mesmo diretório raiz, barrels compartilhados, tipos globais). Tarefas com escopos totalmente disjuntos (ex.: `src/backend/**` vs `src/frontend/**` sem sobreposição) não precisam — mas usar `isolated: true` por precaução é seguro e recomendado quando há dúvida.
+>
+> **Armadilha do wire:** qualquer campo fora de `{ name?, agent?, task, outputSchema?, schemaMode?, isolated? }` no item é ignorado ou rejeitado; `agent` no topo da chamada batch não existe e `isolated` no topo é descartado silenciosamente.
 
 Sem critério de aceite explícito, **não delegue**.
 

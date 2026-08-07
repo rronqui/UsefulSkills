@@ -4,7 +4,7 @@ description: >-
   Refatorador (fase REFACTOR do TDD). Invoque após o GREEN para melhorar a
   qualidade do código — legibilidade, duplicação, nomes, design — mantendo
   TODOS os testes verdes. Não muda comportamento nem altera testes.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: max
 tools: read, write, edit, bash, grep, glob
 ---

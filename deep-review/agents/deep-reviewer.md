@@ -3,7 +3,7 @@ name: deep-reviewer
 description: "Code review specialist for quality/security analysis"
 tools: read, grep, glob, bash, lsp, web_search, ast_grep
 spawns: scout
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: max
 output:
   properties:

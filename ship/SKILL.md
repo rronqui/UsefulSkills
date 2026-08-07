@@ -23,8 +23,10 @@ seguem o protocolo abaixo.
 | Campo | Significado |
 |---|---|
 | dbPath | Banco local para backup no deploy (null se não houver) |
+| backupDir | Diretório do backup (opcional; default: `<dirname(dbPath)>/backup`) |
+| schemaWatchPaths | Array de caminhos (opcional); se qualquer um mudou no pull, o deploy avisa sobre possível migração de schema (forward-only) |
 | buildCommand | Build de produção (null = pular) |
-| stopCommand | Para o servidor (null = pular) |
+| stopCommand | Para o servidor (null = pular); retorno não-zero gera aviso (não fatal) |
 | startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui); DEVE retornar (wrapper/daemonizador como pm2/npm script) — um servidor foreground bloqueia o deploy |
 | versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z)` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a `version` do `package.json` na raiz (ausente/inválido → aviso e checagem pulada) |
 
@@ -34,9 +36,9 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
 | Comando | Efeito |
 |---|---|
-| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Issue + branch `fix/#N-slug` / `feat/#N-slug` a partir da default atualizada |
+| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Issue + branch `fix/N-slug` / `feat/N-slug` a partir da default atualizada |
 | `bin/ship.mjs ship "descrição"` | Commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR `Closes #N`, auto-merge squash; `--body-file <arquivo>` anexa o conteúdo do arquivo ao corpo do PR |
-| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se schema mudou → build → restart → confere versão servida |
+| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se algum schemaWatchPath mudou → build → restart → confere versão servida |
 
 ## Protocolo de entrega (agente)
 
@@ -62,7 +64,7 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
        revisão (passo 4) e rode `bin/ship.mjs ship "descrição"` para publicar via PR.
        O ruleset do repo bloqueia push direto; merge local na default é sempre
        errado neste fluxo.
-   - **Correção de bug** (branch `fix/#N` ou usuário reporta algo
+   - **Correção de bug** (branch `fix/N` ou usuário reporta algo
      quebrado/falhando/lento): leia `skill://bug-diagnosis` e execute-a como a
      própria disciplina de implementação — o loop completo até a Fase 6 (feedback
      loop vermelho → minimizar → hipotetizar → instrumentar → fix com teste de

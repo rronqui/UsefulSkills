@@ -5,7 +5,7 @@ description: >-
   camada de servidor/domínio/dados de uma tarefa cujos testes JÁ existem: regras
   de negócio, persistência, endpoints, contratos de API. Faz os testes passarem
   entregando o requisito completo. Nunca altera os testes para passar.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: high
 tools: read, write, edit, bash, grep, glob
 ---

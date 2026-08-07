@@ -4,9 +4,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-
-const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
-const CONFIG = path.join(root, "ship.config.json");
+import { extractIssueNumber, extractServedVersion, flagValue, slugify } from "./lib.mjs";
 
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", cwd: root }).trim();
@@ -23,20 +21,6 @@ function repoSlug() {
 function defaultBranch() {
   return gh(["api", `repos/${repoSlug()}`, "-q", ".default_branch"]);
 }
-function slugify(title) {
-  return title
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
-    .replace(/-+$/, "");
-}
-function flagValue(argv, name) {
-  const i = argv.indexOf(name);
-  return i !== -1 && argv[i + 1] ? argv[i + 1] : null;
-}
 function usage() {
   console.log(`Uso:
   ship.mjs setup
@@ -45,6 +29,16 @@ function usage() {
   ship.mjs deploy`);
   process.exit(1);
 }
+
+function issueNumberOrDie(url) {
+  const n = extractIssueNumber(url);
+  if (n === null) {
+    console.error(`Não consegui extrair o número da issue/PR de: ${url}`);
+    process.exit(1);
+  }
+  return n;
+}
+
 
 // ---------- setup ----------
 function setup() {
@@ -89,7 +83,7 @@ function cmdNew(argv) {
     "--label", label,
     "--body", desc || "—",
   ]);
-  const n = url.split("/").pop();
+  const n = issueNumberOrDie(url);
   const branch = `${type}/${n}-${slugify(title)}`;
   git(["switch", def]);
   git(["pull", "--ff-only"]);
@@ -162,7 +156,8 @@ async function deploy() {
   }
   const oldHead = git(["rev-parse", "HEAD"]);
   if (cfg.dbPath && existsSync(path.join(root, cfg.dbPath))) {
-    const backupDir = path.join(root, "data", "backup");
+    // backupDir opcional no manifesto; default: <dirname(dbPath)>/backup.
+    const backupDir = path.join(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
     mkdirSync(backupDir, { recursive: true });
     const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
     const dest = path.join(backupDir, `${path.basename(cfg.dbPath)}-${ts}`);
@@ -178,16 +173,21 @@ async function deploy() {
     process.exit(1);
   }
   const changed = git(["diff", "--name-only", oldHead, "HEAD"]).split("\n");
-  if (changed.includes("src/lib/db.ts")) {
-    console.warn("ATENÇÃO: src/lib/db.ts mudou neste pull — schema possivelmente migrado (forward-only).");
+  // schemaWatchPaths opcional no manifesto (string[]); sem ele, sem aviso de schema.
+  const watch = Array.isArray(cfg.schemaWatchPaths) ? cfg.schemaWatchPaths : [];
+  const hits = watch.filter((p) => typeof p === "string" && changed.includes(p));
+  if (hits.length) {
+    console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
   }
   if (cfg.buildCommand && !runShell(cfg.buildCommand)) {
     console.error("Build falhou — servidor antigo continua no ar.");
     process.exit(1);
   }
-  if (cfg.stopCommand) runShell(cfg.stopCommand);
+  if (cfg.stopCommand && !runShell(cfg.stopCommand)) {
+    console.warn("stopCommand retornou não-zero — confira se o servidor antigo realmente parou.");
+  }
   if (cfg.startCommand && !runShell(cfg.startCommand)) {
-    console.error("Start falhou — veja logs/server.log.");
+    console.error("Start falhou — veja a saída acima / o log do seu startCommand.");
     process.exit(1);
   }
   if (cfg.versionCheckUrl) {
@@ -201,11 +201,8 @@ async function deploy() {
       let ok = false;
       for (let attempt = 0; attempt < 5 && !ok; attempt++) {
         try {
-          let html = await (await fetch(cfg.versionCheckUrl)).text();
-          html = html.replace(/<!--[\s\S]*?-->/g, "");
-          const anchor = html.indexOf("Versão da aplicação");
-          if (anchor !== -1) html = html.slice(anchor);
-          const served = (html.match(/v(\d+\.\d+\.\d+)/) || [])[1];
+          const html = await (await fetch(cfg.versionCheckUrl)).text();
+          const served = extractServedVersion(html);
           console.log(
             served === pkg.version
               ? `Versão servida confere: v${served}`
@@ -224,8 +221,18 @@ async function deploy() {
 
 // ---------- dispatch ----------
 const [cmd, ...rest] = process.argv.slice(2);
-if (cmd === "setup") setup();
-else if (cmd === "new") cmdNew(rest);
-else if (cmd === "ship") cmdShip(rest);
-else if (cmd === "deploy") await deploy();
-else usage();
+try {
+  if (cmd === "setup") setup();
+  else if (cmd === "new") cmdNew(rest);
+  else if (cmd === "ship") cmdShip(rest);
+  else if (cmd === "deploy") await deploy();
+  else usage();
+} catch (err) {
+  if (err && err.code === "ENOENT") {
+    const bin = typeof err.syscall === "string" ? err.syscall.replace(/^spawn(Sync)?\s*/i, "") : "binário";
+    console.error(`ship.mjs: binário ausente ou fora do PATH: ${bin}. Instale/corrija (git, gh) e rode de novo.`);
+  } else {
+    console.error(`ship.mjs: ${err?.message ?? err}`);
+  }
+  process.exit(1);
+}

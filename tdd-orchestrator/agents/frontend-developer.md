@@ -5,7 +5,7 @@ description: >-
   camada de UI/cliente de uma tarefa cujos testes JÁ existem: componentes,
   estado, integração com a API, acessibilidade e tratamento de erros visíveis ao
   usuário. Consome o contrato de interface definido. Nunca altera os testes para passar.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: high
 tools: read, write, edit, bash, grep, glob
 ---
