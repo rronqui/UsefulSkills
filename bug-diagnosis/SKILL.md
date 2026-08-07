@@ -169,9 +169,11 @@ Obrigatório antes de declarar concluído:
       registrado em `docs/review-feedback.md` do repo no formato
       `- <data ISO> [arquitetura]: <o que observar> (arquivo: <caminho>)` — o campo
       `(arquivo:)` é omitido se o achado for transversal a módulos (crie o arquivo
-      com header `# Feedback de review` se não existir). No fluxo ship (issue/branch
-      ativa), commite separado: `docs: achado de diagnóstico (#N)`; fora dele, sem
-      commit automático — informe o usuário e deixe o registro no working tree.
+      com header `# Feedback de review` se não existir). Registro idempotente pela
+      chave (categoria, caminho): já existe linha igual → não anexe. No fluxo ship
+      (issue/branch ativa), commite separado: `docs: achado de diagnóstico (#N)`
+      (só se houve entrada nova); fora dele, sem commit automático — informe o
+      usuário e deixe o registro no working tree.
 
 **Então pergunte: o que teria prevenido este bug?** Se a resposta envolver mudança
 de arquitetura (sem costura de teste boa, chamadores emaranhados, acoplamento

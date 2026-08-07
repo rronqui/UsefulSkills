@@ -69,12 +69,23 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
      regressão → limpeza/registro). Ela SUBSTITUI o roteamento trivial/comportamental
      para correções de bug: NÃO re-rota o fix; após a Fase 6 prossiga direto para o
      gate de revisão (passo 4).
-4. **Gate de revisão (obrigatório)**: com a implementação concluída (e suíte verde,
-   no caso TDD), leia `skill://deep-review` e execute-a em modo **branch base** com
-   base = branch default do repo (informe-a como chamador; NUNCA pergunte ao usuário
-   nem use outro modo). Depois percorra os sub-passos 4.1–4.5 — valem para qualquer
-   caminho de implementação (trivial, TDD ou correção de bug). Rodada = uma execução
-   da deep-review + as correções que ela gera; o teto é de **2 rodadas**.
+4. **Gate de revisão (obrigatório)**: o gate revisa COMMITS, nunca working tree.
+   Antes de qualquer deep-review: se o working tree tem mudanças não commitadas,
+   commite a implementação com `git add -A` e mensagem `<tipo>: implementação (#N)`
+   — o `<tipo>` vem do prefixo da branch (`fix` → `fix`, `feat` → `feat`), sem
+   duplicar prefixo (commitlint); no caminho TDD a árvore já chega limpa e este
+   commit não acontece. Depois verifique `git rev-list --count <default>..HEAD`
+   com `git status --short` vazio: zero → nada para revisar; informe o usuário e
+   PARE (não dispare revisores sem material). Se após o commit ainda sobrarem
+   mudanças não commitadas (arquivos regenerados por hook/build), ignore-as — o
+   gate revisa commits, não artefatos. Com material e a implementação
+   concluída (suíte verde no caso TDD), leia `skill://deep-review` e execute-a em
+   modo **branch base** com base = branch default do repo (informe-a como chamador;
+   NUNCA pergunte ao usuário nem use outro modo), passando como instruções
+   adicionais: "`docs/review-feedback.md` é log do gate — fora do escopo de
+   achados". Depois percorra os sub-passos 4.1–4.5 — valem para qualquer caminho
+   de implementação (trivial, TDD ou correção de bug). Rodada = uma execução da
+   deep-review + as correções que ela gera; o teto é de **2 rodadas**.
 
    **4.1 Triagem**: classifique cada achado como válido ou falso positivo com
    justificativa concreta (caminho de código/condição de disparo). Só P0/P1 válidos
@@ -121,7 +132,8 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
       (nunca via ship.mjs) — teste de regressão, fix e doc no mesmo commit.
 
    **4.4 Re-review e teto**: após o commit de correção, repita a deep-review sobre
-   o diff completo da branch:
+   o diff completo da branch com as mesmas instruções adicionais (log do gate fora
+   do escopo de achados):
    - Sem P0/P1 válido → siga ao passo 5 (4.5 no caminho).
    - Com P0/P1 válido e rodada < 2 → os achados novos voltam à triagem (4.1) da
      próxima rodada, incluindo a classificação de roteamento (um fix pode gerar
@@ -140,10 +152,14 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
    **4.5 Feedback persistente** — execute imediatamente antes do passo 5, em todo
    caminho que chega lá: havendo qualquer P0/P1 VÁLIDO no gate (qualquer rodada),
-   anexe uma linha por achado em `docs/review-feedback.md` do repo no formato
+   registre os achados em `docs/review-feedback.md` do repo — o registro é
+   idempotente pela chave (categoria, caminho): se já existe linha com a mesma
+   categoria e o mesmo caminho (ou ambas sem campo `arquivo:`, no caso
+   transversal), não anexe duplicata. Formato de cada entrada nova:
    `- <data ISO> [P<n>] <categoria curta>: <o que observar> (arquivo: <caminho>)`
-   (crie o arquivo com o header `# Feedback de review` se não existir) e commite
-   separado: `docs: feedback de review (#N)`. Falso positivo NUNCA vira entrada.
+   (crie o arquivo com o header `# Feedback de review` se não existir). Houve
+   entrada nova → commit separado: `docs: feedback de review (#N)`; nada novo →
+   pule o commit. Falso positivo NUNCA vira entrada.
 5. **PR**: grave a evidência do gate em `.git/ship-review-evidence.md` (veredito
    consolidado, contagem de achados por prioridade, triagem de falsos positivos,
    P2/P3 não bloqueantes com localização, decisão de escalation se houve; quais
@@ -190,6 +206,11 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
   achado estrutural, e ele também precisa de roteamento.
 - `docs/review-feedback.md` registra só achado VÁLIDO: falso positivo ali vira
   checklist errado no próximo peer review.
+- O gate revisa commits: implementação no working tree é commitada ANTES da
+  deep-review (`<tipo>: implementação (#N)`); sem commits além da base, o gate
+  informa e para — nunca revise working tree em modo "não commitadas" no gate.
+- `docs/review-feedback.md` é idempotente pela chave (categoria, caminho): a
+  mesma lição é registrada uma vez, não uma por rodada.
 - Commits de correção do gate são manuais; `ship.mjs ship` roda UMA vez, no final.
   No caminho TDD a árvore chega limpa ao ship — o motor publica os commits locais
   não publicados, é esperado.
