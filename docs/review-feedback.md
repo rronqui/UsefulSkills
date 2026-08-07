@@ -18,3 +18,4 @@
 - 2026-08-07 [P2] installer-root-type: o guard de tipo precisa cobrir também a RAIZ do destino (arquivo no lugar do diretório da skill) — walk/readdirSync no arquivo dá ENOTDIR e derruba o --check (arquivo: install.mjs)
 - 2026-08-07 [P2] installer-agents-root: o guard de tipo precisa cobrir também a raiz do destino dos AGENTES — bloco novo de scan chamava readdirSync sem o guard e reintroduzia o ENOTDIR (arquivo: install.mjs)
 - 2026-08-07 [P2] test-home-isolation: testes de CLI que isolam home precisam sobrescrever HOME e USERPROFILE (os.homedir lê HOME no POSIX — CI ubuntu bateria na instalação real) (arquivo: scripts/install.test.mjs)
+- 2026-08-07 [P2] state-schema-parity: o schema do progress.json precisa conter TODO campo que o fluxo manda registrar (pr_url exigido na Entrega final/diagrama mas ausente do objeto repo) — estado fora do schema documentado se perde em retomada (arquivo: tdd-orchestrator/SKILL.md)
