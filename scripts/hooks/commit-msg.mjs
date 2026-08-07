@@ -9,7 +9,7 @@ if (!file) process.exit(0);
 
 // Merge/revert/fixup não passam pelo commitlint.
 const firstLine = readFileSync(file, "utf8").split("\n")[0] ?? "";
-if (/^(Merge|Revert|fixup!|squash!|amend!)/.test(firstLine)) process.exit(0);
+if (/^(Merge\s|Revert\s|fixup!|squash!|amend!)/.test(firstLine)) process.exit(0);
 
 // Windows: .bin/commitlint.cmd; Unix: .bin/commitlint.
 const cmd = join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "commitlint.cmd" : "commitlint");

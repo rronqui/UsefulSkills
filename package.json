@@ -1,6 +1,6 @@
 {
   "name": "useful-skills",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Coleção de skills para omp (agentes de coding): fluxo de releases, gate de revisão, orquestração TDD e disciplinas auxiliares",
   "private": true,
   "type": "module",

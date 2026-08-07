@@ -1,5 +1,5 @@
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,18 +7,19 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOOKS = ["commit-msg", "pre-push"];
 
-let hooksDir = join(root, ".git", "hooks");
+// Worktree: o core.hooksPath do repositório pode apontar para fora de .git.
+let hooksDir;
 try {
-  // Worktree: o core.hooksPath do repositório pode apontar para fora de .git.
   hooksDir = execFileSync("git", ["rev-parse", "--git-path", "hooks"], {
     cwd: root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   }).trim();
-  if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 } catch {
-  // Sem git — nada a instalar.
+  console.log("Sem git neste diretório — hooks não instalados.");
+  process.exit(0);
 }
+if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 
 if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
 
@@ -31,11 +32,15 @@ for (const name of HOOKS) {
   if (commentAt !== -1) {
     lines.splice(commentAt, 0, `// Gerado por scripts/install-hooks.mjs — edite o original em scripts/hooks/${name}.mjs.`);
   }
+  // "$0.mjs" resolve o sidecar relativo ao próprio wrapper — sem caminho
+  // absoluto embutido (imune a expansão de $/crase no /bin/sh).
+  // "$@" repassa os argumentos do git (commit-msg precisa do arquivo de mensagem).
   const banner = [
     "#!/bin/sh",
     `# Gerado por scripts/install-hooks.mjs — edite o original em scripts/hooks/${name}.mjs.`,
-    `exec node "${dest.replace(/\\/g, "/")}.mjs"`,
+    `exec node "$0.mjs" "$@"`,
     "",
   ];
-  writeFileSync(dest, [...banner, ...lines].join("\n"), { mode: 0o755 });
+  writeFileSync(dest, [...banner, ...lines].join("\n"));
+  chmodSync(dest, 0o755); // mode de writeFileSync só vale na criação; força em sobrescrita.
 }
