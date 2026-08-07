@@ -28,3 +28,17 @@ e reinicie a sessão (descoberta ocorre no startup).
 - `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos.
 - `tdd-orchestrator`: nenhum binário externo obrigatório além de git/build do projeto; requer os 8 agentes de `tdd-orchestrator/agents/` instalados em `~/.omp/agent/agents/` (o orquestrador verifica e para se faltar algum).
 - `alignment`, `bug-diagnosis` e `conflict-resolution` são adaptações (traduzidas e sem as dependências do ecossistema original) das skills `grilling`, `diagnosing-bugs` e `resolving-merge-conflicts` de github.com/mattpocock/skills (MIT).
+
+## Política de releases
+
+- Mudanças entram somente via issue → branch (`fix/N-slug` / `feat/N-slug`) → implementação → gate de revisão (skill `deep-review`) → PR (`Closes #N`) → merge. Branch `main` protegida por ruleset (sem push direto).
+- Commits seguem Conventional Commits (validados pelo hook `commit-msg`); o bump SemVer é automático pelo release-please: `fix:` → patch, `feat:` → minor, `!`/`BREAKING CHANGE:` → major. Ninguém edita versão manualmente.
+- O release-please roda via `.github/workflows/release-please.yml` usando o secret `RELEASE_PLEASE_TOKEN` (PAT): PRs criados com o `GITHUB_TOKEN` padrão não disparam o CI no PR de release.
+- O hook `pre-push` bloqueia push direto na `main` (bypass documentado: `git push --no-verify`).
+
+### Desenvolvimento local
+
+```bash
+npm install   # instala dependências e os git hooks (prepare)
+npm test      # suíte de testes
+```

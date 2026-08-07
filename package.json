@@ -1,0 +1,19 @@
+{
+  "name": "useful-skills",
+  "version": "0.1.0",
+  "description": "Coleção de skills para omp (agentes de coding): fluxo de releases, gate de revisão, orquestração TDD e disciplinas auxiliares",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "prepare": "node scripts/install-hooks.mjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "vitest": "^4.1.10"
+  }
+}
