@@ -1,0 +1,26 @@
+name: Feature
+description: Propor nova skill, agente ou melhoria
+title: "[feat] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema / motivação
+      description: Que lacuna ou dor a proposta resolve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: O que deve existir e como se integra com as skills atuais.
+    validations:
+      required: true
+  - type: textarea
+    id: aceite
+    attributes:
+      label: Critérios de aceite
+      description: Como saber que está pronto.
+    validations:
+      required: false

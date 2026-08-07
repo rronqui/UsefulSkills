@@ -1,0 +1,33 @@
+name: Bug
+description: Relatar um problema numa skill, agente ou script
+title: "[bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: comportamento
+    attributes:
+      label: Comportamento observado
+      description: O que aconteceu? Inclua mensagens de erro e o comando/skill em uso, se houver.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer segundo a skill/documentação.
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir
+      description: Sequência de ações ou condições para chegar ao problema.
+    validations:
+      required: true
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Versão do omp/agents, skill afetada, repo onde o fluxo rodava.
+    validations:
+      required: false

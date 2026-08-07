@@ -1,0 +1,46 @@
+// Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const HOOKS = ["commit-msg", "pre-push"];
+
+// Worktree: o core.hooksPath do repositório pode apontar para fora de .git.
+let hooksDir;
+try {
+  hooksDir = execFileSync("git", ["rev-parse", "--git-path", "hooks"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+} catch {
+  console.log("Sem git neste diretório — hooks não instalados.");
+  process.exit(0);
+}
+if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
+
+if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+
+for (const name of HOOKS) {
+  const dest = join(hooksDir, name);
+  const src = join(root, "scripts", "hooks", `${name}.mjs`);
+  copyFileSync(src, `${dest}.mjs`);
+  const lines = readFileSync(src, "utf8").split("\n");
+  const commentAt = lines.findIndex((l) => l.startsWith("//"));
+  if (commentAt !== -1) {
+    lines.splice(commentAt, 0, `// Gerado por scripts/install-hooks.mjs — edite o original em scripts/hooks/${name}.mjs.`);
+  }
+  // "$0.mjs" resolve o sidecar relativo ao próprio wrapper — sem caminho
+  // absoluto embutido (imune a expansão de $/crase no /bin/sh).
+  // "$@" repassa os argumentos do git (commit-msg precisa do arquivo de mensagem).
+  const banner = [
+    "#!/bin/sh",
+    `# Gerado por scripts/install-hooks.mjs — edite o original em scripts/hooks/${name}.mjs.`,
+    `exec node "$0.mjs" "$@"`,
+    "",
+  ];
+  writeFileSync(dest, [...banner, ...lines].join("\n"));
+  chmodSync(dest, 0o755); // mode de writeFileSync só vale na criação; força em sobrescrita.
+}
