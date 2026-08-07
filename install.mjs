@@ -5,7 +5,7 @@
 //   node install.mjs --check   compara hashes; lista divergências; exit 1 se houver
 // Requer: Node >= 18. Não toca nenhum arquivo fora do inventário abaixo.
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,11 +59,24 @@ function syncDir(src, dest) {
   let created = 0;
   let updated = 0;
   let equal = 0;
+  let typeConflicts = 0;
   const removed = [];
   for (const rel of srcFiles) {
     const s = path.join(src, rel);
     const d = path.join(dest, rel);
-    if (!existsSync(d)) {
+    let st = null;
+    try {
+      st = statSync(d);
+    } catch {
+      // destino ausente
+    }
+    if (st && st.isDirectory()) {
+      // Conflito de tipo: diretório no destino onde deveria haver arquivo.
+      // --check reporta como drift; o modo normal NÃO destrói o diretório.
+      typeConflicts++;
+      continue;
+    }
+    if (!st) {
       if (!check) {
         mkdirSync(path.dirname(d), { recursive: true });
         cpSync(s, d);
@@ -80,6 +93,9 @@ function syncDir(src, dest) {
     for (const rel of walk(dest).map((f) => path.relative(dest, f))) {
       if (!srcFiles.includes(rel)) removed.push(rel);
     }
+  }
+  if (typeConflicts > 0) {
+    return { status: "drift", detail: `${typeConflicts} conflito(s) de tipo (diretório onde deveria haver arquivo) — remova manualmente` };
   }
   if (check && removed.length > 0) {
     return { status: "drift", detail: `${equal} iguais, ${updated} divergem, ${created} faltam, extras locais: ${removed.join(", ")}` };
@@ -109,7 +125,18 @@ for (const [skill, subdir, file] of AGENTS) {
     drift = true;
     continue;
   }
-  if (!existsSync(dest)) {
+  let st = null;
+  try {
+    st = statSync(dest);
+  } catch {
+    // destino ausente
+  }
+  if (st && st.isDirectory()) {
+    console.log(`agent ${base.padEnd(40)} drift    conflito de tipo (diretório no destino)`);
+    drift = true;
+    continue;
+  }
+  if (!st) {
     if (!check) {
       mkdirSync(agentsDest, { recursive: true });
       cpSync(src, dest);

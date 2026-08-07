@@ -34,3 +34,13 @@ export function extractServedVersion(html) {
   if (anchor !== -1) text = text.slice(anchor);
   return (text.match(/v(\d+\.\d+\.\d+)/) || [])[1] ?? null;
 }
+
+
+// Resolve a lista de schema watch do manifesto. Campo omitido (undefined/null)
+// → default legado ["src/lib/db.ts"] (manifestos antigos não perdem o aviso);
+// lista explícita → usa-a (inclusive [] para desligar o aviso).
+export function resolveSchemaWatch(value) {
+  if (value === undefined || value === null) return ["src/lib/db.ts"];
+  if (Array.isArray(value)) return value.filter((p) => typeof p === "string");
+  return ["src/lib/db.ts"];
+}

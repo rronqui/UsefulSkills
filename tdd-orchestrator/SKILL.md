@@ -220,7 +220,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 
 ## Fase 0 — Planejamento (faça você mesmo, antes de delegar)
 
-1. **Subagentes presentes?** No escopo default `~/.omp/agent/agents/`, confirme os **8** arquivos (`test-author`, `backend-developer`, `frontend-developer`, `refactorer`, `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`). Um único path; sem agregar com `./.omp/agents/`. Se faltar qualquer um: **pare e avise**. Ver Pré-requisito.
+1. **Subagentes presentes?** Confirme os **8** agentes (`test-author`, `backend-developer`, `frontend-developer`, `refactorer`, `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`) disponíveis em projeto (`./.omp/agents/`) **ou** usuário (`~/.omp/agent/agents/`) — o runtime resolve projeto antes de usuário em colisão de nome. Se algum faltar nos DOIS escopos: **pare e avise**. Ver Pré-requisito.
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se um fluxo de entrega externo o invocou com respostas fixas contendo a cláusula `delivery: external` (ex.: skill `ship`), registre `repo.delivery: "external"` em `progress.json` e use as respostas fornecidas diretamente, **sem perguntar**. Caso contrário, registre `repo.delivery: "internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
@@ -567,7 +567,7 @@ stateDiagram-v2
 - Lance os subagentes da mesma onda na **mesma chamada `task`** quando os escopos forem disjuntos.
 - **Nunca** paralelize: dois agentes sobre o mesmo arquivo/glob; `test-author` e dev da mesma tarefa; `refactorer` antes do GREEN; `peer-reviewer` antes do REFACTOR; `validator` antes do DOC.
 - Tarefas dependentes vão para ondas posteriores ou são serializadas.
-- Use `isolated: true` na chamada `task` quando tarefas paralelas editam arquivos sobreponíveis — o OMP cria worktrees copy-on-write e faz merge automático ao final.
+- Use `isolated: true` **em cada item** da chamada `task` quando tarefas paralelas editam arquivos sobreponíveis — o OMP cria worktrees copy-on-write e faz merge automático ao final. (No topo do batch o campo é descartado silenciosamente.)
 
 ---
 

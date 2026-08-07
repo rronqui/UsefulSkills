@@ -1,6 +1,6 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
 import { describe, it, expect } from "vitest";
-import { extractIssueNumber, extractServedVersion, flagValue, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 describe("slugify", () => {
   it("minúsculas, hífen no lugar de separadores", () => {
@@ -58,5 +58,19 @@ describe("extractServedVersion", () => {
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();
+  });
+});
+
+describe("resolveSchemaWatch", () => {
+  it("campo omitido → default legado (retrocompat)", () => {
+    expect(resolveSchemaWatch(undefined)).toEqual(["src/lib/db.ts"]);
+    expect(resolveSchemaWatch(null)).toEqual(["src/lib/db.ts"]);
+  });
+  it("lista explícita é usada (inclusive vazia para desligar)", () => {
+    expect(resolveSchemaWatch(["migrations/"])).toEqual(["migrations/"]);
+    expect(resolveSchemaWatch([])).toEqual([]);
+  });
+  it("elementos não-string são filtrados", () => {
+    expect(resolveSchemaWatch(["a", 1, null])).toEqual(["a"]);
   });
 });

@@ -4,7 +4,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractIssueNumber, extractServedVersion, flagValue, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
@@ -160,8 +160,8 @@ async function deploy() {
   const oldHead = git(["rev-parse", "HEAD"]);
   if (cfg.dbPath && existsSync(path.join(root, cfg.dbPath))) {
     // backupDir opcional no manifesto; default: <dirname(dbPath)>/backup.
-    const backupDir = path.join(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
-    mkdirSync(backupDir, { recursive: true });
+    // path.resolve honra absolutos; relativos resolvem contra a raiz do repo.
+    const backupDir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
     const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
     const dest = path.join(backupDir, `${path.basename(cfg.dbPath)}-${ts}`);
     copyFileSync(path.join(root, cfg.dbPath), dest);
@@ -176,8 +176,8 @@ async function deploy() {
     process.exit(1);
   }
   const changed = git(["diff", "--name-only", oldHead, "HEAD"]).split("\n");
-  // schemaWatchPaths opcional no manifesto (string[]); sem ele, sem aviso de schema.
-  const watch = Array.isArray(cfg.schemaWatchPaths) ? cfg.schemaWatchPaths : [];
+  // schemaWatchPaths opcional no manifesto (string[]); omitido → default legado.
+  const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
   const hits = watch.filter((p) => typeof p === "string" && changed.includes(p));
   if (hits.length) {
     console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
