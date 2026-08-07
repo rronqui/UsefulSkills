@@ -131,7 +131,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
 
 ## FASE 6 — Documentação e dogfood
 
-- README: política SemVer; fluxo issue → branch (`fix/#N`, `feat/#N`) →
+- README: política SemVer; fluxo issue → branch (`fix/N`, `feat/N`) →
   implementação → revisão (skill `deep-review`, gate obrigatório antes do PR) → PR
   (`Closes #N`) → merge; Conventional Commits; papel do release-please; o secret
   `RELEASE_PLEASE_TOKEN` e por que existe; como atualizar a instalação local após release.
@@ -142,13 +142,16 @@ As fases seguintes usam ESSE levantamento, não suposições.
   ```json
   {
     "dbPath": "<caminho do banco local ou null>",
+    "backupDir": "<diretório do backup ou omitir — default: <dirname(dbPath)>/backup>",
+    "schemaWatchPaths": ["<caminho(s) de schema/migração>; omitir → default legado [\"src/lib/db.ts\"]; [] desliga o aviso"],
     "buildCommand": "<comando de build ou null>",
     "stopCommand": "<comando de stop ou null>",
     "startCommand": "<comando de start ou null>",
     "versionCheckUrl": "<URL para checar a versão servida ou null>"
   }
   ```
-  Exemplo FinMonitor: dbPath `data/finmonitor.db`, buildCommand `npm run build`,
+  Exemplo FinMonitor: dbPath `data/finmonitor.db`, schemaWatchPaths `["src/lib/db.ts"]`,
+  buildCommand `npm run build`,
   stopCommand `npm run stop:server`, startCommand `npm run start:server` (SEM `--force-build` — o buildCommand do deploy já rebuilda; `--force-build` causaria build duplo),
   versionCheckUrl `http://localhost:3000`.
 

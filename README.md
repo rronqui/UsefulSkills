@@ -14,20 +14,29 @@ Coleção pessoal de skills para omp (agentes de coding).
 
 ## Instalação
 
-Copie cada pasta de skill para o diretório de skills de usuário do omp:
+Instalador determinístico na raiz do projeto:
 
-    ~/.omp/agent/skills/<nome-da-skill>/
+```bash
+node install.mjs           # instala skills em ~/.omp/agent/skills/ e agentes em ~/.omp/agent/agents/
+node install.mjs --check   # compara hashes; lista divergências; exit 1 se houver drift
+```
 
-e reinicie a sessão (descoberta ocorre no startup).
+e reinicie a sessão do omp (descoberta ocorre no startup). O instalador nunca toca
+arquivo fora do inventário (7 skills + 9 agentes).
 
 ## Requisitos
 
 - `release-bootstrap`: gh CLI autenticado; repo no GitHub (público para rulesets no plano free).
-- `deep-review`: git (e `gh` autenticado para revisão de PRs). Usa o agente `deep-reviewer` desta skill: copie `deep-review/agents/deep-reviewer.md` para `<repo>/.omp/agents/` ou `~/.omp/agent/agents/`.
+- `deep-review`: git (e `gh` autenticado para revisão de PRs). Usa o agente `deep-reviewer` desta skill em `<repo>/.omp/agents/` ou `~/.omp/agent/agents/` (projeto vence usuário em colisão de nome).
 - `ship`: repo já bootstrapped pela release-bootstrap; git; gh autenticado; Node >= 18. Requer também a skill `deep-review` + agente `deep-reviewer` instalados (gate) e as skills `alignment`, `bug-diagnosis`, `conflict-resolution` (alinhamento obrigatório, diagnóstico para correções de bug, resolução de conflitos no merge/PR). Integração TDD via `skill://tdd-orchestrator` (opcional mas recomendada para mudanças comportamentais).
 - `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos.
-- `tdd-orchestrator`: nenhum binário externo obrigatório além de git/build do projeto; requer os 8 agentes de `tdd-orchestrator/agents/` instalados em `~/.omp/agent/agents/` (o orquestrador verifica e para se faltar algum).
+- `tdd-orchestrator`: nenhum binário externo obrigatório além de git/build do projeto; requer os 8 agentes de `tdd-orchestrator/agents/` disponíveis ao runtime em projeto (`./.omp/agents/`) ou usuário (`~/.omp/agent/agents/`) — projeto vence usuário (o orquestrador verifica e para se faltar algum).
 - `alignment`, `bug-diagnosis` e `conflict-resolution` são adaptações (traduzidas e sem as dependências do ecossistema original) das skills `grilling`, `diagnosing-bugs` e `resolving-merge-conflicts` de github.com/mattpocock/skills (MIT).
+- Os 7 agentes com modelo fixado (test-author, backend-developer, frontend-developer,
+  refactorer, validator, integrator, deep-reviewer) usam `model: openai-codex/gpt-5.6-luna, @slow` —
+  primário com fallback para o role `@slow` (remapeável sem editar arquivos). peer-reviewer e
+  spec-kit-author não declaram modelo e herdam o da sessão pai. Override global sem tocar nos
+  agentes: `task.agentModelOverrides` no config do omp.
 
 ## Política de releases
 

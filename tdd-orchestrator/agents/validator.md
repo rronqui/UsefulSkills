@@ -5,7 +5,7 @@ description: >-
   peer review, rodando a suíte completa, lint, type-check, build e checagens de
   segurança. Reporta evidências reais (saída dos comandos), não opiniões. Não
   implementa nem corrige código.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: high
 tools: read, bash, grep, glob
 ---

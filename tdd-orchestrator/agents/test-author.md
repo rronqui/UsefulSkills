@@ -5,7 +5,7 @@ description: >-
   implementação, os testes que definem o comportamento de uma tarefa. Cobre
   todos os critérios de aceite — happy path, edge cases, erros e validações.
   Não implementa a solução. É o único agente autorizado a criar ou alterar testes.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: max
 tools: read, write, edit, bash, grep, glob
 ---

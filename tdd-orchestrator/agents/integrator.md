@@ -4,7 +4,7 @@ description: >-
   Integrador. Invoque ao fim de cada onda para consolidar as tarefas concluídas,
   resolver conflitos mecânicos e garantir que o conjunto continua verde antes da
   próxima onda começar.
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-5.6-luna, @slow
 thinkingLevel: high
 tools: read, write, edit, bash, grep, glob
 ---
