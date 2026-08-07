@@ -4,7 +4,7 @@
 // commit-msg resolver o commitlint em node_modules/.bin).
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,5 +102,41 @@ describe("install-hooks + wrappers gerados", () => {
     } finally {
       rmSync(noGit, { recursive: true, force: true });
     }
+  });
+
+  it("commit-msg funciona com cwd em caminho com espaços", () => {
+    // Repo git em caminho com espaços + commitlint resolvível nele
+    // (junction de node_modules = cenário real de 'C:\Users\Ana Silva\repo',
+    // onde npm install já rodou).
+    const spaced = mkdtempSync(join(tmpdir(), "caminho com espaco "));
+    spawnSync("git", ["init", "-q"], { cwd: spaced });
+    symlinkSync(join(repoRoot, "node_modules"), join(spaced, "node_modules"), "junction");
+    copyFileSync(join(repoRoot, ".commitlintrc.json"), join(spaced, ".commitlintrc.json"));
+    try {
+      const valida = runHook(dir, "commit-msg", {
+        args: [msgFile(dir, "feat: msg valida")],
+        cwd: spaced,
+      });
+      expect(valida.status, valida.stdout + valida.stderr).toBe(0);
+      const invalida = runHook(dir, "commit-msg", {
+        args: [msgFile(dir, "nao convencional")],
+        cwd: spaced,
+      });
+      expect(invalida.status).toBe(1);
+    } finally {
+      rmSync(spaced, { recursive: true, force: true });
+    }
+  });
+
+  it("pre-push bloqueia refspec que mira main (HEAD:main)", () => {
+    const r = runHook(dir, "pre-push", { input: "HEAD 0 refs/heads/main 111\n" });
+    expect(r.status).toBe(1);
+  });
+
+  it("release-please: primeiro release explicito, sem override permanente", () => {
+    const cfg = JSON.parse(readFileSync(join(repoRoot, "release-please-config.json"), "utf8"));
+    const pkgCfg = cfg.packages["."];
+    expect(pkgCfg["release-as"]).toBeUndefined(); // override sticky congela releases futuros
+    expect(pkgCfg["initial-version"]).toBe("0.1.0"); // sem isso, primeiro release sai v1.0.0
   });
 });
