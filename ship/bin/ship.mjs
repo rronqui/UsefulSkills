@@ -6,6 +6,9 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writ
 import path from "node:path";
 import { extractIssueNumber, extractServedVersion, flagValue, slugify } from "./lib.mjs";
 
+const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+const CONFIG = path.join(root, "ship.config.json");
+
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", cwd: root }).trim();
 }
