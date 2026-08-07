@@ -169,7 +169,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "run_id": "<ISO timestamp>",
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
-  "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "head_start": "", "head_current": "", "dirty_at_start": false },
+  "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
   "baseline": { "tests": "PASS|FAIL|NOT_RUN", "build": "PASS|FAIL|NOT_RUN", "known_failures": [] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
