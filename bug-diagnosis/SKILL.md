@@ -165,6 +165,13 @@ Obrigatório antes de declarar concluído:
 - [ ] A hipótese que se confirmou está registrada no relatório final — no fluxo ship,
       no arquivo de evidência do PR (a mensagem de commit é one-line gerada pelo motor) —
       para o próximo debugger aprender
+- [ ] Achado de arquitetura ("o que teria prevenido este bug?") que extrapole o fix
+      registrado em `docs/review-feedback.md` do repo no formato
+      `- <data ISO> [arquitetura]: <o que observar> (arquivo: <caminho>)` — o campo
+      `(arquivo:)` é omitido se o achado for transversal a módulos (crie o arquivo
+      com header `# Feedback de review` se não existir). No fluxo ship (issue/branch
+      ativa), commite separado: `docs: achado de diagnóstico (#N)`; fora dele, sem
+      commit automático — informe o usuário e deixe o registro no working tree.
 
 **Então pergunte: o que teria prevenido este bug?** Se a resposta envolver mudança
 de arquitetura (sem costura de teste boa, chamadores emaranhados, acoplamento

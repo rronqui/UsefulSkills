@@ -72,28 +72,86 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 4. **Gate de revisão (obrigatório)**: com a implementação concluída (e suíte verde,
    no caso TDD), leia `skill://deep-review` e execute-a em modo **branch base** com
    base = branch default do repo (informe-a como chamador; NUNCA pergunte ao usuário
-   nem use outro modo). Depois:
-   - **Triagem**: classifique cada achado como válido ou falso positivo com
-     justificativa concreta (caminho de código/condição de disparo). Só P0/P1
-     válidos bloqueiam.
-   - Sem P0/P1 válido → siga ao passo 5.
-   - Com P0/P1 válido → corrija os válidos (mudança comportamental: atualize os
-     testes junto), rode a suíte de testes do projeto até verde, commite com
-     `git add -A` e mensagem `<tipo>: correções da revisão (rodada K) (#N)` (nunca
-     via ship.mjs), e repita a deep-review sobre o diff completo da branch. Máximo
-     de **2 rodadas**.
-   - Ainda com P0/P1 válido após a 2ª rodada → PARE e pergunte ao usuário com
-     3 opções: (a) corrigir os achados restantes mesmo assim, (b) shipar com os
-     achados documentados na evidência do passo 5, (c) abandonar. Registre a
-     escolha na evidência. Nunca shipar por conta própria nesse estado.
-   - Achados P2/P3 (de qualquer rodada) são não bloqueantes: guarde-os para a
-     evidência do passo 5.
+   nem use outro modo). Depois percorra os sub-passos 4.1–4.5 — valem para qualquer
+   caminho de implementação (trivial, TDD ou correção de bug). Rodada = uma execução
+   da deep-review + as correções que ela gera; o teto é de **2 rodadas**.
+
+   **4.1 Triagem**: classifique cada achado como válido ou falso positivo com
+   justificativa concreta (caminho de código/condição de disparo). Só P0/P1 válidos
+   bloqueiam. Sem P0/P1 válido → siga ao passo 5 (4.5 é executado no caminho).
+
+   **4.2 Roteamento** — para cada P0/P1 válido, classifique ANTES de corrigir:
+   - **Discreto**: localizado (poucos arquivos), sem tocar `interface-contract.md`
+     nem fronteira de módulo, sem mudar comportamento documentado além do que o
+     próprio achado descreve → entra no loop de correção (4.3).
+   - **Estrutural**: toca `interface-contract.md`, cruza fronteira de módulo (novo
+     tipo/variante/evento sem branch no lado consumidor) ou muda decisão de design →
+     PARE e pergunte ao usuário:
+     - (a) abandonar este ship e abrir um novo ciclo ship+TDD do zero para o fix
+       estrutural (este ship encerra aqui; não execute 4.5 — o gate do novo ciclo gera o próprio feedback);
+     - (b) corrigir agora no loop mesmo assim — registrada na evidência, essa
+       escolha isenta o fix da reclassificação de contrato em 4.3 (a decisão já foi
+       do usuário);
+     - (c) shipar com o achado documentado na evidência do passo 5.
+     A espera pela decisão não consome rodada do teto de 2; a correção pela escolha
+     (b) acontece dentro do ciclo normal de rodadas (4.3/4.4).
+
+   **4.3 Loop de correção** — para achados discretos, nesta ordem:
+   1. **Mini-RED**: achado reproduzível → escreva o teste de regressão ANTES do
+      fix, numa costura que exercite o padrão real do bug (critério da Fase 5 de
+      `skill://bug-diagnosis`), e veja-o falhar. Sem costura correta OU repo sem
+      infraestrutura de testes → registre "sem costura" + motivo na evidência e
+      siga sem o teste.
+   2. **Fix**: correção que cruza fronteira de módulo, toca múltiplos arquivos ou
+      introduz/muda tipo compartilhado → delegue via `task` ao `backend-developer`
+      ou `frontend-developer` (briefing: achado completo, caminho do teste de
+      regressão já falhando — ou o passo de reprodução manual se o achado está
+      "sem costura" —, critério de done; testes são read-only para o
+      delegado — ele implementa só o fix); delegação falhar (agente desconhecido,
+      output inválido ou bloqueio) → aplique você mesmo. Fix localizado → aplique
+      você mesmo.
+   3. **Doc**: fix restaura comportamento pretendido → nada a atualizar. Fix muda
+      comportamento documentado (spec, README de API, contrato de payload) →
+      atualize a doc afetada no mesmo commit; doc não trivial → delegue ao
+      `spec-kit-author` (mesma regra de fallback da delegação do fix).
+      Fix toca `interface-contract.md` → reclassifique como estrutural e volte a
+      4.2 (exceto se a escolha (b) já estiver registrada na evidência).
+   4. **Verde + commit**: rode a suíte de testes do projeto até verde (repo sem suíte: registre "sem suíte" na evidência e siga) e commite
+      com `git add -A` e mensagem `<tipo>: correções da revisão (rodada K) (#N)`
+      (nunca via ship.mjs) — teste de regressão, fix e doc no mesmo commit.
+
+   **4.4 Re-review e teto**: após o commit de correção, repita a deep-review sobre
+   o diff completo da branch:
+   - Sem P0/P1 válido → siga ao passo 5 (4.5 no caminho).
+   - Com P0/P1 válido e rodada < 2 → os achados novos voltam à triagem (4.1) da
+     próxima rodada, incluindo a classificação de roteamento (um fix pode gerar
+     achado estrutural).
+   - Com P0/P1 válido após a 2ª rodada → PARE e pergunte ao usuário:
+     - (a) corrigir os achados restantes mesmo assim → aplique a disciplina de 4.3
+       aos achados restantes, commite e siga ao passo 5 SEM nova re-review (o teto
+       de rodadas é final);
+     - (b) shipar com os achados documentados na evidência do passo 5 → siga ao
+       passo 5;
+     - (c) abandonar → este ship encerra; registre os achados na evidência apenas;
+       não execute 4.5 (não commitar feedback em branch que não será publicada).
+     Registre a escolha na evidência. Nunca shipar por conta própria nesse estado.
+   Achados P2/P3 (de qualquer rodada) são não bloqueantes: guarde-os para a
+   evidência do passo 5.
+
+   **4.5 Feedback persistente** — execute imediatamente antes do passo 5, em todo
+   caminho que chega lá: havendo qualquer P0/P1 VÁLIDO no gate (qualquer rodada),
+   anexe uma linha por achado em `docs/review-feedback.md` do repo no formato
+   `- <data ISO> [P<n>] <categoria curta>: <o que observar> (arquivo: <caminho>)`
+   (crie o arquivo com o header `# Feedback de review` se não existir) e commite
+   separado: `docs: feedback de review (#N)`. Falso positivo NUNCA vira entrada.
 5. **PR**: grave a evidência do gate em `.git/ship-review-evidence.md` (veredito
    consolidado, contagem de achados por prioridade, triagem de falsos positivos,
-   P2/P3 não bloqueantes com localização, decisão de escalation se houve; inclua
-   também a saída do validator se houve TDD; inclua a hipótese confirmada do
-   diagnóstico e achados de arquitetura se o caminho foi correção de bug
-   (skill://bug-diagnosis)). Rode
+   P2/P3 não bloqueantes com localização, decisão de escalation se houve; quais
+   P0/P1 válidos tiveram teste de regressão vs "sem costura"; docs atualizadas por
+   commit; classificação (discreto/estrutural) de cada P0/P1; linhas anexadas em
+   `docs/review-feedback.md`; inclua também a saída do validator se houve TDD;
+   inclua a hipótese confirmada do diagnóstico e achados de arquitetura se o
+   caminho foi correção de bug (skill://bug-diagnosis)). Rode
    `bin/ship.mjs ship "descrição curta" --body-file .git/ship-review-evidence.md`
    — descrição one-line (vira título); o corpo leva `Closes #N` + descrição +
    evidência. O auto-merge é habilitado pelo motor; se indisponível, aguarde o CI
@@ -120,6 +178,18 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
   enquanto você corrige.
 - Loop de review: triagem de falsos positivos e teto de 2 rodadas são obrigatórios;
   corrigir código correto para satisfazer achado errado é regressão.
+- O gate é path-agnostic: roda após implementação trivial, TDD ou correção de bug.
+  Repo sem suíte de testes não pula o gate nem o commit — registra "sem suíte" na
+  evidência.
+- Correção do gate: achado reproduzível exige teste de regressão escrito ANTES do
+  fix (mini-RED); sem costura correta, registre o motivo — nunca finja cobertura.
+- Fix que toca `interface-contract.md` não é correção de loop: reclassifique como
+  estrutural e devolva a decisão ao usuário (exceto se a escolha (b) de 4.2 já
+  estiver registrada na evidência).
+- Achados novos de uma re-review voltam à triagem (4.1): um fix pode introduzir
+  achado estrutural, e ele também precisa de roteamento.
+- `docs/review-feedback.md` registra só achado VÁLIDO: falso positivo ali vira
+  checklist errado no próximo peer review.
 - Commits de correção do gate são manuais; `ship.mjs ship` roda UMA vez, no final.
   No caminho TDD a árvore chega limpa ao ship — o motor publica os commits locais
   não publicados, é esperado.
