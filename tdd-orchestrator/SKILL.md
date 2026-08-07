@@ -137,8 +137,12 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 
 - Arquivos de estado do pipeline (**project-local**, no repositório da feature — não confundir com `~/.omp/agent/` do harness): `<repo>/.omp/state/tdd/progress.json` (**fonte única da verdade**) e `<repo>/.omp/state/tdd/progress.md` (resumo humano, regenerado a partir do JSON). Caminhos relativos ao cwd do repo: `.omp/state/tdd/progress.json` e `.omp/state/tdd/progress.md`.
 - **Só o orquestrador escreve no estado.** Os subagentes apenas retornam progresso estruturado; o orquestrador consolida.
-- Garanta que o diretório de estado do **projeto** (`.omp/state/`) está no `.gitignore` do repositório antes de criá-lo (crie o `.gitignore` se não existir; nunca commite o estado). Não misturar com `~/.omp/` (config global do harness).
-- **`progress.md` é OBRIGATÓRIO** e deve ser criado junto com `progress.json` na Fase 0. Regenere-o a cada transição de fase e **antes de** cada commit (tarefa ou onda), para que o commit inclua o `progress.md` atualizado. Formato:
+- Garanta que o diretório de estado do **projeto** (`.omp/state/`) está no `.gitignore` do repositório antes de criá-lo (crie o `.gitignore` se não existir; nunca commite o estado — `progress.json` e `progress.md` ficam só no disco). Não misturar com `~/.omp/` (config global do harness).
+- **`progress.md` é OBRIGATÓRIO** e deve ser criado junto com `progress.json` na
+  Fase 0. Regenere-o a cada transição de fase e **antes de** cada commit (tarefa
+  ou onda), para que ele sempre reflita o estado mais recente — mas ele fica FORA
+  do git, como todo o estado: o commit carrega apenas os artefatos da tarefa
+  (código, testes, Spec Kit), nunca o resumo. Formato:
 
 ```markdown
 # Progresso — <feature>
@@ -380,7 +384,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
      pergunte ao usuário se aprova a mudança. Aprovada → volte a RED para ajustar a
      implementação ao novo contrato. NÃO aprovada → BLOCKED (escale com o conflito).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
-7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado, faça `git add` **apenas dos arquivos da tarefa (incluindo os artefatos Spec Kit atualizados e `progress.md`)**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Ao final de TODAS as tarefas da última onda**, execute a seção Entrega final abaixo.
+7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado (ele fica fora do git, junto com o resto do estado), faça `git add` **apenas dos arquivos da tarefa (incluindo os artefatos Spec Kit atualizados — nunca o estado/`progress.md`)**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Ao final de TODAS as tarefas da última onda**, execute a seção Entrega final abaixo.
 
 ---
 
