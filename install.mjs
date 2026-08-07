@@ -55,6 +55,17 @@ function walk(dir) {
 // Compara um diretório-fonte com o destino: retorna { status, detail }.
 // status: "equal" | "updated" | "created" | "drift" (apenas modo --check reporta drift).
 function syncDir(src, dest) {
+  // Conflito de tipo na RAIZ do destino: arquivo comum onde deveria haver o
+  // diretório da skill. Reporta drift sem crashar (walk/readdirSync daria ENOTDIR).
+  let destStat = null;
+  try {
+    destStat = statSync(dest);
+  } catch {
+    // destino ausente
+  }
+  if (destStat && !destStat.isDirectory()) {
+    return { status: "drift", detail: "conflito de tipo na raiz (arquivo onde deveria haver diretório) — remova manualmente" };
+  }
   const srcFiles = walk(src).map((f) => path.relative(src, f)).sort();
   let created = 0;
   let updated = 0;
@@ -152,6 +163,18 @@ for (const [skill, subdir, file] of AGENTS) {
     drift = drift || check;
   } else {
     console.log(`agent ${base.padEnd(40)} equal`);
+  }
+}
+
+// --check: arquivos extras no destino dos agentes também são drift (reportados,
+// nunca removidos — o modo normal não destrói arquivos do usuário).
+if (check && existsSync(agentsDest)) {
+  const expected = new Set(AGENTS.map(([, , file]) => file));
+  for (const entry of readdirSync(agentsDest)) {
+    if (!expected.has(entry)) {
+      console.log(`agent (extra) ${entry.padEnd(32)} drift    arquivo fora do inventário`);
+      drift = true;
+    }
   }
 }
 
