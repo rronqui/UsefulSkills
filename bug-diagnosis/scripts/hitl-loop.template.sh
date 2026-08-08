@@ -102,6 +102,7 @@ redact() {
         scan = $0
         gsub(/"([^"\\]|\\.)*"/, "", scan)
         gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
+        gsub(/[[:space:]]+#.*/, "", scan)
         flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
         flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
         if (flow_depth <= 0) pending = 0
@@ -121,9 +122,14 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[\[{][[:space:]]*(#.*)?$/) {
-          pending = 2
-          flow_depth = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{]/) {
+          scan = $0
+          gsub(/"([^"\\]|\\.)*"/, "", scan)
+          gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
+          gsub(/[[:space:]]+#.*/, "", scan)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          if (flow_depth > 0) pending = 2
         }
         next
       }
