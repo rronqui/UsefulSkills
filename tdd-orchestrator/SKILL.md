@@ -440,6 +440,7 @@ stateDiagram-v2
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> RED : testes passam sem comportamento implementado
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
+        RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
 
         %% ---------- GREEN ----------
