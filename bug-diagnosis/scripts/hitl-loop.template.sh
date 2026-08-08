@@ -73,7 +73,7 @@ capture_multiline() {
 redact() {
   sed -E \
     -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|passphrase|credential|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
-    -e "s/((^|[^[:alnum:]_-])(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|passphrase|credential|secret)[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig" \
+    -e "s/((^|[^[:alnum:]_-])(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|passphrase|credential|secret)[[:space:]]+).*/\1<REDACTED>/Ig" \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 
