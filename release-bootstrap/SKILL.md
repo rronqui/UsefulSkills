@@ -108,8 +108,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
     vira um no-op silencioso. Bypass documentado: `git push --no-verify`.
 - TESTE REAL (não pule):
   - commit-msg: arquivo temporário de mensagem; entrada válida → exit 0, inválida → exit 1.
-  - pre-push: `printf 'refs/heads/<default> 0 0 0\n' | <hook>` → exit 1; com outra
-    branch → exit 0; stdin vazia → exit 0.
+  - pre-push: `printf 'refs/heads/<default> 0 0 0\n' | <hook>` → exit 1; local feature + remote default → exit 1; local default + remote feature → exit 1; local e remote não-default → exit 0; stdin vazia → exit 0.
 - Adicione `.omp/` ao `.gitignore` (estado do tdd-orchestrator, se usado no projeto).
 
 ## FASE 5 — Versão visível na aplicação
