@@ -99,7 +99,7 @@ function cmdNew(argv) {
         try {
           git(["switch", "--no-guess", originalBranch]);
         } catch {
-          git(["switch", "--orphan", originalBranch]);
+          git(["symbolic-ref", "HEAD", `refs/heads/${originalBranch}`]);
         }
       } else if (!originalBranch && originalHead) {
         git(["switch", "--detach", originalHead]);

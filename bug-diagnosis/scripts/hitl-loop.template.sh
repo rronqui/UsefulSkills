@@ -92,7 +92,7 @@ capture_multiline() {
   printf -v "$var" '%s' "$answer"
 }
 redact() {
-  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token|session[[:space:]_-]*token|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token[[:alnum:]]*|password[[:alnum:]]*|passphrase|credential|credentials|secret[[:alnum:]]*' '
+  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase|credential|credentials|secret[[:alnum:]_-]*' '
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -108,7 +108,7 @@ redact() {
         scan = $0
         gsub(/"([^"\\]|\\.)*"/, "", scan)
         gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
-        gsub(/[[:space:]]+#.*/, "", scan)
+        gsub(/#.*/, "", scan)
         flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
         flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
         if (flow_depth <= 0) pending = 0
@@ -116,15 +116,21 @@ redact() {
       }
       if (pending == 3) {
         print "<REDACTED>"
-        if (lower ~ /^-----end[[:space:]].*-----[[:space:]]*$/) pending = 0
+        if (lower ~ /^[[:space:]]*-----end[[:space:]].*-----[[:space:]]*$/) pending = 0
         next
       }
-      if (lower ~ /^-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
+      if (lower ~ /^[[:space:]]*-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
         print "<REDACTED>"
         pending = 3
         next
       }
       if (pending) {
+        if ($0 ~ /^[[:space:]]*[\[{][[:space:]]*$/) {
+          print "<REDACTED>"
+          pending = 2
+          flow_depth = 1
+          next
+        }
         if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
           print "<REDACTED>"
           next
@@ -142,7 +148,7 @@ redact() {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
-          gsub(/[[:space:]]+#.*/, "", scan)
+          gsub(/#.*/, "", scan)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
           if (flow_depth > 0) pending = 2
