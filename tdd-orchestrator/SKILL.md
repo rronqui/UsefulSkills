@@ -167,7 +167,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `refactor.reason_if_skipped: ""`) durante a migração. Sem justificativa para
    qualquer `NA`, o estado deve permanecer `NOT_RUN` até nova execução.
    Ao migrar `red.criteria_to_tests` legado em texto, converta cada linha
-   `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste"] }`;
+   `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, anexando
    entrada inválida exige nova execução RED, deve marcar a tarefa como `RED`/`PENDING`,
    limpar vereditos e estados posteriores (`green`, `refactor`, `review`, `validate`)
    e não pode ser tratada como rastreabilidade válida.
