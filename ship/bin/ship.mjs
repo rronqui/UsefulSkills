@@ -223,7 +223,8 @@ function cmdShip(argv) {
     prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url", "-q", ".[0].url"]);
     if (prUrl === "null") prUrl = "";
   } catch {
-    prUrl = "";
+    console.error("Não consegui determinar a branch default; PR não criado automaticamente.");
+    process.exit(1);
   }
   if (!prUrl) {
     prUrl = gh([
