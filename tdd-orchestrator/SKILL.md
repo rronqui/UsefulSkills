@@ -404,7 +404,7 @@ stateDiagram-v2
     %% ============================================================
 
     [*] --> PRECHECK
-    PRECHECK --> PRECHECK_GATE : baseline + spec_kit WRITTEN + OK do usuario
+    PRECHECK --> PRECHECK_GATE : precondições avaliadas + OK do usuario
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
