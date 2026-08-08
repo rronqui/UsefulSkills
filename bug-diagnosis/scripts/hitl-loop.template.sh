@@ -76,6 +76,7 @@ capture_multiline() {
     answer+="$line"
     line_count=$((line_count + 1))
   done
+  trap '' TSTP
   restore_tty
   trap - EXIT INT TERM HUP QUIT TSTP
   if (( !saw_end )); then
