@@ -93,12 +93,22 @@ capture_multiline() {
 }
 redact() {
   awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|secret[[:alnum:]_-]*' '
+    function unescaped_double(s, i, j, slashes) {
+      for (i = 1; i <= length(s); i++) {
+        if (substr(s, i, 1) != "\"") continue
+        slashes = 0
+        for (j = i - 1; j >= 1 && substr(s, j, 1) == "\\"; j--) slashes++
+        if ((slashes % 2) == 0) return i
+      }
+      return 0
+    }
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bracket_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       quote_open = ""
+      quote_pos = 0
       flow_depth = 0
     }
     {
@@ -107,9 +117,9 @@ redact() {
         print "<REDACTED>"
         scan = $0
         if (quote_open == "\"") {
-          if (scan ~ /(^|[^\\])"/) {
-            match(scan, /(^|[^\\])"/)
-            scan = substr(scan, RSTART + RLENGTH)
+          quote_pos = unescaped_double(scan)
+          if (quote_pos) {
+            scan = substr(scan, quote_pos + 1)
             quote_open = ""
           } else next
         } else if (quote_open == "\047") {
@@ -121,7 +131,8 @@ redact() {
         gsub(/"([^"\\]|\\.)*"/, "", scan)
         gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
         gsub(/#.*/, "", scan)
-        if (scan ~ /"/) {
+        quote_pos = unescaped_double(scan)
+        if (quote_pos) {
           quote_open = "\""
           next
         }
