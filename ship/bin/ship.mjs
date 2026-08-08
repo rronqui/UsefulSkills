@@ -217,9 +217,9 @@ function cmdShip(argv) {
     git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
   git(["push", "-u", "origin", branch]);
-  let prUrl = "";
   try {
-    prUrl = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "-q", ".[0].url"]);
+    const def = defaultBranch();
+    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url", "-q", ".[0].url"]);
     if (prUrl === "null") prUrl = "";
   } catch {
     // fall through to normal creation
