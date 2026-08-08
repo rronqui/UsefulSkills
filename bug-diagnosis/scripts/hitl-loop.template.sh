@@ -31,7 +31,7 @@ capture() {
 }
 
 capture_multiline() {
-  local var="$1" question="$2" line answer="" hidden=0 saw_end=0
+  local var="$1" question="$2" line answer="" hidden=0 saw_end=0 line_count=0
   local restore_tty
   restore_tty() {
     if ((hidden)); then
@@ -58,8 +58,9 @@ capture_multiline() {
       saw_end=1
       break
     fi
-    if [[ -n "$answer" ]]; then answer+=$'\n'; fi
+    if (( line_count > 0 )); then answer+=$'\n'; fi
     answer+="$line"
+    line_count=$((line_count + 1))
   done
   restore_tty
   trap - EXIT INT TERM HUP QUIT
