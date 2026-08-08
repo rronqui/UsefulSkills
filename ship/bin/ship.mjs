@@ -216,12 +216,19 @@ function cmdShip(argv) {
   } else {
     git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
-  git(["push", "-u", "origin", branch]);
-  const prUrl = gh([
-    "pr", "create",
-    "--title", `${type}: ${description}`,
-    "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
-  ]);
+  let prUrl = "";
+  try {
+    prUrl = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "-q", ".[0].url"]);
+  } catch {
+    // fall through to normal creation
+  }
+  if (!prUrl) {
+    prUrl = gh([
+      "pr", "create",
+      "--title", `${type}: ${description}`,
+      "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
+    ]);
+  }
   console.log(`PR ${prUrl}`);
   const auto = spawnSync("gh", ["pr", "merge", "--auto", "--squash"], { cwd: root, encoding: "utf8" });
   if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
