@@ -244,7 +244,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de cada nova execução, redefina `override_approved: false`; derive `baseline.status`: `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa), `FAIL` se qualquer teste/build falhar, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e `override_approved`. Se vermelha, **pare e reporte**; só avance com autorização explícita para este resultado, registrada em `override_approved`.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de cada nova execução, redefina `override_approved: false`; derive `baseline.status`: `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa), `FAIL` se qualquer teste/build falhar, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e `override_approved`. Se vermelha, **pare e reporte**; só avance com autorização explícita para este resultado, registrada em `override_approved`, e apenas se `known_failures` identificar os gates/erros aprovados.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -420,8 +420,8 @@ stateDiagram-v2
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved) e spec_kit WRITTEN e OK
-    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override ou spec_kit PENDING ou sem OK
+    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved e known_failures documentados) e spec_kit WRITTEN e OK
+    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN, FAIL sem override/known_failures, spec_kit PENDING ou sem OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
@@ -562,7 +562,7 @@ stateDiagram-v2
 
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override, Spec Kit pendente ou sem OK exige nova execução ou decisão |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures documentados)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures, Spec Kit pendente ou sem OK exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste ou comportamento |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
