@@ -294,8 +294,9 @@ async function deploy() {
     }
     if (validVersion) {
       let ok = false;
-      const timeoutMs = Number.isFinite(Number(cfg.versionCheckTimeoutMs)) && Number(cfg.versionCheckTimeoutMs) > 0
-        ? Number(cfg.versionCheckTimeoutMs)
+      const timeoutValue = Number(cfg.versionCheckTimeoutMs);
+      const timeoutMs = Number.isFinite(timeoutValue) && timeoutValue > 0
+        ? Math.min(timeoutValue, 2_147_483_647)
         : 10_000;
       for (let attempt = 0; attempt < 5 && !ok; attempt++) {
         const controller = new AbortController();

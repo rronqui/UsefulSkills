@@ -101,6 +101,7 @@ redact() {
         print "<REDACTED>"
         scan = $0
         gsub(/"([^"\\]|\\.)*"/, "", scan)
+        gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
         flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
         flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
         if (flow_depth <= 0) pending = 0
