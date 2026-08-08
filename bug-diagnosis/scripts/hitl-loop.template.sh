@@ -31,7 +31,7 @@ capture() {
 }
 
 capture_multiline() {
-  local var="$1" question="$2" line answer="" hidden=0 saw_end=0 line_count=0 tty_state=""
+  local var="$1" question="$2" line answer="" hidden=0 saw_end=0 line_count=0 tty_state="" prefix=""
   local restore_tty
   restore_tty() {
     if ((hidden)); then
@@ -66,8 +66,14 @@ capture_multiline() {
   fi
   while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
-    if [[ "${line:0:1}" == "\\" && "${line:1}" == "__END__" ]]; then
-      line=${line:1}
+    if [[ "$line" == *__END__ ]]; then
+      prefix=${line%__END__}
+      if [[ -n "$prefix" && "${prefix//\\/}" == "" ]]; then
+        line=${line:1}
+      elif [[ "$line" == "__END__" ]]; then
+        saw_end=1
+        break
+      fi
     elif [[ "$line" == "__END__" ]]; then
       saw_end=1
       break

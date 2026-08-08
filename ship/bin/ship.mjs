@@ -96,7 +96,11 @@ function cmdNew(argv) {
   const restoreBranch = () => {
     try {
       if (originalBranch && originalBranch !== def) {
-        git(["switch", originalBranch]);
+        try {
+          git(["switch", originalBranch]);
+        } catch {
+          git(["switch", "--orphan", originalBranch]);
+        }
       } else if (!originalBranch && originalHead) {
         git(["switch", "--detach", originalHead]);
       }
