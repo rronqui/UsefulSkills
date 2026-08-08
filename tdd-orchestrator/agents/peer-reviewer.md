@@ -32,7 +32,7 @@ Tarefa revisada, critérios de aceite, mapeamento critério→teste, diff/arquiv
 ## Severidade e veredito
 Severidades: `CRÍTICA` (segurança/perda de dados/quebra grave/critério essencial), `ALTA` (critério não atendido, teste ausente, contrato quebrado), `MÉDIA` (bug provável, edge case relevante), `BAIXA` (melhoria não bloqueante). **APROVADO** só sem bloqueios CRÍTICA/ALTA/MÉDIA.
 
-Para o orquestrador rotear o re-trabalho, classifique cada bloqueio por origem: **TESTE** (→ RED), **CÓDIGO** (→ GREEN), **REFACTOR** (→ REFACTOR), **SPEC/CONTRATO** (→ DOC/escala).
+Para o orquestrador rotear o re-trabalho, classifique cada bloqueio por origem: **TESTE** (→ RED), **CÓDIGO** (→ RED_REVISION para teste de regressão, depois GREEN_FIX), **REFACTOR** (→ REFACTOR), **SPEC/CONTRATO** (→ DOC/escala).
 
 ## Saída
 Comece com **APROVADO** ou **BLOQUEADO**. Se BLOQUEADO, liste cada bloqueio:

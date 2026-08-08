@@ -623,7 +623,7 @@ Após todas as tarefas da onda em `DONE`: delegue ao `integrator` (lista de tare
 > `contract`, item 9 = `security`, item 11 = `git-sanity`). Os itens 5, 10 e 12 são
 > verificados pelo ORQUESTRADOR, fora do validator.
 
-Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de design no review → GREEN/RED; **spec ausente/desatualizada → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
+Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
 
 ---
 
