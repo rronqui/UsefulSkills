@@ -89,7 +89,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
 | `validator` | PASSOU | `gates.*: PASS` | Avance para DONE |
-| `validator` | FALHOU | `gates.*: FAIL` | Roteie por origem do FAIL |
+| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate | Roteie por `origin` do FAIL; ausência de `origin` torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
 | `spec-kit-author` | CONCLUÍDO | `spec_kit.status: WRITTEN` | Confirme artefatos em disco, registre paths e `written_at` |

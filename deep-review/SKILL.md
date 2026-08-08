@@ -159,10 +159,12 @@ completo no assignment).
      linhas de conteúdo de cada hunk) + a ordem "RODE `git diff`/`git show` para
      os arquivos atribuídos" (modo não-commitado: ambos `git diff -- <path>` e
      `git diff --cached -- <path>`; modo jj: `jj --ignore-working-copy diff --git -- <path>`);
-   - Modo PR, qualquer tamanho: "leia os diffs de `pr://<owner>/<repo>/<N>/diff/all` ou
-     por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local
-     e NUNCA leia arquivos do workspace para contexto do PR";
-3. "MAY read full file context as needed via `read`" (exceto em qualquer modo PR, que usa apenas fontes remotas autorizadas);
+   - Modo PR, qualquer tamanho: "leia o patch somente de `pr://<owner>/<repo>/<N>/diff/all` ou
+     por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local nem
+     trate o workspace como fonte do patch. Para a checagem cross-boundary obrigatória, MAY
+     ler arquivos inalterados do workspace somente como contexto do consumidor; não registre
+     achados fora dos arquivos atribuídos";
+3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
 4. Registro de achados e veredito via seções incrementais de `yield`
    (`type: ["findings"]`, `type: ["overall_correctness"]`, `type: ["explanation"]`,
    `type: ["confidence"]`); jamais uma ferramenta separada de finding.

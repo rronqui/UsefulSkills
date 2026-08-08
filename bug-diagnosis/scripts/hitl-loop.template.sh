@@ -102,6 +102,16 @@ redact() {
       }
       return 0
     }
+    function unescaped_single(s, i, count) {
+      i = length(s)
+      while (i > 0 && substr(s, i, 1) ~ /[[:space:]]/) i--
+      count = 0
+      while (i > 0 && substr(s, i, 1) == "\047") {
+        count++
+        i--
+      }
+      return (count % 2) == 1
+    }
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -158,8 +168,7 @@ redact() {
         if (quote_open == "\"" && unescaped_double($0)) {
           quote_open = ""
           pending = 0
-        } else if (quote_open == "\047" && $0 ~ /\047/) {
-          quote_open = ""
+        } else if (quote_open == "\047" && unescaped_single($0)) {
           pending = 0
         }
         next
