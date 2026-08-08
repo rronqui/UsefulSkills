@@ -321,8 +321,8 @@ async function deploy() {
     }
     if (validVersion) {
       let ok = false;
-      const timeoutValue = Number(cfg.versionCheckTimeoutMs);
-      const timeoutMs = Number.isFinite(timeoutValue) && timeoutValue > 0
+      const timeoutValue = cfg.versionCheckTimeoutMs;
+      const timeoutMs = typeof timeoutValue === "number" && Number.isFinite(timeoutValue) && timeoutValue > 0
         ? Math.min(timeoutValue, 2_147_483_647)
         : 10_000;
       for (let attempt = 0; attempt < 5 && !ok; attempt++) {
