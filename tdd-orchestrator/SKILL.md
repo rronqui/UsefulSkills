@@ -89,7 +89,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
 | `validator` | PASSOU | `gates.*: PASS` | Avance para DONE |
-| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate | Roteie por `origin` do FAIL; ausência de `origin` torna o output inválido e exige reexecução |
+| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate | Roteie por `origin` do FAIL (`TOOLING` vai direto a `GREEN_FIX`); ausência de `origin` torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
 | `spec-kit-author` | CONCLUÍDO | `spec_kit.status: WRITTEN` | Confirme artefatos em disco, registre paths e `written_at` |
@@ -193,7 +193,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
-  "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [] },
+ "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [{ "gate": "tests|build|<gate>", "reason": "", "evidence": "" }] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -236,7 +236,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ```
 
 > **Nota:** Os caminhos com `<feature>` no schema acima são placeholders — substitua pelo nome real da feature (ex.: `specs001-mdc-core`) ao criar o `progress.json`.
-> Quando `tests` ou `build` for `NA`, `known_failures` deve conter a justificativa correspondente; sem ela, `baseline.status` não pode ser `PASS`.
+> Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
 
 Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; renove `updated_at`.
 
@@ -482,8 +482,10 @@ stateDiagram-v2
         state VALIDATE_GATES <<choice>>
         VALIDATE --> VALIDATE_GATES : rodar gates (inclui spec_kit)
         VALIDATE_GATES --> DOC : FAIL gate spec_kit (ausente, desatualizado ou conteudo divergente)
-        VALIDATE_GATES --> RED : FAIL origem TESTE
-        VALIDATE_GATES --> RED_REVISION : FAIL origem CODIGO
+        VALIDATE_GATES --> RED : FAIL origin TESTE
+        VALIDATE_GATES --> RED_REVISION : FAIL origin CODIGO
+        VALIDATE_GATES --> GREEN_FIX : FAIL origin TOOLING
+        VALIDATE_GATES --> REFACTOR : FAIL origin REFACTOR
         VALIDATE_GATES --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
         VALIDATE_GATES --> DONE : todos PASS ou NA justificado
 

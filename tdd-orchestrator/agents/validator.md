@@ -49,9 +49,10 @@ gates com o mesmo critério de evidência.
 
 ## Saída
 Veredito em uma linha: **PASSOU** ou **FALHOU**. Depois, um item por gate:
-- `GATE — PASS/FAIL/NA — comando: <cmd> — evidência: <trecho> [— origin: TESTE|CODIGO|REFACTOR|SPEC-CONTRATO se FAIL] [— na_reason: <motivo> se NA]`
+ - `GATE — PASS/FAIL/NA — comando: <cmd> — evidência: <trecho> [— origin: TESTE|CODIGO|TOOLING|REFACTOR|SPEC-CONTRATO se FAIL] [— na_reason: <motivo> se NA]`
 
 Para cada `FAIL`, informe uma única `origin`: `TESTE` para traceability/tests/coverage,
-`SPEC-CONTRATO` para spec_kit/contract, `CODIGO` para lint/type-check/build/security/git-sanity,
-ou `REFACTOR` quando a falha for exclusivamente de refactor. Liste gates `NA` com justificativa.
-**Não declare PASSOU global se algum gate obrigatório está FAIL ou sem evidência.**
+`SPEC-CONTRATO` para spec_kit/contract, `TOOLING` para lint/type-check/build/security/git-sanity
+quando a falha não exigir mudança de comportamento, `CODIGO` quando exigir correção de
+comportamento observável, ou `REFACTOR` quando a falha for exclusivamente de refactor.
+Liste gates `NA` com justificativa. **Não declare PASSOU global se algum gate obrigatório está FAIL ou sem evidência.**

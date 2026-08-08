@@ -102,14 +102,11 @@ redact() {
       }
       return 0
     }
-    function unescaped_single(s, i, count) {
-      i = length(s)
-      while (i > 0 && substr(s, i, 1) ~ /[[:space:]]/) i--
+    function unescaped_single(s, i, j, count) {
+      if (!match(s, /\047[[:space:]]*,?[[:space:]]*(#.*)?$/)) return 0
+      i = RSTART
       count = 0
-      while (i > 0 && substr(s, i, 1) == "\047") {
-        count++
-        i--
-      }
+      for (j = i; j <= length(s) && substr(s, j, 1) == "\047"; j++) count++
       return (count % 2) == 1
     }
     BEGIN {
@@ -227,6 +224,7 @@ redact() {
         }
         print "<REDACTED>"
         pending = 0
+        next
       }
       if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
