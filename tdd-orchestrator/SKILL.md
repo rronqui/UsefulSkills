@@ -414,6 +414,7 @@ stateDiagram-v2
     PRECHECK --> PRECHECK_GATE : precondições avaliadas + OK do usuario
 
     %% ---------- Pré-condições (orquestrador) ----------
+    state PRECHECK_GATE <<choice>>
     PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved) e spec_kit WRITTEN e OK
     PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override ou spec_kit PENDING ou sem OK
 
