@@ -143,7 +143,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 **Run:** <run_id> | **Branch:** <branch_work> → <merge_target> | **Entrega:** <delivery: internal/external> | **Atualizado:** <timestamp>
 
 ## Status Geral
-- Spec Kit: ✅ WRITTEN | Baseline: ✅ PASS | Contrato: DRAFT/APPROVED/NA
+- Spec Kit: <spec_kit.status> | Baseline: <baseline.status> | Contrato: <contract.status>
 
 ## Ondas
 ### Onda 1 — status: completed/integrating/in_progress/pending

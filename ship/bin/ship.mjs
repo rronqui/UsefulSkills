@@ -255,13 +255,15 @@ async function deploy() {
   }
   if (cfg.versionCheckUrl) {
     let pkg = null;
+    let packageRead = true;
     try {
       pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
     } catch {
+      packageRead = false;
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
     const validVersion = isValidSemVer(pkg?.version);
-    if (!validVersion) {
+    if (packageRead && !validVersion) {
       console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
     }
     if (validVersion) {
