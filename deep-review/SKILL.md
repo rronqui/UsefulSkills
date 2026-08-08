@@ -86,7 +86,8 @@ por conta própria e ancoram achados nas linhas atuais.
   (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
 - **Custom**: peça as instruções. Se houver mudanças não commitadas no working tree,
   colete-as também; aplique exclusões e as restrições customizadas antes de calcular
-  estatísticas, particionar e montar assignments. Sem mudanças → mapeie o workspace,
+  estatísticas, particionar e montar assignments. Se o inventário resultante ficar
+  vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie o workspace,
   aplique as mesmas exclusões/restrições, e particione o inventário resultante;
   inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
   por conta própria e ancora achados nas linhas atuais.
