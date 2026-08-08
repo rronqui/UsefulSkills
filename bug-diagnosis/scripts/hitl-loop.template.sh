@@ -40,7 +40,7 @@ capture_multiline() {
     fi
   }
   printf '\n>>> %s\n' "$question"
-  printf '    Paste lines, then enter __END__ on its own line.\n'
+  printf '    Paste lines, then enter __END__ on its own line (prefix a literal \\__END__ with \\).\n'
   if [[ -t 0 ]]; then
     hidden=1
     trap 'restore_tty; exit 130' INT TERM HUP QUIT
@@ -54,7 +54,9 @@ capture_multiline() {
   fi
   while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
-    if [[ "$line" == "__END__" ]]; then
+    if [[ "$line" == '\__END__' ]]; then
+      line="__END__"
+    elif [[ "$line" == "__END__" ]]; then
       saw_end=1
       break
     fi
