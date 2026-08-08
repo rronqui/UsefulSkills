@@ -96,7 +96,7 @@ redact() {
     {
       lower = tolower($0)
       if (pending) {
-        if ($0 ~ /^[[:space:]]/) {
+        if ($0 ~ /^[[:space:]]/ || $0 == "") {
           print "<REDACTED>"
           next
         }
@@ -104,7 +104,7 @@ redact() {
       }
       if (lower ~ key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
-        pending = (lower ~ ("(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*(#.*|[|>][[:space:]]*(#.*)?)?$"))
+        pending = (lower ~ ("(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*(#.*|[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
         next
       }
       print
