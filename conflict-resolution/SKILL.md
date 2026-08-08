@@ -7,9 +7,10 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
 
 1. **Veja o estado atual** do merge/rebase: histórico do git e os arquivos em
    conflito.
-   Antes de editar, se houver alterações locais não relacionadas ao merge/rebase, pare e
-   peça ao chamador para commitá-las ou guardá-las; não misture essas alterações na
-   resolução.
+   Antes de iniciar um merge/rebase, confirme que alterações locais não relacionadas
+   foram commitadas ou guardadas. Se a operação já estiver em conflito e essas alterações
+   existirem, não tente commitá-las nem guardá-las no índice não resolvido: pare e peça
+   uma worktree separada ou um backup externo antes de editar.
 
 2. **Encontre as fontes primárias** de cada conflito. Entenda profundamente por que
    cada mudança foi feita e qual era a intenção original: leia as mensagens de

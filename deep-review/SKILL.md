@@ -72,7 +72,8 @@ por conta própria e ancoram achados nas linhas atuais.
   se o inventário resultante estiver vazio, informe "nenhum arquivo revisável" e pare.
   Caso contrário, `totalLines` é a soma das linhas atuais, `fileCount` o tamanho do
   inventário, e a tabela de dimensionamento define a equipe; instruções do usuário
-  podem restringir o conjunto antes do particionamento.
+  podem restringir o conjunto antes do particionamento. Após essa restrição, se o conjunto ficar vazio,
+  informe "nenhum arquivo revisável" e pare;
 
 - **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
   Falha ao buscar → reporte o erro e pare.
