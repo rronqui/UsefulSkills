@@ -44,6 +44,7 @@ capture_multiline() {
 
 redact() {
   sed -E \
+    -e 's/((authorization|proxy-authorization)[=:][[:space:]]*bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig' \
     -e 's/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[=:][[:space:]]*)[^[:space:]]+/\1<REDACTED>/Ig' \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
@@ -55,8 +56,8 @@ step "Open the app at http://localhost:3000 and sign in."
 capture ERRORED "Click the 'Export' button. Did it throw an error? (y/n)"
 capture_multiline ERROR_MSG "Paste the error message (or 'none'):"
 
-# --- edit above ---------------------------------------------------------
-# Keep the KEY=VALUE block below in sync with every `capture` call above.
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
-printf 'ERROR_MSG=%s\n' "$(printf '%s' "$ERROR_MSG" | redact)"
+redacted_error=$(printf '%s' "$ERROR_MSG" | redact)
+redacted_error=${redacted_error//$'\n'/\\n}
+printf 'ERROR_MSG=%s\n' "$redacted_error"

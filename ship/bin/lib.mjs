@@ -28,13 +28,13 @@ export function extractIssueNumber(url) {
 }
 
 // Parse da versão servida a partir do HTML: remove comentários, procura
-// v(X.Y.Z) a partir do texto âncora "Versão da aplicação" (se presente)
-// senão a primeira ocorrência. Retorna a versão ou null.
+// v(X.Y.Z[-prerelease][+build]) a partir do texto âncora "Versão da aplicação"
+// (se presente) senão a primeira ocorrência. Retorna a versão ou null.
 export function extractServedVersion(html) {
   let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+)/) || [])[1] ?? null;
+  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/) || [])[1] ?? null;
 }
 
 

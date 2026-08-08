@@ -158,6 +158,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ### Passo 0 — Retomada (antes de tudo)
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
+   Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
+   preencha `baseline.status` ausente como `NOT_RUN` antes de avaliar o baseline.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
 
@@ -165,7 +167,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 
 ```json
 {
-  "schema_version": "2.1",
+  "schema_version": "2.2",
   "run_id": "<ISO timestamp>",
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
@@ -377,13 +379,10 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + spec/critérios + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Veredito:
    - **APROVADO** → DOC.
    - **BLOQUEADO** → roteie por tipo: *código* → GREEN; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
-5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** — se foram pulados na Fase 0, delegue ao `spec-kit-author` agora antes de validar (gate `spec_kit` depende disto). (Verificação redundante com o gate `spec_kit` em VALIDATE — defesa em profundidade.)
-   - **Mudança de contrato**: se o `spec-kit-author` reportar nas OBSERVAÇÕES que a
-     entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e
-     pergunte ao usuário se aprova a mudança. Aprovada → volte a RED para ajustar a
-     implementação ao novo contrato. NÃO aprovada → BLOCKED (escale com o conflito).
+5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
+   - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
-7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado (ele fica fora do git, junto com o resto do estado), faça `git add` **apenas dos arquivos da tarefa, do `.gitignore` de infraestrutura e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Se o `.gitignore` de estado ainda não existir, faça um commit de bootstrap separado antes do commit da tarefa.**
+7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, regenere `progress.md` a partir do `progress.json` atualizado (ele fica fora do git), faça `git add` **apenas dos arquivos da tarefa e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**. Se o fluxo criou a entrada `.omp/state/` no `.gitignore`, isole apenas esse hunk em um commit de bootstrap separado (ou use `git add -p`); nunca faça stage do `.gitignore` inteiro junto com a tarefa. Faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push.
 
 ---
 
@@ -418,7 +417,7 @@ stateDiagram-v2
         RED_CHECK --> RED : passam de imediato ou faltam testes
         RED_CHECK --> RED : falha por import-setup (motivo errado)
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
-        RED_CHECK --> VALIDATE : passam de imediato E comportamento ja implementado
+        RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>
@@ -545,7 +544,7 @@ stateDiagram-v2
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo (baseline verde + spec_kit WRITTEN + OK) ou volta a si |
-| `RED` | `test-author` | Início da tarefa; bloqueio de origem TESTE; retorno de `GREEN` (critério sem teste), `DOC` (contrato aprovado) ou `VALIDATE` (FAIL origem TESTE) | `GREEN` só com falha por **asserção**; ou `VALIDATE` se testes passam de imediato e comportamento já implementado |
+| `RED` | `test-author` | Início da tarefa; bloqueio de origem TESTE; retorno de `GREEN`, `DOC` ou `VALIDATE` (FAIL origem TESTE) | `GREEN` só com falha por **asserção**; ou `REVIEW` se testes passam de imediato e comportamento já implementado |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
 | `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor | `DOC` (aprovado) ou `ROUTE_BLOCK` |
@@ -558,7 +557,7 @@ stateDiagram-v2
 | `MERGE` | Orquestrador | Última onda concluída | `delivery: external` → SKIPPED (encerra sem perguntar); senão pergunta ao usuário: criar PR (sem auto-merge) / merge local (aviso se repo bootstrapped) / manter aberta (SKIPPED) |
 
 > **Notas de fidelidade ao fluxo:** (1) o limite de **3 tentativas** está nos rótulos `ROUTE_BLOCK`/`VALIDATE_GATES` porque o contador real é do orquestrador; (2) `REFACTOR` sempre transita para `REVIEW`, inclusive quando `SKIPPED` (estado registrado, nunca pulado em silêncio); (3) a re-entrada `INTEGRATE_CHECK --> CICLO_TAREFA` parte do **estado composto inteiro** — forma mais compatível com o renderizador do GitHub do que apontar para um sub-estado específico; (4) o gate `spec_kit` no `VALIDATE` devolve a `DOC`, não a um agente — porque a documentação é responsabilidade do orquestrador.
-> (5) `BLOCKED --> [*]` no diagrama marca a escalada ao usuário; a reentrada em `RED` após a decisão (tabela "Estado por estado") acontece como novo ingresso no ciclo — não como aresta do diagrama. (6) A aresta `RED_CHECK --> VALIDATE` cobre a exceção do passo 1: testes passam de imediato E o comportamento já está implementado.
+> (5) `BLOCKED --> [*]` no diagrama marca a escalada ao usuário; a reentrada em `RED` após a decisão (tabela "Estado por estado") acontece como novo ingresso no ciclo — não como aresta do diagrama. (6) A aresta `RED_CHECK --> REVIEW` cobre a exceção do passo 1: testes passam de imediato E o comportamento já está implementado.
 
 ---
 

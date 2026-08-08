@@ -58,6 +58,9 @@ describe("extractServedVersion", () => {
   it("ignora versões dentro de comentários HTML", () => {
     expect(extractServedVersion("<!-- v8.8.8 --> <p>v2.0.1</p>")).toBe("2.0.1");
   });
+  it("aceita prerelease e build metadata sem comentário", () => {
+    expect(extractServedVersion("<p>v1.2.3-rc.1+build.7</p>")).toBe("1.2.3-rc.1+build.7");
+  });
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();

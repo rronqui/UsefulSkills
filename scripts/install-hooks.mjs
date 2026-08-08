@@ -21,13 +21,19 @@ try {
 }
 if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 
-try {
-  if (lstatSync(hooksDir).isSymbolicLink()) {
-    console.error(`Diretório de hooks é symlink; recusando escrever: ${hooksDir}`);
-    process.exit(1);
+let ancestor = hooksDir;
+while (true) {
+  try {
+    if (lstatSync(ancestor).isSymbolicLink()) {
+      console.error(`Caminho de hooks contém symlink; recusando escrever: ${ancestor}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
   }
-} catch (err) {
-  if (err?.code !== "ENOENT") throw err;
+  const parent = dirname(ancestor);
+  if (parent === ancestor) break;
+  ancestor = parent;
 }
 if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
 

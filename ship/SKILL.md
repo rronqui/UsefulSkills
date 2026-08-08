@@ -28,7 +28,7 @@ seguem o protocolo abaixo.
 | buildCommand | Build de produção (null = pular) |
 | stopCommand | Para o servidor (null = pular); retorno não-zero gera aviso (não fatal) |
 | startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui); DEVE retornar (wrapper/daemonizador como pm2/npm script) — um servidor foreground bloqueia o deploy |
-| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z)` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a `version` do `package.json` na raiz (ausente/inválido → aviso e checagem pulada) |
+| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z[-prerelease][+build])` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a `version` SemVer do `package.json` na raiz (ausente/inválido → aviso e checagem pulada) |
 
 ## Subcomandos do motor
 

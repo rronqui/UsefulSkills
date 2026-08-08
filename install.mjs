@@ -77,9 +77,9 @@ function syncDir(src, dest) {
     const s = path.join(src, rel);
     const d = path.join(dest, rel);
     let parentConflict = false;
-    let parent = dest;
-    for (const part of rel.split(path.sep).slice(0, -1)) {
-      parent = path.join(parent, part);
+    let parent = path.dirname(d);
+    const boundary = path.dirname(path.dirname(dest));
+    while (true) {
       try {
         const parentStat = statSync(parent);
         if (!parentStat.isDirectory()) {
@@ -92,6 +92,10 @@ function syncDir(src, dest) {
           break;
         }
       }
+      if (parent === boundary) break;
+      const next = path.dirname(parent);
+      if (next === parent) break;
+      parent = next;
     }
     if (parentConflict) {
       typeConflicts++;

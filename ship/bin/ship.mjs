@@ -242,7 +242,7 @@ async function deploy() {
     } catch {
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
-    const validVersion = typeof pkg?.version === "string" && /^\d+\.\d+\.\d+$/.test(pkg.version);
+    const validVersion = typeof pkg?.version === "string" && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(pkg.version);
     if (pkg && !validVersion) {
       console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
     }
