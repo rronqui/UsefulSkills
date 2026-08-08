@@ -96,7 +96,7 @@ redact() {
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
-      bracket_key = "(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:]"
+      bracket_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       pending = 0
       flow_depth = 0
@@ -107,7 +107,7 @@ redact() {
         print "<REDACTED>"
         scan = $0
         gsub(/"([^"\\]|\\.)*"/, "", scan)
-        gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
+        gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
         gsub(/#.*/, "", scan)
         flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
         flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
@@ -165,7 +165,7 @@ redact() {
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{]/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
+          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
