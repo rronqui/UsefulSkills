@@ -168,7 +168,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    qualquer `NA`, o estado deve permanecer `NOT_RUN` até nova execução.
    Ao migrar `red.criteria_to_tests` legado em texto, converta cada linha
    `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste"] }`;
-   entrada inválida exige nova execução RED e não pode ser tratada como rastreabilidade válida.
+   entrada inválida exige nova execução RED, deve marcar a tarefa como `RED`/`PENDING`,
+   limpar vereditos e estados posteriores (`green`, `refactor`, `review`, `validate`)
+   e não pode ser tratada como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
@@ -413,7 +415,7 @@ stateDiagram-v2
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override, spec_kit PENDING ou sem OK
+    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override ou spec_kit PENDING ou sem OK
     PRECHECK_GATE --> CICLO_TAREFA : baseline PASS (tests/build PASS ou NA justificado) ou FAIL com override_approved, spec_kit WRITTEN e OK
 
     %% ============================================================

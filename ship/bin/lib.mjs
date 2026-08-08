@@ -1,6 +1,6 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -62,6 +62,7 @@ export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
   const src = path.resolve(root, cfg.dbPath);
   if (!existsSync(src)) return null;
+  const sourceMode = statSync(src).mode & 0o7777;
   const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
   mkdirSync(dir, { recursive: true });
   const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
@@ -69,7 +70,7 @@ export function performBackup(cfg, root) {
   for (let attempt = 0; ; attempt++) {
     const dest = attempt === 0 ? base : `${base}-${attempt}`;
     try {
-      const fd = openSync(dest, "wx");
+      const fd = openSync(dest, "wx", sourceMode);
       closeSync(fd);
     } catch (err) {
       if (err?.code === "EEXIST") continue;
