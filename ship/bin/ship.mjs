@@ -216,6 +216,7 @@ function cmdShip(argv) {
   } else {
     git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
+  git(["push", "-u", "origin", branch]);
   let prUrl = "";
   try {
     prUrl = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "-q", ".[0].url"]);
