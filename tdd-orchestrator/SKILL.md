@@ -439,7 +439,7 @@ stateDiagram-v2
         RED_CHECK --> RED : falha por import-setup, faltam testes ou matriz AC->teste inválida/incompleta
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> RED : testes passam sem comportamento implementado
-        RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
+        RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
 
         %% ---------- GREEN ----------
