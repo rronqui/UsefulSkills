@@ -86,7 +86,7 @@ capture_multiline() {
   printf -v "$var" '%s' "$answer"
 }
 redact() {
-  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token|session[[:space:]_-]*token|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token|password|passphrase|credential|credentials|secret' '
+  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token|session[[:space:]_-]*token|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token[a-z]*|password[a-z]*|passphrase|credential|credentials|secret[a-z]*' '
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
@@ -109,6 +109,7 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[\[{][[:space:]]*$/) pending = 1
         next
       }

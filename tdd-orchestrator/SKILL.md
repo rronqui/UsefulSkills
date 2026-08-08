@@ -414,9 +414,8 @@ stateDiagram-v2
     PRECHECK --> PRECHECK_GATE : precondições avaliadas + OK do usuario
 
     %% ---------- Pré-condições (orquestrador) ----------
-    state PRECHECK_GATE <<choice>>
+    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved) e spec_kit WRITTEN e OK
     PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override ou spec_kit PENDING ou sem OK
-    PRECHECK_GATE --> CICLO_TAREFA : baseline PASS (tests/build PASS ou NA justificado) ou FAIL com override_approved, spec_kit WRITTEN e OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
@@ -557,7 +556,7 @@ stateDiagram-v2
 
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `baseline.status: PASS` ou `FAIL` com `override_approved`, `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override exige nova execução ou decisão |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste ou comportamento |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
