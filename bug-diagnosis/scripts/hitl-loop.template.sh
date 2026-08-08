@@ -104,7 +104,7 @@ redact() {
       }
       if (lower ~ key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
-        pending = (lower ~ ("(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*([|>][[:space:]]*)?$"))
+        pending = (lower ~ ("(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*(#.*|[|>][[:space:]]*(#.*)?)?$"))
         next
       }
       print
