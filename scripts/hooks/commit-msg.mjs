@@ -31,7 +31,7 @@ const r =
   process.platform === "win32"
     ? spawnSync(
         process.env.ComSpec ?? "cmd.exe",
-        ["/d", "/s", "/c", `"%COMMITLINT_BIN%" --edit "%COMMIT_MSG_FILE%"`],
+        ["/d", "/v:off", "/s", "/c", `"%COMMITLINT_BIN%" --edit "%COMMIT_MSG_FILE%"`],
         {
           stdio: "inherit",
           env: { ...process.env, COMMITLINT_BIN: bin, COMMIT_MSG_FILE: file },
