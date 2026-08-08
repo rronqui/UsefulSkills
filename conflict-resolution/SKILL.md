@@ -27,10 +27,11 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
    (Em repo da solução ship/release-bootstrap: os comandos do CI e/ou do manifesto
    `ship.config.json`.)
 
-5. **Finalize o merge/rebase.** Faça stage apenas dos caminhos resolvidos (`git add --
-   <arquivo-resolvido> ...`), confira `git status --short` para garantir que não há
-   alterações não relacionadas no índice e commit. Em rebase, continue o processo até
-   todos os commits rebasados.
+5. **Finalize o merge/rebase.** Faça stage apenas dos caminhos resolvidos; se um arquivo
+   também contiver alterações não relacionadas, use `git add -p` para selecionar somente
+   os hunks da resolução. Inspecione `git diff --cached` e `git status --short` para
+   garantir que não há alterações não relacionadas no índice e commit. Em rebase,
+   continue o processo até todos os commits rebasados.
 
 **Integração com a solução UsefulSkills:**
 - Merge local do `tdd-orchestrator` (Entrega final, caminho "merge local"): em

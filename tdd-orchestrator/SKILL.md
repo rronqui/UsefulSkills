@@ -77,8 +77,8 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS` | Avance para GREEN |
-| `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `red.criteria_to_tests: matriz atual do RED (não reutilizar evidência stale)`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Avance para REVIEW |
-| `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `red.criteria_to_tests: recalcular na próxima execução RED`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico |
+| `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Avance para REVIEW preservando o objeto `red.criteria_to_tests` produzido pelo RED |
+| `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico e substitua `red.criteria_to_tests` pelo objeto AC→teste atual |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
@@ -161,10 +161,11 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
    preencha `baseline.status` ausente como `FAIL` se `tests` ou `build` for `FAIL`,
-   `PASS` se cada gate for `PASS` ou `NA`, ou `NOT_RUN` nos demais casos. `NA`
-   Inicialize campos novos ausentes (`baseline.override_approved: false`,
-   `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`) durante a migração.
-   exige justificativa em `known_failures`.
+   `PASS` se cada gate for `PASS` ou `NA` com justificativa correspondente em
+   `known_failures`, ou `NOT_RUN` nos demais casos. Inicialize campos novos ausentes
+   (`baseline.override_approved: false`, `green.reason_if_skipped: ""`,
+   `refactor.reason_if_skipped: ""`) durante a migração. Sem justificativa para
+   qualquer `NA`, o estado deve permanecer `NOT_RUN` até nova execução ou override.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
@@ -221,6 +222,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ```
 
 > **Nota:** Os caminhos com `<feature>` no schema acima são placeholders — substitua pelo nome real da feature (ex.: `specs001-mdc-core`) ao criar o `progress.json`.
+> Quando `tests` ou `build` for `NA`, `known_failures` deve conter a justificativa correspondente; sem ela, `baseline.status` não pode ser `PASS`.
 
 Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; renove `updated_at`.
 
@@ -388,7 +390,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
    - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
-7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, regenere `progress.md` a partir do `progress.json` atualizado (ele fica fora do git), faça `git add` **apenas dos arquivos da tarefa e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**. Se o fluxo criou a entrada `.omp/state/` no `.gitignore`, isole apenas esse hunk em um commit de bootstrap separado (ou use `git add -p`); nunca faça stage do `.gitignore` inteiro junto com a tarefa. Faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push.
+7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, regenere `progress.md` a partir do `progress.json` atualizado (ele fica fora do git), faça `git add` **apenas dos arquivos da tarefa e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**. Se o fluxo criou a entrada `.omp/state/` no `.gitignore`, isole apenas esse hunk em um commit de bootstrap separado; se o `.gitignore` for novo e não houver hunk selecionável, permita stage do arquivo inteiro somente nesse commit separado. Caso contrário, use `git add -p`; nunca faça stage do `.gitignore` inteiro junto com a tarefa. Faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push.
 
 ---
 
@@ -408,8 +410,7 @@ stateDiagram-v2
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override, spec_kit PENDING ou sem OK
-    PRECHECK_GATE --> CICLO_TAREFA : baseline PASS ou FAIL com override_approved, spec_kit WRITTEN e OK
+    PRECHECK_GATE --> CICLO_TAREFA : baseline PASS (tests/build PASS ou NA justificado) ou FAIL com override_approved, spec_kit WRITTEN e OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
