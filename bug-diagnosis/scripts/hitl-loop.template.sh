@@ -107,8 +107,9 @@ redact() {
         print "<REDACTED>"
         scan = $0
         if (quote_open == "\"") {
-          if (scan ~ /"/) {
-            sub(/^[^"]*"/, "", scan)
+          if (scan ~ /(^|[^\\])"/) {
+            match(scan, /(^|[^\\])"/)
+            scan = substr(scan, RSTART + RLENGTH)
             quote_open = ""
           } else next
         } else if (quote_open == "\047") {
