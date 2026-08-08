@@ -79,7 +79,8 @@ capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
-redacted_error=$(printf '%s' "$ERROR_MSG" | redact)
+redacted_error=$(printf '%s' "$ERROR_MSG" | redact; printf '\001')
+redacted_error=${redacted_error%$'\001'}
 redacted_error=${redacted_error//\\/\\\\}
 redacted_error=${redacted_error//$'\n'/\\n}
 printf 'ERROR_MSG=%s\n' "$redacted_error"

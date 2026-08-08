@@ -415,7 +415,7 @@ stateDiagram-v2
         %% ---------- RED ----------
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
-        RED_CHECK --> RED : falha por import-setup, faltam testes ou comportamento nao implementado
+        RED_CHECK --> RED : falha por import-setup ou faltam testes / testes passam sem comportamento implementado
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
 

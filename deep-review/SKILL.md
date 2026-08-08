@@ -68,6 +68,10 @@ Para PR, branch base, não commitadas e commit, diff vazio → informe o usuári
 orquestrador deve mapear o workspace, particionar arquivos revisáveis e incluir em
 cada assignment a lista exata de arquivos atribuídos; os revisores leem esses arquivos
 por conta própria e ancoram achados nas linhas atuais.
+  No Custom sem diff, aplique as mesmas exclusões a arquivos rastreados/revisáveis,
+  use `totalLines = 0`, `fileCount` do inventário resultante e a tabela de
+  dimensionamento para definir a equipe; instruções do usuário podem restringir o
+  conjunto antes do particionamento.
 
 - **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
   Falha ao buscar → reporte o erro e pare.
