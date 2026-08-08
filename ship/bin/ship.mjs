@@ -261,7 +261,7 @@ async function deploy() {
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
     const validVersion = isValidSemVer(pkg?.version);
-    if (pkg && !validVersion) {
+    if (!validVersion) {
       console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
     }
     if (validVersion) {

@@ -43,12 +43,12 @@ function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
 
-function walk(dir) {
+function walk(dir, includeSymlinks = false) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walk(full));
-    else if (entry.isFile() || entry.isSymbolicLink()) out.push(full);
+    if (entry.isDirectory()) out.push(...walk(full, includeSymlinks));
+    else if (entry.isFile() || (includeSymlinks && entry.isSymbolicLink())) out.push(full);
   }
   return out;
 }
@@ -130,7 +130,7 @@ function syncDir(src, dest) {
   }
   const destRoot = (() => { try { return lstatSync(dest); } catch { return null; } })();
   if (destRoot?.isDirectory()) {
-    for (const rel of walk(dest).map((f) => path.relative(dest, f))) {
+    for (const rel of walk(dest, true).map((f) => path.relative(dest, f))) {
       if (!srcFileKeys.has(inventoryKey(rel))) removed.push(rel);
     }
   }

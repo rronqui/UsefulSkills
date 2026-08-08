@@ -42,10 +42,14 @@ capture_multiline() {
   printf '\n>>> %s\n' "$question"
   printf '    Paste lines, then enter __END__ on its own line.\n'
   if [[ -t 0 ]]; then
-    stty -echo || return 1
     hidden=1
     trap 'restore_tty; exit 130' INT TERM HUP QUIT
     trap restore_tty EXIT
+    if ! stty -echo; then
+      hidden=0
+      trap - EXIT INT TERM HUP QUIT
+      return 1
+    fi
     printf '    [input hidden]\n'
   fi
   while IFS= read -r line; do
@@ -66,7 +70,7 @@ capture_multiline() {
 }
 redact() {
   sed -E \
-    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
+    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 

@@ -160,7 +160,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
    preencha `baseline.status` ausente como `FAIL` se `tests` ou `build` for `FAIL`,
-   `PASS` se ambos forem `PASS`, ou `NOT_RUN` nos demais casos.
+   `PASS` se cada gate for `PASS` ou `NA`, ou `NOT_RUN` nos demais casos. `NA`
+   exige justificativa em `known_failures`.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
 
@@ -173,7 +174,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
-  "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NOT_RUN", "build": "PASS|FAIL|NOT_RUN", "known_failures": [] },
+  "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -227,7 +228,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se um fluxo de entrega externo o invocou com respostas fixas contendo a cláusula `delivery: external` (ex.: skill `ship`), registre `repo.delivery: "external"` em `progress.json` e use as respostas fornecidas diretamente, **sem perguntar**. Caso contrário, registre `repo.delivery: "internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Derive `baseline.status`: `PASS` somente se todos os gates aplicáveis passarem, `FAIL` se qualquer teste/build falhar, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build` e `known_failures`. Se vermelha, **pare e reporte**; só avance com autorização explícita.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Derive `baseline.status`: `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa), `FAIL` se qualquer teste/build falhar, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e `override_approved`. Se vermelha, **pare e reporte**; só avance com autorização explícita, registrada em `override_approved`.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -402,9 +403,8 @@ stateDiagram-v2
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK --> PRECHECK_GATE : baseline + spec_kit WRITTEN + OK do usuario
-    PRECHECK_GATE --> PRECHECK : baseline VERMELHO ou NOT_RUN, spec_kit PENDING ou sem OK
-    PRECHECK_GATE --> CICLO_TAREFA : baseline VERDE, spec_kit WRITTEN e OK
+    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN ou FAIL sem override, spec_kit PENDING ou sem OK
+    PRECHECK_GATE --> CICLO_TAREFA : baseline PASS ou FAIL com override_approved, spec_kit WRITTEN e OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
