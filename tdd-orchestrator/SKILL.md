@@ -89,7 +89,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
 | `validator` | PASSOU | `gates.*: PASS` | Avance para DONE |
-| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate | Roteie por `origin` do FAIL (`TOOLING` vai direto a `GREEN_FIX`); ausência de `origin` torna o output inválido e exige reexecução |
+| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate | Roteie por `origin` do FAIL (`TOOLING` vai a `TOOLING_FIX`); ausência de `origin` torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
 | `spec-kit-author` | CONCLUÍDO | `spec_kit.status: WRITTEN` | Confirme artefatos em disco, registre paths e `written_at` |
@@ -215,7 +215,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
         {
           "id": "T-001",
           "title": "...",
-          "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
+          "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
           "acceptance_criteria": ["AC-001"],
@@ -393,7 +393,7 @@ Sem critério de aceite explícito, **não delegue**.
 
 Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
 
-> **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
+> **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `TOOLING_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
 
 1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
 2. **GREEN — `backend-developer` e/ou `frontend-developer`.** Implementa o **requisito completo** (a menor solução que atende **todos** os critérios). O dev reconfirma o vermelho antes de codar. Critério sem teste → para e devolve ao `test-author`. **Testes são read-only.**
@@ -442,6 +442,7 @@ stateDiagram-v2
         RED_CHECK --> REVIEW : passam de imediato, comportamento ja implementado e matriz AC->teste válida
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
+        TOOLING_FIX --> REFACTOR : gate tooling corrigido e suíte preservada
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>
@@ -481,10 +482,10 @@ stateDiagram-v2
         %% ---------- VALIDATE ----------
         state VALIDATE_GATES <<choice>>
         VALIDATE --> VALIDATE_GATES : rodar gates (inclui spec_kit)
-        VALIDATE_GATES --> DOC : FAIL gate spec_kit (ausente, desatualizado ou conteudo divergente)
+        VALIDATE_GATES --> DOC : FAIL origin SPEC-CONTRATO (inclui spec_kit e contract)
         VALIDATE_GATES --> RED : FAIL origin TESTE
         VALIDATE_GATES --> RED_REVISION : FAIL origin CODIGO
-        VALIDATE_GATES --> GREEN_FIX : FAIL origin TOOLING
+        VALIDATE_GATES --> TOOLING_FIX : FAIL origin TOOLING
         VALIDATE_GATES --> REFACTOR : FAIL origin REFACTOR
         VALIDATE_GATES --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
         VALIDATE_GATES --> DONE : todos PASS ou NA justificado
@@ -576,9 +577,10 @@ stateDiagram-v2
 | `RED_REVISION` | `test-author` | Bloqueio de REVIEW ou FAIL de VALIDATE por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
 | `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
 | `GREEN_FIX` | `backend`/`frontend-developer` | RED_REVISION válido | `REFACTOR` após correção verde |
+| `TOOLING_FIX` | `backend`/`frontend-developer` | FAIL de VALIDATE com `origin: TOOLING` e evidência do gate | `REFACTOR` após corrigir o gate; não exige RED comportamental |
 | `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor ou comportamento já implementado com fases GREEN/REFACTOR registradas como SKIPPED | `DOC` (aprovado) ou `ROUTE_BLOCK` |
-| `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC/CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit` falhou em `VALIDATE` | `VALIDATE` (spec em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `BLOCKED` se contrato mudou e NÃO foi aprovado |
-| `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` falhar; rota por origem do FAIL |
+| `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC/CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit`/`contract` falhou em `VALIDATE` | `VALIDATE` (spec/contrato em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `BLOCKED` se contrato mudou e NÃO foi aprovado |
+| `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` ou `contract` falhar; rota por origem do FAIL |
 | `DONE` | Orquestrador | Todos os gates verdes | Commit da tarefa; encerra o ciclo |
 | `BLOCKED` | Orquestrador → Usuário | 3 tentativas ou mudança não aprovada | Escala; reentra em `RED` após decisão |
 | `INTEGRATE` | `integrator` | Todas as tarefas DONE | Commit de onda (verde) ou devolve ao ciclo |
@@ -624,8 +626,7 @@ Após todas as tarefas da onda em `DONE`: delegue ao `integrator` (lista de tare
 > veredito de cada um é só dele; item 6 = gates `lint` + `type-check`, item 8 =
 > `contract`, item 9 = `security`, item 11 = `git-sanity`). Os itens 5, 10 e 12 são
 > verificados pelo ORQUESTRADOR, fora do validator.
-
-Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
+Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; falha de ferramenta sem mudança comportamental → TOOLING_FIX, que reconfirma o gate antes/depois sem exigir RED; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada ou contrato divergente → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
 
 ---
 

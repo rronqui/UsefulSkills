@@ -3,7 +3,7 @@
 // (HOME cobre POSIX, USERPROFILE cobre Windows).
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -129,6 +129,23 @@ describe("install.mjs", () => {
       expect(existsSync(extra)).toBe(true);
     } finally {
       rmSync(home, { recursive: true, force: true });
+    }
+  });
+  it("falha antes de escrever quando ~/.omp é um symlink", () => {
+    const home = newHome();
+    const target = newHome();
+    try {
+      const ompLink = join(home, ".omp");
+      const ompTarget = join(target, "omp-target");
+      mkdirSync(ompTarget, { recursive: true });
+      symlinkSync(ompTarget, ompLink, process.platform === "win32" ? "junction" : "dir");
+      const result = runInstaller(home);
+      expect(result.status, result.stdout + result.stderr).toBe(1);
+      expect(result.stdout + result.stderr).toMatch(/symlink|simb[oó]lico/i);
+      expect(existsSync(join(ompTarget, "agent", "skills"))).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+      rmSync(target, { recursive: true, force: true });
     }
   });
 });

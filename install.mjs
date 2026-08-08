@@ -53,10 +53,33 @@ function walk(dir, includeSymlinks = false) {
   return out;
 }
 
+function destinationConflict(target) {
+  const rootPath = path.parse(path.resolve(target)).root;
+  let current = rootPath;
+  const relative = path.relative(rootPath, path.resolve(target));
+  for (const segment of relative ? relative.split(path.sep) : []) {
+    current = path.join(current, segment);
+    let stat;
+    try {
+      stat = lstatSync(current);
+    } catch (err) {
+      if (err?.code === "ENOENT") continue;
+      return { kind: "inacessível", path: current };
+    }
+    if (stat.isSymbolicLink()) return { kind: "symlink", path: current };
+    if (!stat.isDirectory()) return { kind: "conflito de tipo", path: current };
+  }
+  return null;
+}
+
 // Compara um diretório-fonte com o destino: retorna { status, detail }.
 // status: "equal" | "updated" | "created" | "drift"; conflitos de tipo são drift
 // em qualquer modo, enquanto divergências de conteúdo são drift apenas no --check.
 function syncDir(src, dest) {
+  const ancestorConflict = destinationConflict(dest);
+  if (ancestorConflict) {
+    return { status: "drift", detail: `${ancestorConflict.kind} no ancestral ${ancestorConflict.path} — remova manualmente` };
+  }
   // Conflito de tipo na RAIZ do destino: arquivo comum onde deveria haver o
   // diretório da skill. Reporta drift sem crashar (walk/readdirSync daria ENOTDIR).
   let destStat = null;
@@ -154,13 +177,22 @@ function syncDir(src, dest) {
 let drift = false;
 
 console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
+const destinationConflicts = [
+  ["skills", skillsDest, destinationConflict(skillsDest)],
+  ["agents", agentsDest, destinationConflict(agentsDest)],
+].filter(([, , conflict]) => conflict);
 let skillsDestStat = null;
 try {
   skillsDestStat = lstatSync(skillsDest);
 } catch {
   // destino ausente
 }
-if (skillsDestStat && !skillsDestStat.isDirectory()) {
+if (destinationConflicts.length > 0) {
+  for (const [kind, target, conflict] of destinationConflicts) {
+    console.log(`${kind} (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino ${target} não será alterado`);
+  }
+  drift = true;
+} else if (skillsDestStat && !skillsDestStat.isDirectory()) {
   console.log("skill (raiz)          drift    conflito de tipo (arquivo onde deveria haver diretório) — remova manualmente");
   drift = true;
 } else {

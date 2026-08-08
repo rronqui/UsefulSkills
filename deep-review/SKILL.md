@@ -153,8 +153,9 @@ completo no assignment).
    - Custom sem diff: não inclua hunks nem ordene `git diff`/`git show`; inclua somente
      a lista exata de arquivos do inventário atribuídos e peça leitura do workspace atual.
    - Diff pequeno (≤ 50.000 caracteres E ≤ 20 arquivos): inclua os hunks dos arquivos
-     dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff nem
-     leia o workspace no modo PR";
+     dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff; no
+     modo PR, nunca trate o workspace como fonte do patch; MAY leia arquivos inalterados
+     apenas como contexto do consumidor para a checagem cross-boundary";
    - Diff grande: apenas uma prévia por arquivo (primeiras ~`max(5, floor(100/fileCount))`
      linhas de conteúdo de cada hunk) + a ordem "RODE `git diff`/`git show` para
      os arquivos atribuídos" (modo não-commitado: ambos `git diff -- <path>` e
@@ -266,7 +267,8 @@ Com os resultados de todos os revisores:
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
 - Revisor registra achados apenas nos arquivos atribuídos; pode ler contexto fora deles
   para checagens cross-boundary. Sobreposição de ownership gera achados duplicados.
-- Modo PR nunca usa git local nem arquivos do workspace como fonte de contexto.
+ - Modo PR nunca usa git local nem trata o workspace como fonte do patch; arquivos inalterados
+   do workspace podem ser lidos apenas como contexto do consumidor para a checagem cross-boundary.
 - Não passe `outputSchema` na chamada `task` para o agente `deep-reviewer`: a saída
   nativa dele (seções incrementais de `yield`) é o contrato que a TUI renderiza
   como veredito + achados.

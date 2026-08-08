@@ -103,11 +103,22 @@ redact() {
       return 0
     }
     function unescaped_single(s, i, j, count) {
-      if (!match(s, /\047[[:space:]]*,?[[:space:]]*(#.*)?$/)) return 0
+      if (!match(s, /\047[[:space:]]*[,;\]\}\)]?[[:space:]]*(#.*)?$/)) return 0
       i = RSTART
+      while (i > 1 && substr(s, i - 1, 1) == "\047") i--
       count = 0
       for (j = i; j <= length(s) && substr(s, j, 1) == "\047"; j++) count++
       return (count % 2) == 1
+    }
+    function single_closed(s, i, start, count) {
+      start = 0
+      for (i = 1; i <= length(s); i++) {
+        if (substr(s, i, 1) == ":" || substr(s, i, 1) == "=") start = i
+      }
+      if (!start) return 0
+      count = 0
+      for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == "\047") count++
+      return count > 0 && (count % 2) == 0
     }
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -157,6 +168,7 @@ redact() {
         if (flow_depth <= 0) {
           pending = 0
           flow_parens = 0
+          if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*$/) pending = 1
         }
         next
       }
@@ -166,19 +178,20 @@ redact() {
           quote_open = ""
           pending = 0
         } else if (quote_open == "\047" && unescaped_single($0)) {
+          quote_open = ""
           pending = 0
         }
         next
       }
       if (pending == 5) {
         print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*`[[:space:]]*$/) pending = 0
+        if (lower ~ /^[[:space:]]*`[[:space:]]*[,;\]\}\)]?[[:space:]]*$/) pending = 0
         else pending = 5
         next
       }
       if (pending == 4) {
         print "<REDACTED>"
-        if ((here_quote == "\"" && lower ~ /^"[[:space:]]*@/) || (here_quote == "\047" && lower ~ /^\047[[:space:]]*@/)) {
+        if ((here_quote == "\"" && lower ~ /^[[:space:]]*"@[[:space:]]*$/) || (here_quote == "\047" && lower ~ /^[[:space:]]*\047@[[:space:]]*$/)) {
           pending = 0
           here_quote = ""
         }
@@ -222,9 +235,18 @@ redact() {
           print "<REDACTED>"
           next
         }
-        print "<REDACTED>"
-        pending = 0
-        next
+        if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {
+          pending = 0
+          print
+          next
+        }
+        if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
+          pending = 0
+        } else {
+          print "<REDACTED>"
+          pending = 0
+          next
+        }
       }
       if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
@@ -233,8 +255,8 @@ redact() {
           here_quote = (lower ~ /@"/) ? "\"" : "\047"
           pending = 4
         }
-        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) { quote_open = "\""; pending = 6 }
-        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) { quote_open = "\047"; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /"/ && lower !~ /"([^"\\]|\\.)*"([[:space:]]*[,;\]\}\)]?[[:space:]]*(#.*)?)?$/) { quote_open = "\""; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /\047/ && !single_closed(lower)) { quote_open = "\047"; pending = 6 }
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@\(/) {
