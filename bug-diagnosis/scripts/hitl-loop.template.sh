@@ -228,6 +228,7 @@ redact() {
           flow_parens = 0
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          if (flow_depth > 0) pending = 2
         }
         next
       }
