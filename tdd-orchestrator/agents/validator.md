@@ -48,11 +48,18 @@ gates com o mesmo critério de evidência.
 > orquestrador, não seus.
 
 ## Saída
-Veredito em uma linha: **PASSOU** ou **FALHOU**. Depois, um item por gate:
- - `GATE — PASS/FAIL/NA — comando: <cmd> — evidência: <trecho> [— origin: TESTE|CODIGO|TOOLING|REFACTOR|SPEC-CONTRATO se FAIL] [— na_reason: <motivo> se NA]`
+Veredito em uma linha: **PASSOU** ou **FALHOU**. Depois, exatamente uma linha por
+gate, na ordem canônica `tests`, `traceability`, `spec_kit`, `coverage`, `lint`,
+`type_check`, `build`, `security`, `contract`, `git_sanity`:
+ - `<gate-key> — PASS/FAIL/NA — comando: <cmd> — evidência: <trecho> [— origin: TESTE|CODIGO|TOOLING|REFACTOR|SPEC-CONTRATO se FAIL] [— na_reason: <motivo> se NA]`
+
+Cada `<gate-key>` deve aparecer uma única vez; ausência, duplicação, chave desconhecida
+ou ordem diferente torna o output inválido e exige reexecução.
 
 Para cada `FAIL`, informe uma única `origin`: `TESTE` para traceability/tests/coverage,
-`SPEC-CONTRATO` para spec_kit/contract, `TOOLING` para lint/type-check/build/security/git-sanity
-quando a falha não exigir mudança de comportamento, `CODIGO` quando exigir correção de
-comportamento observável, ou `REFACTOR` quando a falha for exclusivamente de refactor.
+`SPEC-CONTRATO` para spec_kit ou falha de definição do contrato, `TOOLING` para
+lint/type-check/build/security/git-sanity quando a falha não exigir mudança de
+comportamento, `CODIGO` quando exigir correção de comportamento observável ou de
+implementação que viola contrato aprovado, ou `REFACTOR` quando a falha for
+exclusivamente de refactor.
 Liste gates `NA` com justificativa. **Não declare PASSOU global se algum gate obrigatório está FAIL ou sem evidência.**

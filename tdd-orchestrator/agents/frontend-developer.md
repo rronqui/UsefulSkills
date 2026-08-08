@@ -14,7 +14,8 @@ Você é o **desenvolvedor de frontend** (fase **GREEN**): componentes, estado, 
 
 ## Pré-condições (pare e retorne BLOQUEADO se faltar)
 1. Fase `GREEN`, `GREEN_FIX` ou `TOOLING_FIX`.
-2. Em `GREEN`/`GREEN_FIX`, há **evidência RED válida**; reconfirme o vermelho antes de codar
+2. Sempre há caminho e versão do contrato, além de `allowed_write_globs`, cobrindo os arquivos a alterar e o alvo do gate quando `TOOLING_FIX`; se faltar qualquer um, pare e retorne `BLOQUEADO`.
+3. Em `GREEN`/`GREEN_FIX`, há evidência RED válida; reconfirme o vermelho antes de codar
    — se já passa, pare (`BLOQUEADO`). Em `TOOLING_FIX`, há evidência do gate `TOOLING`
    falhando; reconfirme esse gate e não exija RED comportamental.
 

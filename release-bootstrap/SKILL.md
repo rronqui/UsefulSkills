@@ -92,8 +92,8 @@ As fases seguintes usam ESSE levantamento, não suposições.
   Em shell POSIX/Git Bash, valide a saída e remova o terminador antes de enviar por
   stdin, limpando o token mesmo em falha:
   `token="$(gh auth token)" || exit 1; [ -n "$token" ] || { unset token; exit 1; }; if printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; then status=0; else status=$?; fi; unset token; exit $status`.
-  No PowerShell, escreva o token sem newline no stdin do processo e remova-o após o uso:
-`$token = (gh auth token).Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = $null; try { $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() }; $token = $null }`.
+  No PowerShell, adquira o token dentro do `try`, escreva-o sem newline no stdin do processo e remova-o no `finally`:
+`$token = $null; $p = $null; try { $token = (gh auth token).Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() }; $token = $null }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 

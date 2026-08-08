@@ -162,6 +162,34 @@ redact() {
       if (match(s, "(" labels ")[[:space:]]*[:=]")) return RSTART + RLENGTH - 1
       return 0
     }
+    function strip_quoted(s, out, i, ch, quote) {
+      out = ""
+      quote = ""
+      for (i = 1; i <= length(s); i++) {
+        ch = substr(s, i, 1)
+        if (quote == "\"") {
+          if (ch == "\"" && !quote_escaped(s, i)) quote = ""
+          continue
+        }
+        if (quote == "\047") {
+          if (ch == "\047") {
+            if (substr(s, i + 1, 1) == "\047") i++
+            else quote = ""
+          }
+          continue
+        }
+        if (ch == "\047" && i > 1 && i < length(s) && substr(s, i - 1, 1) ~ /[[:alnum:]]/ && substr(s, i + 1, 1) ~ /[[:alnum:]]/) {
+          out = out ch
+          continue
+        }
+        if (ch == "\"" || ch == "\047") {
+          quote = ch
+          continue
+        }
+        out = out ch
+      }
+      return out
+    }
     function single_closed(s, i, start, count) {
       start = assignment_start(s)
       if (!start) return 0
@@ -175,12 +203,44 @@ redact() {
       for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == wanted) return 1
       return 0
     }
-    function value_quote_count(s, wanted, i, start, count) {
+    function value_quote_count(s, wanted, i, start, count, prev, nxt) {
       start = assignment_start(s)
       if (!start) return 0
       count = 0
-      for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == wanted) count++
+      for (i = start + 1; i <= length(s); i++) {
+        if (substr(s, i, 1) != wanted) continue
+        prev = (i > 1) ? substr(s, i - 1, 1) : ""
+        nxt = (i < length(s)) ? substr(s, i + 1, 1) : ""
+        if (wanted == "\047" && prev ~ /[[:alnum:]]/ && nxt ~ /[[:alnum:]]/) continue
+        count++
+      }
       return count
+    }
+    function value_double_unclosed(s, rest, pos, count, start) {
+      start = assignment_start(s)
+      if (!start) return 0
+      rest = substr(s, start + 1)
+      count = 0
+      while ((pos = unescaped_double(rest))) {
+        count++
+        rest = substr(rest, pos + 1)
+      }
+      return (count % 2) == 1
+    }
+    function value_plain_scalar(s, start, value) {
+      start = assignment_start(s)
+      if (!start) return 0
+      value = substr(s, start + 1)
+      return value !~ /^[[:space:]]*(#.*)?$/ &&
+        value !~ /^[[:space:]]*[\047"]/ &&
+        value !~ /^[[:space:]]*[\[{(@|>`]/
+    }
+    function pem_label(s, marker) {
+      marker = s
+      sub(/^.*-----begin[[:space:]]+/, "", marker)
+      sub(/^.*-----end[[:space:]]+/, "", marker)
+      sub(/[[:space:]]+private[[:space:]]+key-----.*$/, "", marker)
+      return marker
     }
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -188,9 +248,9 @@ redact() {
       bracket_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       quote_open = ""
-      here_quote = ""
       quote_pos = 0
       flow_parens = 0
+      pem_label_value = ""
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
@@ -210,8 +270,7 @@ redact() {
             quote_open = ""
           } else next
         }
-        gsub(/"([^"\\]|\\.)*"/, "", scan)
-        gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+        scan = strip_quoted(scan)
         gsub(/#.*/, "", scan)
         quote_pos = unescaped_double(scan)
         if (quote_pos) {
@@ -232,23 +291,30 @@ redact() {
           pending = 0
           flow_parens = 0
           if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ /[=:][[:space:]]*$/ || lower ~ /[=:][[:space:]]*(\{|\[|@|\||>)/)) pending = 1
-          if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) pending = 3
+          if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
+          if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_plain_scalar(lower)) pending = 1
+          if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) { pending = 3; pem_label_value = pem_label(lower) }
         }
         next
       }
       if (pending == 6) {
-        print "<REDACTED>"
-        if (quote_open == "\"" && unescaped_double($0)) {
-          quote_open = ""
-          pending = 0
-        } else if (quote_open == "\047" && unescaped_single($0)) {
-          quote_open = ""
-          pending = 0
+        scan = $0
+        if (quote_open == "\"") {
+          quote_pos = unescaped_double(scan)
+          if (quote_pos) {
+            scan = substr(scan, quote_pos + 1)
+            quote_open = ""
+            pending = 0
+          } else next
+        } else if (quote_open == "\047") {
+          if (scan ~ /\047/) {
+            sub(/^[^\047]*\047/, "", scan)
+            quote_open = ""
+            pending = 0
+          } else next
         }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(@\(|@\{|[\[{])/) {
-          scan = $0
-          gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+          scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
           flow_parens = (scan ~ /[()]/)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
@@ -276,20 +342,23 @@ redact() {
       }
       if (pending == 3) {
         print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/) pending = 0
+        if (lower ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/ && pem_label(lower) == pem_label_value) {
+          pending = 0
+          pem_label_value = ""
+        }
         next
       }
       if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
         print "<REDACTED>"
         pending = 3
+        pem_label_value = pem_label(lower)
         next
       }
       if (pending) {
         if ($0 ~ /^[[:space:]]*[\[{]/ || $0 ~ /^[[:space:]]*@[\{(]/) {
           print "<REDACTED>"
           scan = $0
-          gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+          scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
           flow_parens = ($0 ~ /^[[:space:]]*@\(/)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
@@ -339,14 +408,14 @@ redact() {
           here_quote = (lower ~ /@"/) ? "\"" : "\047"
           pending = 4
         }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_has_quote(lower, "\"") && lower !~ /"([^"\\]|\\.)*"([[:space:]]*[,;\]\}\)]?[[:space:]]*(#.*)?)?$/) { quote_open = "\""; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_has_quote(lower, "\"") && value_double_unclosed(lower)) { quote_open = "\""; pending = 6 }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_quote_count(lower, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_plain_scalar(lower)) pending = 1
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@\(/) {
           scan = $0
-          gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+          scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
           flow_depth = gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
           flow_parens = (flow_depth > 0)
@@ -355,8 +424,7 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/ && lower !~ /[=:][[:space:]]*@\(/) {
           scan = $0
-          gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+          scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
           quote_pos = unescaped_double(scan)
           if (quote_pos) {

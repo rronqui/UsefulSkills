@@ -54,9 +54,15 @@ function walk(dir, includeSymlinks = false) {
 }
 
 function destinationConflict(target) {
-  const rootPath = path.parse(path.resolve(target)).root;
+  const resolvedTarget = path.resolve(target);
+  const resolvedHome = path.resolve(home);
+  const relativeToHome = path.relative(resolvedHome, resolvedTarget);
+  // Only user-controlled components below HOME are install conflicts. System
+  // ancestors (for example macOS /var -> /private/var) are trusted.
+  const startsOutsideHome = relativeToHome === ".." || relativeToHome.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToHome);
+  const rootPath = startsOutsideHome ? path.parse(resolvedTarget).root : resolvedHome;
   let current = rootPath;
-  const relative = path.relative(rootPath, path.resolve(target));
+  const relative = path.relative(rootPath, resolvedTarget);
   for (const segment of relative ? relative.split(path.sep) : []) {
     current = path.join(current, segment);
     let stat;

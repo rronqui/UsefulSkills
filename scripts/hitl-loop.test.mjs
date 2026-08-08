@@ -30,6 +30,18 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts indented continuation after a plain sensitive scalar", () => {
+    const result = runCapture([
+      "password: first-secret",
+      "  second-secret",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
 
   it("keeps redacting until an exact here-string terminator", () => {
     const result = runCapture([
@@ -81,6 +93,21 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+
+  it("redacts scalar and backtick continuations after a multiline flow close", () => {
+    const result = runCapture([
+      "password: {",
+      "  first-secret",
+      "}, api_key: `",
+      "  second-secret",
+      "`",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps flow state after a quote closes before an @{} value", () => {
     const result = runCapture([
       'password: "first-secret',
@@ -96,6 +123,20 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("third-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps flow state when a backtick-escaped quote contains a delimiter", () => {
+    const result = runCapture([
+      "password = @{",
+      'value = "first`"}',
+      'still-secret"',
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first");
+    expect(result.stdout).not.toContain("still-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
 
 
   it("does not keep quote state after a multiline single quote closes", () => {
@@ -149,6 +190,21 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("base64-second");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps a PEM block open until the matching footer type", () => {
+    const result = runCapture([
+      "private_key: -----BEGIN RSA PRIVATE KEY-----",
+      "base64-first",
+      "-----END PRIVATE KEY-----",
+      "base64-second",
+      "-----END RSA PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("base64-first");
+    expect(result.stdout).not.toContain("base64-second");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
 
   it("keeps a backtick-escaped double quote inside a multiline value", () => {
     const result = runCapture([
@@ -161,6 +217,15 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("first-secret");
     expect(result.stdout).not.toContain("still-secret");
     expect(result.stdout).not.toContain("later-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("does not keep quote state for apostrophes in plain or double-quoted values", () => {
+    const result = runCapture([
+      "password: \"don't\"",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("normal: visible");
   });
 

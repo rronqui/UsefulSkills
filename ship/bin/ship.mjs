@@ -219,10 +219,10 @@ function cmdShip(argv) {
   git(["push", "-u", "origin", branch]);
   let prUrl = "";
   let def = "";
-  const owner = repoSlug().split("/")[0];
+  const repository = repoSlug();
   try {
     def = defaultBranch();
-    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url,headRepositoryOwner", "-q", `map(select(.headRepositoryOwner.login == "${owner}")) | .[0].url`]);
+    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url,headRepository", "-q", `map(select(.headRepository.nameWithOwner == "${repository}")) | .[0].url`]);
     if (prUrl === "null") prUrl = "";
   } catch {
     console.error("Não consegui determinar a branch default; PR não criado automaticamente.");

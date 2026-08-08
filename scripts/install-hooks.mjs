@@ -23,6 +23,9 @@ if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 
 let ancestor = hooksDir;
 while (true) {
+  // Stop at the project boundary; parent system paths are not user-controlled
+  // hook destinations and may legitimately be symlinks (for example /var).
+  if (ancestor === root) break;
   try {
     if (lstatSync(ancestor).isSymbolicLink()) {
       console.error(`Caminho de hooks contém symlink; recusando escrever: ${ancestor}`);
