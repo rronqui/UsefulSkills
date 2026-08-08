@@ -424,8 +424,8 @@ stateDiagram-v2
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved e known_failures documentados) e spec_kit WRITTEN e OK
-    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN, FAIL sem override/known_failures, spec_kit PENDING ou sem OK
+    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved e known_failures correspondentes aos gates) e spec_kit WRITTEN e OK
+    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN, FAIL sem override/known_failures correspondentes, spec_kit PENDING ou sem OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
@@ -483,7 +483,7 @@ stateDiagram-v2
         VALIDATE --> VALIDATE_GATES : rodar gates (inclui spec_kit)
         VALIDATE_GATES --> DOC : FAIL gate spec_kit (ausente, desatualizado ou conteudo divergente)
         VALIDATE_GATES --> RED : FAIL origem TESTE
-        VALIDATE_GATES --> GREEN : FAIL origem CODIGO
+        VALIDATE_GATES --> RED_REVISION : FAIL origem CODIGO
         VALIDATE_GATES --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
         VALIDATE_GATES --> DONE : todos PASS ou NA justificado
 
@@ -569,9 +569,9 @@ stateDiagram-v2
 
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures documentados)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures, Spec Kit pendente ou sem OK exige nova execução ou decisão |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures correspondentes aos gates)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures correspondentes, Spec Kit pendente ou sem OK exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção** e matriz AC→teste válida; `REVIEW` se testes passam de imediato, comportamento já implementado e matriz válida; reexecute RED se faltar teste ou matriz |
-| `RED_REVISION` | `test-author` | Bloqueio de REVIEW por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
+| `RED_REVISION` | `test-author` | Bloqueio de REVIEW ou FAIL de VALIDATE por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
 | `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
 | `GREEN_FIX` | `backend`/`frontend-developer` | RED_REVISION válido | `REFACTOR` após correção verde |
 | `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor ou comportamento já implementado com fases GREEN/REFACTOR registradas como SKIPPED | `DOC` (aprovado) ou `ROUTE_BLOCK` |
