@@ -89,7 +89,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
   primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
   nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos:
-  `gh auth token | gh secret set RELEASE_PLEASE_TOKEN`.
+  `gh auth token | tr -d '\r\n' | gh secret set RELEASE_PLEASE_TOKEN`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 

@@ -89,8 +89,8 @@ capture_multiline() {
 redact() {
   awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token|password|passphrase|credential|credentials|secret' '
     BEGIN {
-      key = "(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:]"
-      word = "(^|[^[:alnum:]_-])(" labels ")[[:space:]]+"
+      key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\047\"]?[=:]"
+      word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       pending = 0
     }
     {
@@ -104,7 +104,9 @@ redact() {
       }
       if (lower ~ key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
-        pending = (lower ~ ("(^|[^[:alnum:]_-])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*(#.*|[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
+        pending = (lower ~ ("(^|[^[:alnum:]])(" labels ")[[:space:]]*[\047\"]?[=:][[:space:]]*(#.*|[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
+        if (!pending && lower ~ key && lower ~ /"/ && lower !~ /"[^"]*"([[:space:]]*)$/) pending = 1
+        if (!pending && lower ~ key && lower ~ /\047/ && lower !~ /\047[^\047]*\047([[:space:]]*)$/) pending = 1
         next
       }
       print
