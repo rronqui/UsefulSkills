@@ -187,8 +187,10 @@ try {
 } catch {
   // destino ausente
 }
-if (destinationConflicts.length > 0) {
-  for (const [kind, target, conflict] of destinationConflicts) {
+const skillsDestinationConflicts = destinationConflicts.filter(([kind]) => kind === "skills");
+const agentsDestinationConflicts = destinationConflicts.filter(([kind]) => kind === "agents");
+if (skillsDestinationConflicts.length > 0) {
+  for (const [kind, target, conflict] of skillsDestinationConflicts) {
     console.log(`${kind} (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino ${target} não será alterado`);
   }
   drift = true;
@@ -242,7 +244,12 @@ try {
 } catch {
   // destino ausente
 }
-if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
+if (agentsDestinationConflicts.length > 0) {
+  for (const [kind, target, conflict] of agentsDestinationConflicts) {
+    console.log(`${kind} (raiz)           drift    ${conflict.kind} em ${conflict.path}; destino ${target} não será alterado`);
+  }
+  drift = true;
+} else if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
   console.log("agent (raiz)           drift    conflito de tipo no caminho do diretório — remova manualmente");
   drift = true;
 } else {

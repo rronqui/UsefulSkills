@@ -84,13 +84,15 @@ por conta própria e ancoram achados nas linhas atuais.
   `jj diff --git` no lugar dos dois.
 - **Commit**: liste os últimos 20 com `git log --oneline -20`, pergunte qual
   (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
-- **Custom**: peça as instruções. Se houver mudanças não commitadas no working tree,
-  colete-as também; aplique exclusões e as restrições customizadas antes de calcular
-  estatísticas, particionar e montar assignments. Se o inventário resultante ficar
-  vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie o workspace,
-  aplique as mesmas exclusões/restrições, e particione o inventário resultante;
-  inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
-  por conta própria e ancora achados nas linhas atuais.
+ - **Custom**: peça as instruções. Se houver mudanças não commitadas (staged ou
+   unstaged), colete `git diff` e `git diff --cached`; liste também arquivos
+   untracked via `git status --short --untracked-files=all` e inclua cada arquivo
+   no inventário se não for excluído. Aplique exclusões e restrições customizadas antes de calcular
+   estatísticas, particionar e montar assignments. Se o inventário resultante
+   ficar vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie
+   o workspace, aplique as mesmas exclusões/restrições, e particione o inventário;
+   inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
+   por conta própria e ancora achados nas linhas atuais.
 
 Instruções adicionais do usuário (texto além do ref do PR, ou foco explícito) são
 SEMPRE repassadas aos revisores.

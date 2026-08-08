@@ -93,9 +93,12 @@ capture_multiline() {
 }
 redact() {
   awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*access[[:space:]_-]*key[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|secret[[:alnum:]_-]*' '
-    function unescaped_double(s, i, j, slashes) {
+    function unescaped_double(s, i, j, slashes, backticks) {
       for (i = 1; i <= length(s); i++) {
         if (substr(s, i, 1) != "\"") continue
+        backticks = 0
+        for (j = i - 1; j >= 1 && substr(s, j, 1) == "`"; j--) backticks++
+        if ((backticks % 2) == 1) continue
         slashes = 0
         for (j = i - 1; j >= 1 && substr(s, j, 1) == "\\"; j--) slashes++
         if ((slashes % 2) == 0) return i
@@ -110,15 +113,74 @@ redact() {
       for (j = i; j <= length(s) && substr(s, j, 1) == "\047"; j++) count++
       return (count % 2) == 1
     }
-    function single_closed(s, i, start, count) {
-      start = 0
+    function quote_escaped(s, i, j, slashes, backticks) {
+      backticks = 0
+      for (j = i - 1; j >= 1 && substr(s, j, 1) == "`"; j--) backticks++
+      if ((backticks % 2) == 1) return 1
+      slashes = 0
+      for (j = i - 1; j >= 1 && substr(s, j, 1) == "\\"; j--) slashes++
+      return (slashes % 2) == 1
+    }
+    function assignment_start(s, i, ch, quote, brackets, segment_start, segment, candidate) {
+      quote = ""
+      brackets = 0
+      segment_start = 1
+      candidate = 0
       for (i = 1; i <= length(s); i++) {
-        if (substr(s, i, 1) == ":" || substr(s, i, 1) == "=") start = i
+        ch = substr(s, i, 1)
+        if (quote == "\"") {
+          if (ch == "\"" && !quote_escaped(s, i)) quote = ""
+          continue
+        }
+        if (quote == "\047") {
+          if (ch == "\047") {
+            if (substr(s, i + 1, 1) == "\047") i++
+            else quote = ""
+          }
+          continue
+        }
+        if (ch == "\047" && i > 1 && i < length(s) && substr(s, i - 1, 1) ~ /[[:alnum:]]/ && substr(s, i + 1, 1) ~ /[[:alnum:]]/) continue
+        if (ch == "\"" || ch == "\047") {
+          quote = ch
+          continue
+        }
+        if (ch == "[") {
+          brackets++
+          continue
+        }
+        if (ch == "]" && brackets > 0) {
+          brackets--
+          continue
+        }
+        if (!brackets && (ch == ":" || ch == "=")) {
+          segment = substr(s, segment_start, i - segment_start)
+          if (segment ~ labels) candidate = i
+          segment_start = i + 1
+        }
       }
+      if (candidate) return candidate
+      if (match(s, "(" labels ")[[:space:]]*[:=]")) return RSTART + RLENGTH - 1
+      return 0
+    }
+    function single_closed(s, i, start, count) {
+      start = assignment_start(s)
       if (!start) return 0
       count = 0
       for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == "\047") count++
       return count > 0 && (count % 2) == 0
+    }
+    function value_has_quote(s, wanted, i, start) {
+      start = assignment_start(s)
+      if (!start) return 0
+      for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == wanted) return 1
+      return 0
+    }
+    function value_quote_count(s, wanted, i, start, count) {
+      start = assignment_start(s)
+      if (!start) return 0
+      count = 0
+      for (i = start + 1; i <= length(s); i++) if (substr(s, i, 1) == wanted) count++
+      return count
     }
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -131,6 +193,7 @@ redact() {
       flow_parens = 0
     }
     {
+      quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
       lower = tolower($0)
       if (pending == 2) {
         print "<REDACTED>"
@@ -168,7 +231,8 @@ redact() {
         if (flow_depth <= 0) {
           pending = 0
           flow_parens = 0
-          if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*$/) pending = 1
+          if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ /[=:][[:space:]]*$/ || lower ~ /[=:][[:space:]]*(\{|\[|@|\||>)/)) pending = 1
+          if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) pending = 3
         }
         next
       }
@@ -181,6 +245,19 @@ redact() {
           quote_open = ""
           pending = 0
         }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(@\(|@\{|[\[{])/) {
+          scan = $0
+          gsub(/"([^"\\]|\\.)*"/, "", scan)
+          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
+          gsub(/#.*/, "", scan)
+          flow_parens = (scan ~ /[()]/)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
+          pending = (flow_depth > 0) ? 2 : 0
+        }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ /[=:][[:space:]]*$/ || lower ~ /[=:][[:space:]]*(\{|\[|@|\||>)/)) pending = 1
+        if (!pending && lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) pending = 3
         next
       }
       if (pending == 5) {
@@ -191,7 +268,7 @@ redact() {
       }
       if (pending == 4) {
         print "<REDACTED>"
-        if ((here_quote == "\"" && lower ~ /^[[:space:]]*"@[[:space:]]*$/) || (here_quote == "\047" && lower ~ /^[[:space:]]*\047@[[:space:]]*$/)) {
+        if ((here_quote == "\"" && lower ~ /^"@[[:space:]]*$/) || (here_quote == "\047" && lower ~ /^\047@[[:space:]]*$/)) {
           pending = 0
           here_quote = ""
         }
@@ -199,7 +276,7 @@ redact() {
       }
       if (pending == 3) {
         print "<REDACTED>"
-        if (lower ~ /-----end[[:space:]].*-----[[:space:]]*$/) pending = 0
+        if (lower ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/) pending = 0
         next
       }
       if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
@@ -235,12 +312,17 @@ redact() {
           print "<REDACTED>"
           next
         }
-        if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {
+        if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {
           pending = 0
           print
           next
         }
-        if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
+        if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
+          print "<REDACTED>"
+          pending = 3
+          next
+        }
+        if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) {
           pending = 0
         } else {
           print "<REDACTED>"
@@ -248,18 +330,20 @@ redact() {
           next
         }
       }
-      if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
+      if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
-        pending = (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && (lower ~ ("(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$") || lower ~ ("(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
+        pending = (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ ("(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$") || lower ~ ("(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
+        if (!pending && lower ~ quoted_key && lower ~ /[=:][[:space:]]*([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*$/) pending = 1
+        if (!pending && lower ~ quoted_key && lower ~ /[=:][[:space:]]*$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
           here_quote = (lower ~ /@"/) ? "\"" : "\047"
           pending = 4
         }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /"/ && lower !~ /"([^"\\]|\\.)*"([[:space:]]*[,;\]\}\)]?[[:space:]]*(#.*)?)?$/) { quote_open = "\""; pending = 6 }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /\047/ && !single_closed(lower)) { quote_open = "\047"; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_has_quote(lower, "\"") && lower !~ /"([^"\\]|\\.)*"([[:space:]]*[,;\]\}\)]?[[:space:]]*(#.*)?)?$/) { quote_open = "\""; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_quote_count(lower, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
-        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@\(/) {
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@\(/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
@@ -268,8 +352,8 @@ redact() {
           flow_parens = (flow_depth > 0)
           pending = (flow_depth > 0) ? 2 : 0
         }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
-        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/ && lower !~ /[=:][[:space:]]*@\(/) {
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/ && lower !~ /[=:][[:space:]]*@\(/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)

@@ -218,9 +218,11 @@ function cmdShip(argv) {
   }
   git(["push", "-u", "origin", branch]);
   let prUrl = "";
+  let def = "";
+  const owner = repoSlug().split("/")[0];
   try {
-    const def = defaultBranch();
-    prUrl = gh(["pr", "list", "--head", `${repoSlug().split("/")[0]}:${branch}`, "--base", def, "--state", "open", "--json", "url", "-q", ".[0].url"]);
+    def = defaultBranch();
+    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url,headRepositoryOwner", "-q", `map(select(.headRepositoryOwner.login == "${owner}")) | .[0].url`]);
     if (prUrl === "null") prUrl = "";
   } catch {
     console.error("Não consegui determinar a branch default; PR não criado automaticamente.");
@@ -229,12 +231,13 @@ function cmdShip(argv) {
   if (!prUrl) {
     prUrl = gh([
       "pr", "create",
+      "--base", def,
       "--title", `${type}: ${description}`,
       "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
     ]);
   }
   console.log(`PR ${prUrl}`);
-  const auto = spawnSync("gh", ["pr", "merge", "--auto", "--squash"], { cwd: root, encoding: "utf8" });
+  const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
   if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
   else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
 }

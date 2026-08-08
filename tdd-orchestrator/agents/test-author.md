@@ -35,7 +35,8 @@ Critério ambíguo, contrato que contradiz a spec, ou teste que exigiria mudar c
 Status: CONCLUÍDO | BLOQUEADO | FALHOU
 Fase: RED | RED_REVISION | Tarefa:
 Arquivos de teste alterados:
-Mapeamento critério → teste: objeto JSON `{"AC-NNN":["arquivo::teste", "..."]}` (um ou mais testes por critério)
-Evidência RED: comando + trecho mostrando a falha por asserção (falha pelo motivo esperado: sim/não)
-Impacto em documentação: nenhum | <descrição para o orquestrador>
+ Mapeamento critério → teste: objeto JSON `{"AC-NNN":["arquivo::teste", "..."]}` (um ou mais testes por critério)
+ Evidência RED: comando + trecho mostrando a falha por asserção (falha pelo motivo esperado: sim/não)
+ Em `RED_REVISION`, preencha `red.revision_delta` com `ac`, `test` e `evidence` novos; delta obrigatório não pode repetir a falha já registrada. Sem delta verificável, retorne `BLOQUEADO`
+ Impacto em documentação: nenhum | <descrição para o orquestrador>
 Bloqueios/Ambiguidades:

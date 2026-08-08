@@ -81,6 +81,22 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps flow state after a quote closes before an @{} value", () => {
+    const result = runCapture([
+      'password: "first-secret',
+      '", api_key: @{',
+      "nested = second-secret",
+      "other = third-secret",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).not.toContain("third-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
 
   it("does not keep quote state after a multiline single quote closes", () => {
     const result = runCapture([
@@ -104,6 +120,97 @@ describe("hitl-loop redaction", () => {
     ]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts a PEM header reached through scalar continuation", () => {
+    const result = runCapture([
+      "password:",
+      "-----BEGIN PRIVATE KEY-----",
+      "base64-secret",
+      "-----END PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("base64-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("does not close a PEM block on a fake certificate marker", () => {
+    const result = runCapture([
+      "private_key: -----BEGIN PRIVATE KEY-----",
+      "base64-first",
+      "note: -----END CERTIFICATE-----",
+      "base64-second",
+      "-----END PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("base64-first");
+    expect(result.stdout).not.toContain("base64-second");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("keeps a backtick-escaped double quote inside a multiline value", () => {
+    const result = runCapture([
+      'password = "first-secret',
+      '  `"still-secret',
+      '  later-secret"',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still-secret");
+    expect(result.stdout).not.toContain("later-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("does not enter quote state for quoted keys with plain values", () => {
+    const result = runCapture([
+      "'password': plain-value",
+      "cfg['password'] = another-value",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("plain-value");
+    expect(result.stdout).not.toContain("another-value");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("selects the later sensitive field in a multi-field record", () => {
+    const result = runCapture([
+      "api_key: don't, password: 'first-secret",
+      "second-secret'",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("keeps a multiline value open when the quoted key contains a colon", () => {
+    const result = runCapture([
+      "'password:foo': 'first-secret",
+      "second-secret'",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+
+
+  it("does not accept an indented here-string marker", () => {
+    const result = runCapture([
+      'password = @"',
+      '  "@',
+      "later-secret",
+      '"@',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("later-secret");
     expect(result.stdout).toContain("normal: visible");
   });
 
