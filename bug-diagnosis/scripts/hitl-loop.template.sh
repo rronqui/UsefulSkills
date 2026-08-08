@@ -204,7 +204,7 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (pending && lower ~ /[=:][[:space:]]*@[\047"]/) pending = 4
-        if (pending && lower ~ /[=:][[:space:]]*@\(/) {
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@\(/) {
           pending = 2
           flow_depth = 1
           flow_parens = 1
