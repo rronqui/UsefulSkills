@@ -52,7 +52,8 @@ capture_multiline() {
     fi
     printf '    [input hidden]\n'
   fi
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line=${line%$'\r'}
     if [[ "$line" == "__END__" ]]; then
       saw_end=1
       break
@@ -70,7 +71,8 @@ capture_multiline() {
 }
 redact() {
   sed -E \
-    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
+    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|passphrase|credential|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
+    -e "s/((^|[^[:alnum:]_-])(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|private[_-]?key|secret[_-]?key|jwt|token|password|passphrase|credential|secret)[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig" \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 
@@ -86,5 +88,6 @@ printf 'ERRORED=%s\n' "$ERRORED"
 redacted_error=$(printf '%s' "$ERROR_MSG" | redact; printf '\001')
 redacted_error=${redacted_error%$'\001'}
 redacted_error=${redacted_error//\\/\\\\}
+redacted_error=${redacted_error//$'\r'/\\r}
 redacted_error=${redacted_error//$'\n'/\\n}
 printf 'ERROR_MSG=%s\n' "$redacted_error"

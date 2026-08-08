@@ -223,6 +223,17 @@ if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
       drift = true;
       continue;
     }
+    let srcStat = null;
+    try {
+      srcStat = lstatSync(src);
+    } catch {
+      // origem ausente
+    }
+    if (!srcStat || !srcStat.isFile() || srcStat.isSymbolicLink()) {
+      console.log(`agent ${base.padEnd(40)} FALTA na origem ou symlink não permitido`);
+      drift = true;
+      continue;
+    }
     let st = null;
     try {
       st = lstatSync(dest);
