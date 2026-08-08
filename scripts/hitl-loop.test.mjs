@@ -333,4 +333,31 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts a new quoted field after a flow closes", () => {
+    const result = runCapture([
+      "password: {",
+      "  first-secret",
+      "}, api_key: 'new-secret",
+      "next-secret'",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("new-secret");
+    expect(result.stdout).not.toContain("next-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("redacts a new quoted field after an earlier quote closes", () => {
+    const result = runCapture([
+      "password: 'old-secret",
+      "', api_key: 'new-secret",
+      "next-secret'",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("old-secret");
+    expect(result.stdout).not.toContain("new-secret");
+    expect(result.stdout).not.toContain("next-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
 });

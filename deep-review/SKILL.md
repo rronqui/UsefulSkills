@@ -161,10 +161,10 @@ completo no assignment).
      apenas como contexto do consumidor para a checagem cross-boundary";
    - Diff grande: apenas uma prévia por arquivo (primeiras ~`max(5, floor(100/fileCount))`
      linhas de conteúdo de cada hunk) + a ordem adequada ao modo: em **Custom**, rode
-     `git diff HEAD -- <path>` para cada arquivo e, para untracked, `git diff --no-index -- /dev/null <path>`;
-     em **Não commitadas**, rode ambos `git diff -- <path>` e `git diff --cached -- <path>`; em
+     `git diff HEAD -- "<path>"` para cada arquivo e, para untracked, `git diff --no-index -- /dev/null "<path>"`;
+     em **Não commitadas**, rode ambos `git diff -- "<path>"` e `git diff --cached -- "<path>"`; em
      branch/commit, rode `git diff`/`git show` para os arquivos atribuídos; em jj, rode
-     `jj --ignore-working-copy diff --git -- <path>`.
+     `jj --ignore-working-copy diff --git -- "<path>"`.
    - Modo PR, qualquer tamanho: "leia o patch somente de `pr://<owner>/<repo>/<N>/diff/all` ou
      por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local nem
      trate o workspace como fonte do patch. Para a checagem cross-boundary obrigatória, MAY

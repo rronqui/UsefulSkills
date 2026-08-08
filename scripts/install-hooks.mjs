@@ -1,7 +1,7 @@
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,7 +21,8 @@ try {
 }
 if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 const hooksRelative = relative(root, hooksDir);
-const hooksInsideProject = hooksRelative === "" || (!hooksRelative.startsWith("..") && !hooksRelative.startsWith("/"));
+const parentTraversal = hooksRelative === ".." || hooksRelative.startsWith(`..${sep}`);
+const hooksInsideProject = hooksRelative === "" || (!parentTraversal && !isAbsolute(hooksRelative));
 
 let ancestor = hooksDir;
 while (true) {
