@@ -99,9 +99,17 @@ function cmdNew(argv) {
         try {
           git(["switch", "--no-guess", originalBranch]);
         } catch {
-          git(["symbolic-ref", "HEAD", `refs/heads/${originalBranch}`]);
-          git(["read-tree", "--empty"]);
-          git(["clean", "-fd"]);
+          if (originalHead) {
+            try {
+              git(["switch", "--discard-changes", "--no-guess", originalBranch]);
+            } catch {
+              git(["switch", "--detach", originalHead]);
+            }
+          } else {
+            git(["symbolic-ref", "HEAD", `refs/heads/${originalBranch}`]);
+            git(["read-tree", "--empty"]);
+            git(["clean", "-fd"]);
+          }
         }
       } else if (!originalBranch && originalHead) {
         git(["switch", "--detach", originalHead]);
