@@ -439,6 +439,8 @@ stateDiagram-v2
         RED_CHECK --> RED : falha por import-setup ou faltam testes / testes passam sem comportamento implementado
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
+        RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
+        GREEN_FIX --> REFACTOR : verde com requisito corrigido
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>
@@ -458,7 +460,7 @@ stateDiagram-v2
         %% ---------- Roteamento de bloqueio por origem ----------
         state ROUTE_BLOCK <<choice>>
         ROUTE_BLOCK --> RED : origem TESTE
-        ROUTE_BLOCK --> GREEN : origem CODIGO
+        ROUTE_BLOCK --> RED_REVISION : origem CODIGO
         ROUTE_BLOCK --> REFACTOR : origem REFACTOR
         ROUTE_BLOCK --> DOC : origem SPEC-CONTRATO
         ROUTE_BLOCK --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
@@ -568,8 +570,9 @@ stateDiagram-v2
 |---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures documentados)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures, Spec Kit pendente ou sem OK exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste ou comportamento |
-| `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
-| `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
+| `RED_REVISION` | `test-author` | Bloqueio de REVIEW por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
+| `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
+| `GREEN_FIX` | `backend`/`frontend-developer` | RED_REVISION válido | `REFACTOR` após correção verde |
 | `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor ou comportamento já implementado com fases GREEN/REFACTOR registradas como SKIPPED | `DOC` (aprovado) ou `ROUTE_BLOCK` |
 | `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC/CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit` falhou em `VALIDATE` | `VALIDATE` (spec em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `BLOCKED` se contrato mudou e NÃO foi aprovado |
 | `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` falhar; rota por origem do FAIL |
