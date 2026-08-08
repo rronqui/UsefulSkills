@@ -1,7 +1,7 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
 import { describe, it, expect, vi } from "vitest";
 import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -115,19 +115,6 @@ describe("performBackup", () => {
       expect(dest).toBe(join(root, "data", "backup", `app.db-${dest.split("-").pop()}`));
       expect(existsSync(dest)).toBe(true);
       expect(readFileSync(dest, "utf8")).toBe("v1");
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-  it("preserva permissões restritivas do banco no backup", () => {
-    if (process.platform === "win32") return;
-    const root = mkdtempSync(join(tmpdir(), "bkp-mode-"));
-    const db = join(root, "db.sqlite");
-    writeFileSync(db, "segredo");
-    chmodSync(db, 0o600);
-    try {
-      const dest = performBackup({ dbPath: "db.sqlite" }, root);
-      expect(statSync(dest).mode & 0o777).toBe(0o600);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

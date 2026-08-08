@@ -90,7 +90,7 @@ redact() {
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
-      bracket_key = "(" labels ")[[:space:]]*[\047\"]?][[:space:]]*[=:]"
+      bracket_key = "(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       pending = 0
     }
@@ -109,6 +109,7 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[\[{][[:space:]]*$/) pending = 1
         next
       }
       print
@@ -117,10 +118,12 @@ redact() {
 }
 
 # --- edit below ---------------------------------------------------------
+APP_INSTRUCTIONS="${APP_INSTRUCTIONS:-Open the application and reproduce the issue.}"
 
-step "Open the app at http://localhost:3000 and sign in."
+step "$APP_INSTRUCTIONS"
 
-capture ERRORED "Click the 'Export' button. Did it throw an error? (y/n)"
+ERROR_QUESTION="${ERROR_QUESTION:-Did the operation under test fail? (y/n)}"
+capture ERRORED "$ERROR_QUESTION"
 capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 
 printf '\n--- Captured ---\n'

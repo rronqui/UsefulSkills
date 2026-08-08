@@ -85,26 +85,49 @@ function cmdNew(argv) {
     console.error("Working tree sujo — commit ou descarte as mudanças antes.");
     process.exit(1);
   }
+  const originalBranch = git(["branch", "--show-current"]);
   const def = defaultBranch();
+  const restoreBranch = () => {
+    if (originalBranch && originalBranch !== def) {
+      try {
+        git(["switch", originalBranch]);
+      } catch {
+        // preserve the original failure if restoration is unavailable
+      }
+    }
+  };
   try {
     git(["switch", def]);
     git(["pull", "--ff-only"]);
   } catch {
+    restoreBranch();
     console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
     process.exit(1);
   }
   const label = type === "fix" ? "bug" : "enhancement";
-  const url = gh([
-    "issue", "create",
-    "--title", `[${type === "fix" ? "bug" : "feat"}] ${title}`,
-    "--label", label,
-    "--body", desc || "—",
-  ]);
-  const n = issueNumberOrDie(url);
+  let url;
+  try {
+    url = gh([
+      "issue", "create",
+      "--title", `[${type === "fix" ? "bug" : "feat"}] ${title}`,
+      "--label", label,
+      "--body", desc || "—",
+    ]);
+  } catch (err) {
+    restoreBranch();
+    throw err;
+  }
+  const n = extractIssueNumber(url);
+  if (n === null) {
+    restoreBranch();
+    console.error(`Não consegui extrair o número da issue/PR de: ${url}`);
+    process.exit(1);
+  }
   const branch = `${type}/${n}-${slugify(title)}`;
   try {
     git(["switch", "-c", branch]);
   } catch (err) {
+    restoreBranch();
     let closed = true;
     try {
       gh(["issue", "close", n, "--comment", "Issue fechada automaticamente: não foi possível criar a branch correspondente."]);
