@@ -220,6 +220,7 @@ function cmdShip(argv) {
   let prUrl = "";
   try {
     prUrl = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "-q", ".[0].url"]);
+    if (prUrl === "null") prUrl = "";
   } catch {
     // fall through to normal creation
   }
