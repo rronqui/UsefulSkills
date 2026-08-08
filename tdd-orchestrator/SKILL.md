@@ -173,7 +173,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [] }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `implemented_by` e `reviewed_by` como `""`, e `gates` com todos os campos em `"pending"`;
-   `blockers` e `evidence`; redefina a onda como `status: in_progress`,
+   limpe `blockers` e `evidence`; redefina a onda como `status: in_progress`,
    `integration.status: pending` e `integration.evidence: ""`; não trate a entrada inválida como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
