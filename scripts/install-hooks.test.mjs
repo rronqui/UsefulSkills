@@ -28,6 +28,7 @@ const sh = findSh();
 function initRepo(name) {
   const dir = mkdtempSync(join(tmpdir(), `hooks-${name}-`));
   spawnSync("git", ["init", "-q"], { cwd: dir });
+  spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: dir });
   cpSync(join(repoRoot, "scripts"), join(dir, "scripts"), { recursive: true });
   symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   copyFileSync(join(repoRoot, ".commitlintrc.json"), join(dir, ".commitlintrc.json"));

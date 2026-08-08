@@ -44,7 +44,8 @@ capture_multiline() {
   if [[ -t 0 ]]; then
     stty -echo || return 1
     hidden=1
-    trap 'restore_tty; exit 130' INT TERM
+    trap 'restore_tty; exit 130' INT TERM HUP QUIT
+    trap restore_tty EXIT
     printf '    [input hidden]\n'
   fi
   while IFS= read -r line; do
@@ -56,7 +57,7 @@ capture_multiline() {
     answer+="$line"
   done
   restore_tty
-  trap - INT TERM
+  trap - EXIT INT TERM HUP QUIT
   if (( !saw_end )); then
     printf '    ERROR: multiline capture ended before __END__.\n' >&2
     return 1
@@ -65,7 +66,7 @@ capture_multiline() {
 }
 redact() {
   sed -E \
-    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"']*/\1<REDACTED>/Ig" \
+    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"\r\n]*/\1<REDACTED>/Ig" \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 
@@ -79,5 +80,6 @@ capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
 redacted_error=$(printf '%s' "$ERROR_MSG" | redact)
+redacted_error=${redacted_error//\\/\\\\}
 redacted_error=${redacted_error//$'\n'/\\n}
 printf 'ERROR_MSG=%s\n' "$redacted_error"

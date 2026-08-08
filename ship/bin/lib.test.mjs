@@ -67,6 +67,9 @@ describe("extractServedVersion", () => {
   it("não aceita versão com sufixo semântico inválido", () => {
     expect(extractServedVersion("<p>v1.2.3+build+oops</p>")).toBeNull();
   });
+  it("não aceita hífen sem identificador", () => {
+    expect(extractServedVersion("<p>v1.2.3-</p>")).toBeNull();
+  });
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();
@@ -79,6 +82,9 @@ describe("isValidSemVer", () => {
   });
   it("rejeita identificador numérico prerelease com zero à esquerda", () => {
     expect(isValidSemVer("1.2.3-01")).toBe(false);
+  });
+  it("rejeita newline final fora do valor SemVer", () => {
+    expect(isValidSemVer("1.2.3\n")).toBe(false);
   });
 });
 

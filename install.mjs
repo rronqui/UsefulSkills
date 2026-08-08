@@ -109,7 +109,7 @@ function syncDir(src, dest) {
     } catch {
       // destino ausente
     }
-    if (st && st.isDirectory()) {
+    if (st && (st.isDirectory() || st.isSymbolicLink())) {
       // Conflito de tipo: diretório no destino onde deveria haver arquivo.
       // --check reporta como drift; o modo normal NÃO destrói o diretório.
       typeConflicts++;
@@ -229,7 +229,7 @@ if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
     } catch {
       // destino ausente
     }
-    if (st && st.isDirectory()) {
+    if (st && (st.isDirectory() || st.isSymbolicLink())) {
       console.log(`agent ${base.padEnd(40)} drift    conflito de tipo (diretório no destino)`);
       drift = true;
       continue;

@@ -64,8 +64,10 @@ Sem escopo explícito, pergunte ao usuário (ferramenta `ask`) qual modo quer:
 ### Coleta do diff por modo
 
 Para PR, branch base, não commitadas e commit, diff vazio → informe o usuário e PARE
-(não dispare revisores sem material). **Custom é a exceção:** sem mudanças, o
-assignment contém apenas as instruções e os revisores leem o workspace por conta própria.
+*(não dispare revisores sem material). **Custom é a exceção:** sem mudanças, o
+orquestrador deve mapear o workspace, particionar arquivos revisáveis e incluir em
+cada assignment a lista exata de arquivos atribuídos; os revisores leem esses arquivos
+por conta própria e ancoram achados nas linhas atuais.
 
 - **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
   Falha ao buscar → reporte o erro e pare.
@@ -80,8 +82,9 @@ assignment contém apenas as instruções e os revisores leem o workspace por co
   (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
 - **Custom**: peça as instruções. Se houver mudanças não commitadas no working tree,
   colete-as também e inclua as estatísticas e o diff (as instruções customizadas vão
-  como "instruções adicionais"). Sem mudanças → o assignment do revisor contém apenas
-  as instruções e ele lê o workspace por conta própria.
+  como "instruções adicionais"). Sem mudanças → mapeie e particione o workspace,
+  inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
+  por conta própria e ancora achados nas linhas atuais.
 
 Instruções adicionais do usuário (texto além do ref do PR, ou foco explícito) são
 SEMPRE repassadas aos revisores.

@@ -77,7 +77,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS` | Avance para GREEN |
-| `test-author` | FALHOU | (verifique se já implementado) | Se sim → REVIEW; se não → reexecute |
+| `test-author` | FALHOU | `red.status: PASS`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Se já implementado → REVIEW; se não → reexecute RED |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
@@ -546,10 +546,10 @@ stateDiagram-v2
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo somente com `baseline.status: PASS`, `spec_kit WRITTEN` e OK; `FAIL`/`NOT_RUN` exige nova execução ou decisão |
-| `RED` | `test-author` | Início da tarefa ou bloqueio de origem TESTE | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste |
+| `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
-| `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor | `DOC` (aprovado) ou `ROUTE_BLOCK` |
+| `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor ou comportamento já implementado com fases GREEN/REFACTOR registradas como SKIPPED | `DOC` (aprovado) ou `ROUTE_BLOCK` |
 | `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC/CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit` falhou em `VALIDATE` | `VALIDATE` (spec em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `BLOCKED` se contrato mudou e NÃO foi aprovado |
 | `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` falhar; rota por origem do FAIL |
 | `DONE` | Orquestrador | Todos os gates verdes | Commit da tarefa; encerra o ciclo |

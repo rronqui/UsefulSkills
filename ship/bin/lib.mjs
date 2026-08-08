@@ -3,7 +3,7 @@
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
-const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
 
 export function isValidSemVer(value) {
   return typeof value === "string" && SEMVER_RE.test(value);
@@ -40,7 +40,7 @@ export function extractServedVersion(html) {
   let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z+.-]|[.-](?=$|[^0-9A-Za-z]))/) || [])[1] ?? null;
+  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z+.-]|\.(?=$|[^0-9A-Za-z]))/) || [])[1] ?? null;
 }
 
 
