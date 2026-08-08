@@ -98,7 +98,7 @@ redact() {
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bracket_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
-      pending = 0
+      quote_open = ""
       flow_depth = 0
     }
     {
@@ -106,9 +106,28 @@ redact() {
       if (pending == 2) {
         print "<REDACTED>"
         scan = $0
+        if (quote_open == "\"") {
+          if (scan ~ /"/) {
+            sub(/^[^"]*"/, "", scan)
+            quote_open = ""
+          } else next
+        } else if (quote_open == "\047") {
+          if (scan ~ /\047/) {
+            sub(/^[^\047]*\047/, "", scan)
+            quote_open = ""
+          } else next
+        }
         gsub(/"([^"\\]|\\.)*"/, "", scan)
         gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
         gsub(/#.*/, "", scan)
+        if (scan ~ /"/) {
+          quote_open = "\""
+          next
+        }
+        if (scan ~ /\047/) {
+          quote_open = "\047"
+          next
+        }
         flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
         flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
         if (flow_depth <= 0) pending = 0
