@@ -101,6 +101,7 @@ function cmdNew(argv) {
         } catch {
           git(["symbolic-ref", "HEAD", `refs/heads/${originalBranch}`]);
           git(["read-tree", "--empty"]);
+          git(["clean", "-fd"]);
         }
       } else if (!originalBranch && originalHead) {
         git(["switch", "--detach", originalHead]);
