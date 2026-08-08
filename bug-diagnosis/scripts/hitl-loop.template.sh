@@ -152,6 +152,17 @@ redact() {
         }
         next
       }
+      if (pending == 6) {
+        print "<REDACTED>"
+        if (quote_open == "\"" && unescaped_double($0)) {
+          quote_open = ""
+          pending = 0
+        } else if (quote_open == "\047" && $0 ~ /\047/) {
+          quote_open = ""
+          pending = 0
+        }
+        next
+      }
       if (pending == 5) {
         print "<REDACTED>"
         if (lower ~ /^[[:space:]]*`[[:space:]]*$/) pending = 0

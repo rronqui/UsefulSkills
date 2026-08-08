@@ -220,7 +220,7 @@ function cmdShip(argv) {
   let prUrl = "";
   try {
     const def = defaultBranch();
-    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url", "-q", ".[0].url"]);
+    prUrl = gh(["pr", "list", "--head", `${repoSlug().split("/")[0]}:${branch}`, "--base", def, "--state", "open", "--json", "url", "-q", ".[0].url"]);
     if (prUrl === "null") prUrl = "";
   } catch {
     console.error("Não consegui determinar a branch default; PR não criado automaticamente.");
