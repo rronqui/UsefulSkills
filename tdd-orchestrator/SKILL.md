@@ -436,8 +436,7 @@ stateDiagram-v2
         %% ---------- RED ----------
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
-        RED_CHECK --> RED : falha por import-setup ou faltam testes / testes passam sem comportamento implementado
-        RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
+        RED_CHECK --> RED : falha por import-setup, faltam testes ou matriz AC->teste inválida/incompleta
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
@@ -569,7 +568,7 @@ stateDiagram-v2
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures documentados)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures, Spec Kit pendente ou sem OK exige nova execução ou decisão |
-| `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste ou comportamento |
+| `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção** e matriz AC→teste válida; `REVIEW` se testes passam de imediato, comportamento já implementado e matriz válida; reexecute RED se faltar teste ou matriz |
 | `RED_REVISION` | `test-author` | Bloqueio de REVIEW por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
 | `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
 | `GREEN_FIX` | `backend`/`frontend-developer` | RED_REVISION válido | `REFACTOR` após correção verde |
