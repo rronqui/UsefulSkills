@@ -1,6 +1,6 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync } from "node:fs";
+import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -79,9 +79,16 @@ export function performBackup(cfg, root) {
         linkSync(temp, dest);
         unlinkSync(temp);
       } catch (err) {
-        if (!["EPERM", "EOPNOTSUPP", "EXDEV"].includes(err?.code) || existsSync(dest)) throw err;
-        renameSync(temp, dest);
-        tempReserved = false;
+        if (!["EPERM", "EOPNOTSUPP", "EXDEV"].includes(err?.code)) throw err;
+        try {
+          copyFileSync(temp, dest, constants.COPYFILE_EXCL);
+        } catch (copyErr) {
+          if (copyErr?.code !== "EEXIST") {
+            try { unlinkSync(dest); } catch {}
+          }
+          throw copyErr;
+        }
+        unlinkSync(temp);
       }
       return dest;
     } catch (err) {
