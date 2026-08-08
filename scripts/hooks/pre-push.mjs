@@ -7,8 +7,9 @@ import { readFileSync } from "node:fs";
 let input = "";
 try {
   input = readFileSync(0, "utf8");
-} catch {
-  process.exit(0);
+} catch (err) {
+  console.error(`[pre-push] Não foi possível ler as refs recebidas pela entrada padrão: ${err?.message ?? err}`);
+  process.exit(1);
 }
 
 for (const line of input.split("\n")) {

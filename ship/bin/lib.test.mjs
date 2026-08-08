@@ -1,5 +1,5 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -89,6 +89,37 @@ describe("performBackup", () => {
       expect(existsSync(dest)).toBe(true);
       expect(readFileSync(dest, "utf8")).toBe("v1");
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it("honra dbPath absoluto", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    const outside = mkdtempSync(join(tmpdir(), "bkp-external-"));
+    const db = join(outside, "app.db");
+    writeFileSync(db, "externo");
+    try {
+      const dest = performBackup({ dbPath: db, backupDir: join(root, "backup") }, root);
+      expect(dest).not.toBeNull();
+      expect(readFileSync(dest, "utf8")).toBe("externo");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("não sobrescreve backup existente no mesmo instante", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    writeFileSync(join(root, "db.sqlite"), "v1");
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    try {
+      const first = performBackup({ dbPath: "db.sqlite" }, root);
+      writeFileSync(join(root, "db.sqlite"), "v2");
+      const second = performBackup({ dbPath: "db.sqlite" }, root);
+      expect(second).not.toBe(first);
+      expect(readFileSync(first, "utf8")).toBe("v1");
+      expect(readFileSync(second, "utf8")).toBe("v2");
+    } finally {
+      vi.useRealTimers();
       rmSync(root, { recursive: true, force: true });
     }
   });

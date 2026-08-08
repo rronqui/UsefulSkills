@@ -77,7 +77,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS` | Avance para GREEN |
-| `test-author` | FALHOU | (verifique se já implementado) | Se sim → VALIDATE; se não → reexecute |
+| `test-author` | FALHOU | (verifique se já implementado) | Se sim → REVIEW; se não → reexecute |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
@@ -170,7 +170,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
-  "baseline": { "tests": "PASS|FAIL|NOT_RUN", "build": "PASS|FAIL|NOT_RUN", "known_failures": [] },
+  "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NOT_RUN", "build": "PASS|FAIL|NOT_RUN", "known_failures": [] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -224,7 +224,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se um fluxo de entrega externo o invocou com respostas fixas contendo a cláusula `delivery: external` (ex.: skill `ship`), registre `repo.delivery: "external"` em `progress.json` e use as respostas fornecidas diretamente, **sem perguntar**. Caso contrário, registre `repo.delivery: "internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok" — o resultado **entra no plano que você apresenta**. Se vermelha, **pare e reporte** (`baseline.status = FAIL`); só avance com `known_failures` registrados e autorização explícita.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok" — o resultado entra em `baseline.status`, `baseline.tests`, `baseline.build` e `known_failures`. Se vermelha, **pare e reporte**; só avance com autorização explícita.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -367,23 +367,23 @@ Sem critério de aceite explícito, **não delegue**.
 > ### 🛑 CHECKPOINT POR TAREFA
 > Antes da fase 1: recebi o "ok"; **`spec_kit.status = WRITTEN`**; esta tarefa vai como `task` a um **subagente** (eu não codo); começo pela fase **RED**. Sem exceção de "rápido demais para delegar".
 
-Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos). A próxima onda só começa após a integração da atual.
+Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
 
 > **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
 
-1. **RED — `test-author`.** Testes que falham cobrindo **todos** os critérios (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, avance para VALIDATE; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
+1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim → REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
 2. **GREEN — `backend-developer` e/ou `frontend-developer`.** Implementa o **requisito completo** (a menor solução que atende **todos** os critérios). O dev reconfirma o vermelho antes de codar. Critério sem teste → para e devolve ao `test-author`. **Testes são read-only.**
 3. **REFACTOR — `refactorer`.** Mantém tudo verde. Se nada relevante a refatorar, registre `refactor.status: SKIPPED` + `reason_if_skipped` — nunca cosmético, nunca silencioso.
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + spec/critérios + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Veredito:
    - **APROVADO** → DOC.
    - **BLOQUEADO** → roteie por tipo: *código* → GREEN; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
-5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. O `spec-kit-author` atualiza in-place `./specs/<feature>/spec.md`/`plan.md` (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** — se foram pulados na Fase 0, delegue ao `spec-kit-author` agora antes de validar (gate `spec_kit` depende disto). (Verificação redundante com o gate `spec_kit` em VALIDATE — defesa em profundidade.) Se o `spec-kit-author` reportar ambiguidades nas **OBSERVAÇÕES**, avalie: se bloqueante, pergunte ao usuário; se menor, registre em `progress.json` e resolva.
+5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** — se foram pulados na Fase 0, delegue ao `spec-kit-author` agora antes de validar (gate `spec_kit` depende disto). (Verificação redundante com o gate `spec_kit` em VALIDATE — defesa em profundidade.)
    - **Mudança de contrato**: se o `spec-kit-author` reportar nas OBSERVAÇÕES que a
      entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e
      pergunte ao usuário se aprova a mudança. Aprovada → volte a RED para ajustar a
      implementação ao novo contrato. NÃO aprovada → BLOCKED (escale com o conflito).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
-7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado (ele fica fora do git, junto com o resto do estado), faça `git add` **apenas dos arquivos da tarefa (incluindo os artefatos Spec Kit atualizados — nunca o estado/`progress.md`)**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Ao final de TODAS as tarefas da última onda**, execute a seção Entrega final abaixo.
+7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado (ele fica fora do git, junto com o resto do estado), faça `git add` **apenas dos arquivos da tarefa, do `.gitignore` de infraestrutura e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Se o `.gitignore` de estado ainda não existir, faça um commit de bootstrap separado antes do commit da tarefa.**
 
 ---
 

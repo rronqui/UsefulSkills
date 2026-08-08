@@ -79,6 +79,13 @@ function cmdNew(argv) {
     process.exit(1);
   }
   const def = defaultBranch();
+  try {
+    git(["switch", def]);
+    git(["pull", "--ff-only"]);
+  } catch {
+    console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
+    process.exit(1);
+  }
   const label = type === "fix" ? "bug" : "enhancement";
   const url = gh([
     "issue", "create",
@@ -88,9 +95,17 @@ function cmdNew(argv) {
   ]);
   const n = issueNumberOrDie(url);
   const branch = `${type}/${n}-${slugify(title)}`;
-  git(["switch", def]);
-  git(["pull", "--ff-only"]);
-  git(["switch", "-c", branch]);
+  try {
+    git(["switch", "-c", branch]);
+  } catch (err) {
+    try {
+      gh(["issue", "close", n, "--comment", "Issue fechada automaticamente: não foi possível criar a branch correspondente."]);
+    } catch {
+      console.error(`Não consegui fechar a issue ${n} após a falha de criação da branch.`);
+    }
+    console.error(`Não consegui criar a branch ${branch}; a issue ${n} foi fechada para não ficar órfã.`);
+    process.exit(1);
+  }
   console.log(`Issue ${url}`);
   console.log(`Branch ${branch} criada a partir de ${def}.`);
 }
@@ -125,10 +140,22 @@ function cmdShip(argv) {
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
     const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
     if (!unpublished) {
-      console.error("Nada para commitar.");
-      process.exit(1);
+      let def;
+      try {
+        def = defaultBranch();
+        const branchCommits = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
+        if (!branchCommits) {
+          console.error("Nada para commitar.");
+          process.exit(1);
+        }
+      } catch {
+        console.error("Nada para commitar.");
+        process.exit(1);
+      }
+      console.log("Árvore limpa — branch já publicada; tentando criar o PR.");
+    } else {
+      console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
     }
-    console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
   } else {
     git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
@@ -150,11 +177,22 @@ async function deploy() {
     console.error("ship.config.json ausente — rode 'ship.mjs setup' e preencha.");
     process.exit(1);
   }
-  const cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
+  let cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
   const def = defaultBranch();
   const cur = git(["branch", "--show-current"]);
   if (cur !== def) {
     console.error(`Deploy roda na branch default (${def}); a atual é '${cur}'.`);
+    process.exit(1);
+  }
+  try {
+    git(["fetch", "origin", def]);
+    const ahead = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
+    if (ahead > 0) {
+      console.error(`Deploy bloqueado: a branch '${def}' tem ${ahead} commit(s) local(is) à frente de origin/${def}. Publique ou reconcilie antes de tentar o deploy.`);
+      process.exit(1);
+    }
+  } catch {
+    console.error(`Não consegui verificar se '${def}' está alinhada com origin/${def}; deploy cancelado por segurança.`);
     process.exit(1);
   }
   const oldHead = git(["rev-parse", "HEAD"]);
@@ -167,10 +205,22 @@ async function deploy() {
     console.error(`git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`);
     process.exit(1);
   }
-  const changed = git(["diff", "--name-only", oldHead, "HEAD"]).split("\n");
-  // schemaWatchPaths opcional no manifesto (string[]); omitido → default legado.
+  try {
+    cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
+  } catch {
+    console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
+    process.exit(1);
+  }
+  const changed = git(["diff", "--name-only", oldHead, "HEAD"])
+    .split("\n")
+    .map((file) => file.trim().replaceAll("\\", "/"))
+    .filter(Boolean);
   const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
-  const hits = watch.filter((p) => typeof p === "string" && changed.includes(p));
+  const hits = watch.filter((watched) => {
+    const absolute = path.resolve(root, watched);
+    const relative = path.relative(root, absolute).replaceAll("\\", "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+    return changed.some((file) => !relative || file === relative || file.startsWith(`${relative}/`));
+  });
   if (hits.length) {
     console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
   }
@@ -192,11 +242,24 @@ async function deploy() {
     } catch {
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
-    if (pkg) {
+    const validVersion = typeof pkg?.version === "string" && /^\d+\.\d+\.\d+$/.test(pkg.version);
+    if (pkg && !validVersion) {
+      console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
+    }
+    if (validVersion) {
       let ok = false;
+      const timeoutMs = Number.isFinite(Number(cfg.versionCheckTimeoutMs)) && Number(cfg.versionCheckTimeoutMs) > 0
+        ? Number(cfg.versionCheckTimeoutMs)
+        : 10_000;
       for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const html = await (await fetch(cfg.versionCheckUrl)).text();
+          const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
+          if (!response || response.ok === false || (typeof response.status === "number" && (response.status < 200 || response.status >= 300))) {
+            throw new Error(`HTTP ${response?.status ?? "desconhecido"}`);
+          }
+          const html = await response.text();
           const served = extractServedVersion(html);
           console.log(
             served === pkg.version
@@ -205,7 +268,9 @@ async function deploy() {
           );
           ok = true;
         } catch {
-          if (attempt < 4) await new Promise((r) => setTimeout(r, 2000));
+          if (attempt < 4) await new Promise((r) => setTimeout(r, 2_000));
+        } finally {
+          clearTimeout(timer);
         }
       }
       if (!ok) console.warn(`Não consegui checar versão em ${cfg.versionCheckUrl} após 5 tentativas.`);

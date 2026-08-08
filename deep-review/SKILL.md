@@ -63,8 +63,9 @@ Sem escopo explícito, pergunte ao usuário (ferramenta `ask`) qual modo quer:
 
 ### Coleta do diff por modo
 
-Rode os comandos via `bash` a partir da raiz do repo. Diff vazio em qualquer modo →
-informe o usuário e PARE (não dispare revisores sem material).
+Para PR, branch base, não commitadas e commit, diff vazio → informe o usuário e PARE
+(não dispare revisores sem material). **Custom é a exceção:** sem mudanças, o
+assignment contém apenas as instruções e os revisores leem o workspace por conta própria.
 
 - **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
   Falha ao buscar → reporte o erro e pare.
@@ -136,7 +137,9 @@ do usuário, e as regras do protocolo da FASE 4 quando o ambiente não tiver o a
 completo no assignment).
 
 **Por revisor (`task` do item)** — assignment com:
-1. Lista EXATA dos arquivos atribuídos ("Focus ONLY on assigned files");
+1. Lista EXATA dos arquivos atribuídos como alvos de achados. O revisor pode ler
+   arquivos relacionados para contexto e checagem cross-boundary, mas não registra
+   achados fora dos arquivos atribuídos;
 2. Instrução de acesso ao diff:
    - Diff pequeno (≤ 50.000 caracteres E ≤ 20 arquivos): inclua os hunks dos arquivos
      dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff";
@@ -242,12 +245,13 @@ Com os resultados de todos os revisores:
   é o esperado para diffs pequenos.
 - Nunca inclua diff inteiro inline acima dos limites (50.000 caracteres ou 20
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
-- Revisor lê APENOS os arquivos atribuídos; sobreposição de escopo entre revisores
-  gera achados duplicados.
+- Revisor registra achados apenas nos arquivos atribuídos; pode ler contexto fora deles
+  para checagens cross-boundary. Sobreposição de ownership gera achados duplicados.
 - Modo PR nunca usa git local nem arquivos do workspace como fonte de contexto.
 - Não passe `outputSchema` na chamada `task` para o agente `deep-reviewer`: a saída
   nativa dele (seções incrementais de `yield`) é o contrato que a TUI renderiza
   como veredito + achados.
 - Use sempre o `deep-reviewer` desta skill — nunca o agente embutido `reviewer` do
   omp (evita conflito de comportamento e dependência do binário).
-- Diff vazio ou 100% filtrado em qualquer modo: pare antes de disparar revisores.
+- Diff vazio ou 100% filtrado em modos que exigem diff: pare antes de disparar revisores;
+  Custom sem diff segue com leitura do workspace.

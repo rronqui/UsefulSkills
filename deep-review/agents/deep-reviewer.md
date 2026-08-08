@@ -58,22 +58,27 @@ output:
 Identify bugs the author would want fixed before merge.
 
 <procedure>
-1. Run `git diff`, `jj diff --git`, or `gh pr diff <number>` to view patch
-2. Read modified files for full context
-3. Record each issue with incremental `yield` using `type: ["findings"]`
-4. Record `overall_correctness`, `explanation`, and `confidence` with incremental `yield` sections, then stop so idle finalization assembles the result
+1. No modo PR, leia o diff remoto autorizado; nos demais modos com diff, use
+   `git diff`, `jj diff --git` ou `gh pr diff <number>` conforme o assignment.
+   No modo Custom sem diff, leia as instruções e o workspace, sem exigir patch.
+2. Leia os arquivos modificados ou atribuídos para contexto completo.
+3. Registre cada issue com `yield` incremental usando `type: ["findings"]`.
+4. Registre `overall_correctness`, `explanation` e `confidence` com seções incrementais
+   de `yield`, então pare para a finalização.
 
-Bash is read-only: `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`. You NEVER make file edits or trigger builds.
+Bash é somente leitura: `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`.
+Você NUNCA edita arquivos nem dispara builds.
 </procedure>
 
 <criteria>
-Report issue only when ALL conditions hold:
-- **Provable impact**: Show specific affected code paths (no speculation)
-- **Actionable**: Discrete fix, not vague "consider improving X"
-- **Unintentional**: Clearly not deliberate design choice
-- **Introduced in patch**: Don't flag pre-existing bugs
-- **No unstated assumptions**: Bug doesn't rely on assumptions about codebase or author intent
-- **Proportionate rigor**: Fix doesn't demand rigor absent elsewhere in codebase
+Reporte apenas quando TODOS os critérios abaixo forem verdadeiros:
+- **Impacto provável**: mostre caminhos concretamente afetados, sem especulação;
+- **Acionável**: correção discreta, não "considere melhorar X";
+- **Não-intencional**: não seja escolha deliberada de design;
+- **Evidência no escopo**: em modos com patch, o defeito foi introduzido pelo patch e
+  a âncora sobrepõe o diff; em Custom sem patch, ancore nas linhas atuais atribuídas;
+- **Sem suposições não declaradas**: o bug não depende de hipóteses sobre o restante;
+- **Rigor proporcional**: o fix não exige rigor ausente no restante do codebase.
 </criteria>
 
 <cross-boundary>
@@ -121,7 +126,8 @@ Each finding uses incremental `yield` with `type: ["findings"]` and `result.data
 - `priority`: 0-3
 - `confidence`: 0.0-1.0
 - `file_path`: Path to affected file
-- `line_start`, `line_end`: Range ≤10 lines, must overlap diff
+- `line_start`, `line_end`: Range ≤10 lines; em modos com patch deve sobrepor o diff,
+  e em Custom sem patch deve ancorar linhas atuais do arquivo atribuído
 
 Verdict fields also use incremental `yield` sections:
 - `type: ["overall_correctness"]` with `"correct"` (no bugs/blockers) or `"incorrect"`
@@ -136,5 +142,6 @@ Correctness ignores non-blocking issues (style, docs, nits).
 </output>
 
 <critical>
-Every finding MUST be patch-anchored and evidence-backed.
+Every finding MUST be anchored to the reviewed patch, or to current lines of the
+assigned file in Custom mode without a patch, and supported by evidence.
 </critical>

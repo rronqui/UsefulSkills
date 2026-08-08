@@ -8,7 +8,8 @@
 #
 # Two helpers:
 #   step "<instruction>"          → show instruction, wait for Enter
-#   capture VAR "<question>"      → show question, read response into VAR
+#   capture VAR "<question>"      → show question, read one response into VAR
+#   capture_multiline VAR "<q>"   → read until a line containing __END__
 #
 # At the end, captured values are printed as KEY=VALUE for the agent to parse.
 #
@@ -29,17 +30,33 @@ capture() {
   printf -v "$var" '%s' "$answer"
 }
 
+capture_multiline() {
+  local var="$1" question="$2" line answer=""
+  printf '\n>>> %s\n' "$question"
+  printf '    Paste lines, then enter __END__ on its own line.\n'
+  while IFS= read -r line; do
+    [[ "$line" == "__END__" ]] && break
+    if [[ -n "$answer" ]]; then answer+=$'\n'; fi
+    answer+="$line"
+  done
+  printf -v "$var" '%s' "$answer"
+}
+
+redact() {
+  sed -E \
+    -e 's/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[=:][[:space:]]*)[^[:space:]]+/\1<REDACTED>/Ig' \
+    -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
+}
+
 # --- edit below ---------------------------------------------------------
 
 step "Open the app at http://localhost:3000 and sign in."
 
 capture ERRORED "Click the 'Export' button. Did it throw an error? (y/n)"
-
-capture ERROR_MSG "Paste the error message (or 'none'):"
+capture_multiline ERROR_MSG "Paste the error message (or 'none'):"
 
 # --- edit above ---------------------------------------------------------
-
 # Keep the KEY=VALUE block below in sync with every `capture` call above.
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
-printf 'ERROR_MSG=%s\n' "$ERROR_MSG"
+printf 'ERROR_MSG=%s\n' "$(printf '%s' "$ERROR_MSG" | redact)"

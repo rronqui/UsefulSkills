@@ -88,8 +88,8 @@ As fases seguintes usam ESSE levantamento, não suposições.
   `{".": "X.Y.0"}`, senão o run falha com "Missing required manifest versions". Após o
   primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
-  nunca rodaria no PR de release. Crie o secret com um PAT:
-  `gh secret set RELEASE_PLEASE_TOKEN --body "$(gh auth token)"`.
+  nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos:
+  `gh auth token | gh secret set RELEASE_PLEASE_TOKEN --body-file -`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 
@@ -103,9 +103,9 @@ As fases seguintes usam ESSE levantamento, não suposições.
   - `commit-msg`: valida o título (isenta Merge/Revert/fixup!/squash!).
   - `pre-push`: bloqueia push direto na branch default. PROTOCOLO CORRETO: o git passa as
     refs pela STDIN, formato `<local ref> <local sha> <remote ref> <remote sha>` (uma
-    linha por ref). Leia a stdin e rejeite se o local ref for `refs/heads/<default>`.
-    NUNCA use variáveis de ambiente — o git não as define e o hook vira um no-op
-    silencioso. Bypass documentado: `git push --no-verify`.
+    linha por ref). Leia a stdin e rejeite se o local **ou** o remote ref for
+    `refs/heads/<default>`. NUNCA use variáveis de ambiente — o git não as define e o hook
+    vira um no-op silencioso. Bypass documentado: `git push --no-verify`.
 - TESTE REAL (não pule):
   - commit-msg: arquivo temporário de mensagem; entrada válida → exit 0, inválida → exit 1.
   - pre-push: `printf 'refs/heads/<default> 0 0 0\n' | <hook>` → exit 1; com outra

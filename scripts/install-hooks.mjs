@@ -1,5 +1,5 @@
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,27 @@ try {
 }
 if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
 
+try {
+  if (lstatSync(hooksDir).isSymbolicLink()) {
+    console.error(`Diretório de hooks é symlink; recusando escrever: ${hooksDir}`);
+    process.exit(1);
+  }
+} catch (err) {
+  if (err?.code !== "ENOENT") throw err;
+}
 if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+
+const destinations = HOOKS.flatMap((name) => [join(hooksDir, name), `${join(hooksDir, name)}.mjs`]);
+for (const dest of destinations) {
+  try {
+    if (lstatSync(dest).isSymbolicLink()) {
+      console.error(`Destino de hook é symlink; recusando sobrescrever: ${dest}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
+  }
+}
 
 for (const name of HOOKS) {
   const dest = join(hooksDir, name);

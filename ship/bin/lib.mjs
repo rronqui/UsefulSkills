@@ -1,6 +1,6 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export function slugify(title) {
@@ -49,15 +49,24 @@ export function resolveSchemaWatch(value) {
 
 // Etapa de backup do deploy. Sem dbPath → null; arquivo ausente → null (o chamador
 // emite o aviso). Cria o diretório de backup se necessário e copia o arquivo;
-// retorna o destino escrito. backupDir absoluto é honrado via path.resolve.
+// retorna o destino escrito. Caminhos absolutos são honrados; diretórios relativos
+// são resolvidos a partir da raiz do repositório. O nome é reservado atomicamente
+// para que chamadas no mesmo instante nunca sobrescrevam um snapshot anterior.
 export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
-  const src = path.join(root, cfg.dbPath);
+  const src = path.resolve(root, cfg.dbPath);
   if (!existsSync(src)) return null;
   const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
   mkdirSync(dir, { recursive: true });
   const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-  const dest = path.join(dir, `${path.basename(cfg.dbPath)}-${ts}`);
-  copyFileSync(src, dest);
-  return dest;
+  const base = path.join(dir, `${path.basename(src)}-${ts}`);
+  for (let attempt = 0; ; attempt++) {
+    const dest = attempt === 0 ? base : `${base}-${attempt}`;
+    try {
+      writeFileSync(dest, readFileSync(src), { flag: "wx" });
+      return dest;
+    } catch (err) {
+      if (err?.code !== "EEXIST") throw err;
+    }
+  }
 }

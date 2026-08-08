@@ -53,7 +53,8 @@ function walk(dir) {
 }
 
 // Compara um diretório-fonte com o destino: retorna { status, detail }.
-// status: "equal" | "updated" | "created" | "drift" (apenas modo --check reporta drift).
+// status: "equal" | "updated" | "created" | "drift"; conflitos de tipo são drift
+// em qualquer modo, enquanto divergências de conteúdo são drift apenas no --check.
 function syncDir(src, dest) {
   // Conflito de tipo na RAIZ do destino: arquivo comum onde deveria haver o
   // diretório da skill. Reporta drift sem crashar (walk/readdirSync daria ENOTDIR).
@@ -75,6 +76,27 @@ function syncDir(src, dest) {
   for (const rel of srcFiles) {
     const s = path.join(src, rel);
     const d = path.join(dest, rel);
+    let parentConflict = false;
+    let parent = dest;
+    for (const part of rel.split(path.sep).slice(0, -1)) {
+      parent = path.join(parent, part);
+      try {
+        const parentStat = statSync(parent);
+        if (!parentStat.isDirectory()) {
+          parentConflict = true;
+          break;
+        }
+      } catch (err) {
+        if (err?.code !== "ENOENT") {
+          parentConflict = true;
+          break;
+        }
+      }
+    }
+    if (parentConflict) {
+      typeConflicts++;
+      continue;
+    }
     let st = null;
     try {
       st = statSync(d);
@@ -105,8 +127,15 @@ function syncDir(src, dest) {
       if (!srcFiles.includes(rel)) removed.push(rel);
     }
   }
+  const srcTopLevel = new Set(readdirSync(src));
+  const extraTopLevel = existsSync(dest)
+    ? readdirSync(dest).filter((entry) => !srcTopLevel.has(entry))
+    : [];
   if (typeConflicts > 0) {
-    return { status: "drift", detail: `${typeConflicts} conflito(s) de tipo (diretório onde deveria haver arquivo) — remova manualmente` };
+    return { status: "drift", detail: `${typeConflicts} conflito(s) de tipo (arquivo-pai ou diretório onde deveria haver arquivo) — remova manualmente` };
+  }
+  if (check && extraTopLevel.length > 0) {
+    return { status: "drift", detail: `${equal} iguais, ${updated} divergem, ${created} faltam, extras no topo: ${extraTopLevel.join(", ")}` };
   }
   if (check && removed.length > 0) {
     return { status: "drift", detail: `${equal} iguais, ${updated} divergem, ${created} faltam, extras locais: ${removed.join(", ")}` };
@@ -115,16 +144,35 @@ function syncDir(src, dest) {
   if (created > 0) return { status: check ? "drift" : "created", detail: `${created} arquivo(s) ${check ? "ausentes" : "instalados"}` };
   return { status: "equal", detail: `${equal} arquivo(s) iguais` };
 }
-
 let drift = false;
-console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
 
-for (const name of SKILLS) {
-  const src = path.join(root, name);
-  const dest = path.join(skillsDest, name);
-  const { status, detail } = syncDir(src, dest);
-  if (status === "drift") drift = true;
-  console.log(`skill ${name.padEnd(18)} ${status.padEnd(8)} ${detail}`);
+console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
+let skillsDestStat = null;
+try {
+  skillsDestStat = statSync(skillsDest);
+} catch {
+  // destino ausente
+}
+if (skillsDestStat && !skillsDestStat.isDirectory()) {
+  console.log("skill (raiz)          drift    conflito de tipo (arquivo onde deveria haver diretório) — remova manualmente");
+  drift = true;
+} else {
+  for (const name of SKILLS) {
+    const src = path.join(root, name);
+    const dest = path.join(skillsDest, name);
+    const { status, detail } = syncDir(src, dest);
+    if (status === "drift") drift = true;
+    console.log(`skill ${name.padEnd(18)} ${status.padEnd(8)} ${detail}`);
+  }
+  if (check && existsSync(skillsDest)) {
+    const expected = new Set(SKILLS);
+    for (const entry of readdirSync(skillsDest)) {
+      if (!expected.has(entry)) {
+        console.log(`skill (extra) ${entry.padEnd(32)} drift    diretório fora do inventário`);
+        drift = true;
+      }
+    }
+  }
 }
 
 // Conflito de tipo na raiz do destino dos agentes (arquivo onde deveria haver
@@ -194,5 +242,9 @@ if (agentsDestStat && !agentsDestStat.isDirectory()) {
 if (check) {
   console.log(drift ? "\nDRIFT detectado — rode `node install.mjs` para sincronizar." : "\nInstalação sincronizada.");
   process.exit(drift ? 1 : 0);
+}
+if (drift) {
+  console.error("\nDRIFT detectado — conflitos exigem correção manual.");
+  process.exit(1);
 }
 console.log("\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).");
