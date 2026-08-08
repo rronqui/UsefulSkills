@@ -92,7 +92,7 @@ capture_multiline() {
   printf -v "$var" '%s' "$answer"
 }
 redact() {
-  awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|secret[[:alnum:]_-]*' '
+  awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*access[[:space:]_-]*key[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|secret[[:alnum:]_-]*' '
     function unescaped_double(s, i, j, slashes) {
       for (i = 1; i <= length(s); i++) {
         if (substr(s, i, 1) != "\"") continue
@@ -109,7 +109,7 @@ redact() {
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       quote_open = ""
       quote_pos = 0
-      flow_depth = 0
+      flow_parens = 0
     }
     {
       lower = tolower($0)
@@ -140,9 +140,16 @@ redact() {
           quote_open = "\047"
           next
         }
-        flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
-        flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
-        if (flow_depth <= 0) pending = 0
+        flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+        flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+        if (flow_parens) {
+          flow_depth += gsub(/\(/, "", scan)
+          flow_depth -= gsub(/\)/, "", scan)
+        }
+        if (flow_depth <= 0) {
+          pending = 0
+          flow_parens = 0
+        }
         next
       }
       if (pending == 4) {
@@ -167,10 +174,15 @@ redact() {
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
-          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
-          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
+          flow_parens = ($0 ~ /^[[:space:]]*@\(/)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          if (flow_parens) {
+            flow_depth += gsub(/\(/, "", scan)
+            flow_depth -= gsub(/\)/, "", scan)
+          }
           if (flow_depth > 0) pending = 2
-          else pending = 0
+          else { pending = 0; flow_parens = 0 }
           next
         }
         if ($0 ~ /^[[:space:]]*@["\047]/) {
@@ -195,15 +207,17 @@ redact() {
         if (pending && lower ~ /[=:][[:space:]]*@\(/) {
           pending = 2
           flow_depth = 1
+          flow_parens = 1
         }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
-        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/) {
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/ && lower !~ /[=:][[:space:]]*@\(/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
-          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
-          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
+          flow_parens = 0
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
           if (flow_depth > 0) pending = 2
         }
         next
