@@ -180,14 +180,15 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
 - **Impacto provável**: apontar caminhos de código concretamente afetados (sem especulação);
 - **Acionável**: fix discreto; nunca "considere melhorar X";
 - **Não-intencional**: claramente não é escolha deliberada de design;
-- **Introduzido pelo patch**: nunca reportar bug pré-existente;
+- **Evidência no escopo**: em modos com patch, o defeito foi introduzido pelo patch;
+  em Custom sem patch, o defeito está no estado atual revisado;
 - **Sem suposições não declaradas**: o bug não depende de suposição sobre o resto do
   codebase ou sobre a intenção do autor;
 - **Rigor proporcional**: o fix não exige um rigor ausente no resto do codebase.
-
 **Checagem cross-boundary (obrigatória)**: para cada novo tipo, variante ou valor que
-o patch introduz cruzando fronteira de função/módulo (evento, mensagem, comando,
-frame, variante de enum, item de fila, payload de IPC):
+cruza fronteira de função/módulo — introduzido pelo patch quando há patch, ou presente
+no estado atual em Custom sem patch (evento, mensagem, comando, frame, variante de
+enum, item de fila, payload de IPC):
 1. Localizar o **ponto de despacho** no lado CONSUMIDOR — o switch, router, cadeia de
    filtros, registro de handlers ou loop que recebe e roteia valores desse tipo.
 2. Confirmar que o novo tipo tem branch explícito, ou que o catch-all existente o

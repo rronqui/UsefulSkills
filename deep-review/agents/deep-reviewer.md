@@ -82,8 +82,10 @@ Reporte apenas quando TODOS os critérios abaixo forem verdadeiros:
 </criteria>
 
 <cross-boundary>
-For every new type, variant, or value introduced by the patch that crosses a function or module boundary
-(event, message, command, frame, enum variant, queue item, IPC payload):
+For every new type, variant, or value crossing a function or module boundary,
+introduced by a patch when a patch exists or present in the current workspace for
+Custom without a patch (event, message, command, frame, enum variant, queue item,
+IPC payload):
 1. Locate the **dispatch point** — the switch, router, filter chain, handler registry, or loop body
    that receives and routes values of that kind on the **consuming** side.
 2. Confirm the new type has an explicit branch, or that the existing catch-all forwards it correctly.

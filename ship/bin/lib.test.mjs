@@ -61,6 +61,9 @@ describe("extractServedVersion", () => {
   it("aceita prerelease e build metadata sem comentário", () => {
     expect(extractServedVersion("<p>v1.2.3-rc.1+build.7</p>")).toBe("1.2.3-rc.1+build.7");
   });
+  it("aceita pontuação após a versão", () => {
+    expect(extractServedVersion("<p>v1.2.3.</p>")).toBe("1.2.3");
+  });
   it("não aceita versão com sufixo semântico inválido", () => {
     expect(extractServedVersion("<p>v1.2.3+build+oops</p>")).toBeNull();
   });

@@ -255,6 +255,7 @@ async function deploy() {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
+          const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
           if (!response || response.ok === false || (typeof response.status === "number" && (response.status < 200 || response.status >= 300))) {
             await response?.body?.cancel();
             throw new Error(`HTTP ${response?.status ?? "desconhecido"}`);
