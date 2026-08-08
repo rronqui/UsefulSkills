@@ -1,7 +1,7 @@
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,12 +20,13 @@ try {
   process.exit(0);
 }
 if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
+const hooksRelative = relative(root, hooksDir);
+const hooksInsideProject = hooksRelative === "" || (!hooksRelative.startsWith("..") && !hooksRelative.startsWith("/"));
 
 let ancestor = hooksDir;
 while (true) {
-  // Stop at the project boundary; parent system paths are not user-controlled
+  if ((hooksInsideProject && ancestor === root) || (!hooksInsideProject && ancestor !== hooksDir)) break;
   // hook destinations and may legitimately be symlinks (for example /var).
-  if (ancestor === root) break;
   try {
     if (lstatSync(ancestor).isSymbolicLink()) {
       console.error(`Caminho de hooks contém symlink; recusando escrever: ${ancestor}`);

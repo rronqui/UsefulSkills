@@ -272,11 +272,12 @@ async function deploy() {
     process.exit(1);
   }
   const oldHead = git(["rev-parse", "HEAD"]);
+  const prePullDbPath = cfg.dbPath;
   const backupDest = performBackup(cfg, root);
   if (backupDest) console.log(`Backup: ${backupDest}`);
   else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   try {
-    git(["pull", "--ff-only"]);
+    git(["pull", "--ff-only", "origin", def]);
   } catch {
     console.error(`git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`);
     process.exit(1);
@@ -287,9 +288,14 @@ async function deploy() {
     console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
     process.exit(1);
   }
+  if (cfg.dbPath !== prePullDbPath) {
+    const postPullBackup = performBackup(cfg, root);
+    if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
+    else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
+  }
   const changed = git(["diff", "--name-only", oldHead, "HEAD"])
     .split("\n")
-    .map((file) => file.trim().replaceAll("\\", "/"))
+    .map((file) => file.replace(/\r$/, "").replaceAll("\\", "/"))
     .filter(Boolean);
   const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
   const hits = watch.filter((watched) => {

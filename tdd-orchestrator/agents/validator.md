@@ -56,10 +56,11 @@ gate, na ordem canônica `tests`, `traceability`, `spec_kit`, `coverage`, `lint`
 Cada `<gate-key>` deve aparecer uma única vez; ausência, duplicação, chave desconhecida
 ou ordem diferente torna o output inválido e exige reexecução.
 
-Para cada `FAIL`, informe uma única `origin`: `TESTE` para traceability/tests/coverage,
-`SPEC-CONTRATO` para spec_kit ou falha de definição do contrato, `TOOLING` para
-lint/type-check/build/security/git-sanity quando a falha não exigir mudança de
-comportamento, `CODIGO` quando exigir correção de comportamento observável ou de
-implementação que viola contrato aprovado, ou `REFACTOR` quando a falha for
-exclusivamente de refactor.
+Para cada `FAIL`, informe uma única `origin`: `TESTE` para traceability/tests/coverage
+quando a falha estiver no teste, no mapeamento ou na ausência de cobertura; `SPEC-CONTRATO`
+para `spec_kit` ou falha de definição do contrato; `TOOLING` para lint/type-check/build/
+security/git-sanity quando a falha não exigir mudança de comportamento; `CODIGO` quando
+a implementação divergir do comportamento observável, da spec ou de contrato aprovado
+(inclusive em `tests`, `traceability`, `coverage` e `spec_kit`); ou `REFACTOR` quando a
+falha for exclusivamente de refactor.
 Liste gates `NA` com justificativa. **Não declare PASSOU global se algum gate obrigatório está FAIL ou sem evidência.**

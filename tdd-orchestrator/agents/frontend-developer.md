@@ -37,7 +37,7 @@ Status: CONCLUÍDO | BLOQUEADO | FALHOU | Fase: GREEN/GREEN_FIX/TOOLING_FIX | Ta
 Arquivos alterados:
  Evidência de pré-condição: RED reconfirmado (GREEN/GREEN_FIX) ou gate TOOLING reproduzido (TOOLING_FIX)
  Evidência GREEN: comando + trecho da suíte passando (GREEN/GREEN_FIX)
- Evidência TOOLING pós-correção: em `TOOLING_FIX`, comando completo do gate (`lint`, `type-check`, `build`, `security` ou `git-sanity`) e trecho PASSOU; sem esse PASSOU, retorne BLOQUEADO e não avance a REFACTOR
+ Evidência TOOLING pós-correção: em `TOOLING_FIX`, comando completo do gate (`lint`, `type-check`, `build`, `security` ou `git-sanity`) e trecho PASSOU, comando completo da suíte e trecho PASSOU; o diff deve ser somente de configuração/ferramenta e não tocar comportamento de produção; sem essas evidências ou com diff comportamental, retorne BLOQUEADO e não avance a REFACTOR
 Contrato: caminho + versão — compatível: sim/não
 Impacto em documentação: nenhum | <descrição>
 Bloqueios:
