@@ -5,7 +5,7 @@
 //   node install.mjs --check   compara hashes; lista divergências; exit 1 se houver
 // Requer: Node >= 18. Não toca nenhum arquivo fora do inventário abaixo.
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,7 @@ const AGENTS = [
   ["tdd-orchestrator", "agents", "validator.md"],
   ["deep-review", "agents", "deep-reviewer.md"],
 ];
+const inventoryKey = (name) => process.platform === "win32" ? name.toLowerCase() : name;
 
 function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
@@ -60,7 +61,7 @@ function syncDir(src, dest) {
   // diretório da skill. Reporta drift sem crashar (walk/readdirSync daria ENOTDIR).
   let destStat = null;
   try {
-    destStat = statSync(dest);
+    destStat = lstatSync(dest);
   } catch {
     // destino ausente
   }
@@ -73,6 +74,7 @@ function syncDir(src, dest) {
   let equal = 0;
   let typeConflicts = 0;
   const removed = [];
+  const srcFileKeys = new Set(srcFiles.map(inventoryKey));
   for (const rel of srcFiles) {
     const s = path.join(src, rel);
     const d = path.join(dest, rel);
@@ -81,7 +83,7 @@ function syncDir(src, dest) {
     const boundary = path.dirname(path.dirname(dest));
     while (true) {
       try {
-        const parentStat = statSync(parent);
+        const parentStat = lstatSync(parent);
         if (!parentStat.isDirectory()) {
           parentConflict = true;
           break;
@@ -103,7 +105,7 @@ function syncDir(src, dest) {
     }
     let st = null;
     try {
-      st = statSync(d);
+      st = lstatSync(d);
     } catch {
       // destino ausente
     }
@@ -126,14 +128,15 @@ function syncDir(src, dest) {
       equal++;
     }
   }
-  if (existsSync(dest)) {
+  const destRoot = (() => { try { return lstatSync(dest); } catch { return null; } })();
+  if (destRoot?.isDirectory()) {
     for (const rel of walk(dest).map((f) => path.relative(dest, f))) {
-      if (!srcFiles.includes(rel)) removed.push(rel);
+      if (!srcFileKeys.has(inventoryKey(rel))) removed.push(rel);
     }
   }
-  const srcTopLevel = new Set(readdirSync(src));
-  const extraTopLevel = existsSync(dest)
-    ? readdirSync(dest).filter((entry) => !srcTopLevel.has(entry))
+  const srcTopLevel = new Set(readdirSync(src).map(inventoryKey));
+  const extraTopLevel = destRoot?.isDirectory()
+    ? readdirSync(dest).filter((entry) => !srcTopLevel.has(inventoryKey(entry)))
     : [];
   if (typeConflicts > 0) {
     return { status: "drift", detail: `${typeConflicts} conflito(s) de tipo (arquivo-pai ou diretório onde deveria haver arquivo) — remova manualmente` };
@@ -153,7 +156,7 @@ let drift = false;
 console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
 let skillsDestStat = null;
 try {
-  skillsDestStat = statSync(skillsDest);
+  skillsDestStat = lstatSync(skillsDest);
 } catch {
   // destino ausente
 }
@@ -168,10 +171,10 @@ if (skillsDestStat && !skillsDestStat.isDirectory()) {
     if (status === "drift") drift = true;
     console.log(`skill ${name.padEnd(18)} ${status.padEnd(8)} ${detail}`);
   }
-  if (check && existsSync(skillsDest)) {
-    const expected = new Set(SKILLS);
+  if (check && skillsDestStat?.isDirectory()) {
+    const expected = new Set(SKILLS.map(inventoryKey));
     for (const entry of readdirSync(skillsDest)) {
-      if (!expected.has(entry)) {
+      if (!expected.has(inventoryKey(entry))) {
         console.log(`skill (extra) ${entry.padEnd(32)} drift    diretório fora do inventário`);
         drift = true;
       }
@@ -186,7 +189,7 @@ let agentsParent = path.dirname(agentsDest);
 const agentsBoundary = path.dirname(path.dirname(agentsDest));
 while (true) {
   try {
-    if (!statSync(agentsParent).isDirectory()) {
+    if (!lstatSync(agentsParent).isDirectory()) {
       agentsParentConflict = true;
       break;
     }
@@ -203,7 +206,7 @@ while (true) {
 }
 let agentsDestStat = null;
 try {
-  agentsDestStat = statSync(agentsDest);
+  agentsDestStat = lstatSync(agentsDest);
 } catch {
   // destino ausente
 }
@@ -222,7 +225,7 @@ if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
     }
     let st = null;
     try {
-      st = statSync(dest);
+      st = lstatSync(dest);
     } catch {
       // destino ausente
     }
@@ -252,10 +255,10 @@ if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
 
   // --check: arquivos extras no destino dos agentes também são drift (reportados,
   // nunca removidos — o modo normal não destrói arquivos do usuário).
-  if (check && existsSync(agentsDest)) {
-    const expected = new Set(AGENTS.map(([, , file]) => file));
+  if (check && agentsDestStat?.isDirectory()) {
+    const expected = new Set(AGENTS.map(([, , file]) => inventoryKey(file)));
     for (const entry of readdirSync(agentsDest)) {
-      if (!expected.has(entry)) {
+      if (!expected.has(inventoryKey(entry))) {
         console.log(`agent (extra) ${entry.padEnd(32)} drift    arquivo fora do inventário`);
         drift = true;
       }
