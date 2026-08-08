@@ -215,10 +215,19 @@ redact() {
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
+          quote_pos = unescaped_double(scan)
+          if (quote_pos) {
+            quote_open = "\""
+            scan = substr(scan, 1, quote_pos - 1)
+          } else if (scan ~ /\047/) {
+            quote_open = "\047"
+            sub(/\047[^\047]*$/, "", scan)
+          } else {
+            quote_open = ""
+          }
           flow_parens = 0
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
-          if (flow_depth > 0) pending = 2
         }
         next
       }

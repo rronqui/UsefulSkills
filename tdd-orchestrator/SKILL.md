@@ -169,10 +169,11 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Ao migrar `red.criteria_to_tests` legado em texto, converta cada linha
    `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando
    entrada inválida exige nova execução RED: marque a tarefa como `phase: RED` e `red.status: PENDING`,
-   limpe `red.failing_tests`, `red.failure_reason_expected`, `red.criteria_to_tests`;
+   limpe `red.failing_tests`, `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [] }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `implemented_by` e `reviewed_by` como `""`, e `gates` com todos os campos em `"pending"`;
+   redefina para `PENDING` o `status` de cada AC em `acceptance_criteria` referenciado pela tarefa;
    limpe `blockers` e `evidence`; redefina a onda como `status: in_progress`,
    `integration.status: pending` e `integration.evidence: ""`; não trate a entrada inválida como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
