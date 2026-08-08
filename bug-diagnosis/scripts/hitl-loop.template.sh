@@ -152,6 +152,12 @@ redact() {
         }
         next
       }
+      if (pending == 5) {
+        print "<REDACTED>"
+        if (lower ~ /^[[:space:]]*`[[:space:]]*$/) pending = 0
+        else pending = 5
+        next
+      }
       if (pending == 4) {
         print "<REDACTED>"
         if (lower ~ /^[[:space:]]*["\047]@[[:space:]]*$/) pending = 0
@@ -194,16 +200,18 @@ redact() {
           print "<REDACTED>"
           next
         }
+        print "<REDACTED>"
         pending = 0
+        next
       }
       if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
         pending = (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && (lower ~ ("(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$") || lower ~ ("(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
-        if (pending && lower ~ /@[\047"][[:space:]]*$/) pending = 4
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) pending = 4
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@\(/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
@@ -229,9 +237,10 @@ redact() {
           } else {
             quote_open = ""
           }
-          flow_parens = 0
+          flow_parens = (scan ~ /[()]/)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
           if (flow_depth > 0) pending = 2
         }
         next

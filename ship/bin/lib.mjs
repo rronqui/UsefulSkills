@@ -1,6 +1,6 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, constants, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -68,19 +68,21 @@ export function performBackup(cfg, root) {
   const base = path.join(dir, `${path.basename(src)}-${ts}`);
   for (let attempt = 0; ; attempt++) {
     const dest = attempt === 0 ? base : `${base}-${attempt}`;
-    let fd;
+    const temp = `${dest}.tmp-${process.pid}`;
+    let tempReserved = false;
     try {
-      fd = openSync(dest, "wx");
-      closeSync(fd);
-      fd = undefined;
-      copyFileSync(src, dest);
+      const tempFd = openSync(temp, "wx");
+      closeSync(tempFd);
+      tempReserved = true;
+      copyFileSync(src, temp);
+      linkSync(temp, dest);
+      unlinkSync(temp);
       return dest;
     } catch (err) {
-      if (fd !== undefined) {
-        try { closeSync(fd); } catch {}
+      if (tempReserved) {
+        try { unlinkSync(temp); } catch {}
       }
       if (err?.code === "EEXIST") continue;
-      try { unlinkSync(dest); } catch {}
       throw err;
     }
   }

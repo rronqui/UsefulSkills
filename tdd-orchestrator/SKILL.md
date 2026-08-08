@@ -76,7 +76,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; normalize and persist `red.criteria_to_tests` as the AC→test object | Avance para GREEN |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→test não vazio | Avance para GREEN somente se a matriz cobrir todos os AC |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Normalize e preserve o objeto `red.criteria_to_tests` produzido pelo RED; avance para REVIEW |
 | `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico, normalize o objeto AC→teste atual e substitua `red.criteria_to_tests` |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
@@ -173,6 +173,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
    `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
+   Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de testes; qualquer objeto incompleto dispara o mesmo reset para RED.
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [] }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, e `gates` com todos os campos em `"pending"`;
@@ -399,7 +400,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 3. **REFACTOR — `refactorer`.** Mantém tudo verde. Se nada relevante a refatorar, registre `refactor.status: SKIPPED` + `reason_if_skipped` — nunca cosmético, nunca silencioso.
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + tarefa (id/título, `implemented_by` e `reviewed_by`) + `spec.md`, `plan.md`, `tasks.md`/critérios + contrato `interface-contract.md`/versão quando aplicável + `red.criteria_to_tests` (objeto AC→test) + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Quando `implemented_by: existing-code`, trate sempre a tarefa como revisão de implementação existente: leia os arquivos de produção e testes atuais referenciados pelos critérios, independentemente de o diff isolado estar vazio ou conter apenas os testes RED; não bloqueie por ausência de patch de produção.
    - **APROVADO** → DOC.
-   - **BLOQUEADO** → roteie por tipo: *código* → GREEN; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
+   - **BLOQUEADO** → roteie por tipo: *código* → `RED_REVISION` para o `test-author` criar primeiro o teste de regressão; só depois `GREEN_FIX`; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
 5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
    - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**

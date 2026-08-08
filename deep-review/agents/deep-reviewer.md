@@ -61,7 +61,7 @@ Identify bugs the author would want fixed before merge.
 1. No modo PR, leia o diff remoto autorizado; nos demais modos com diff, use
    `git diff`, `jj diff --git` ou `gh pr diff <number>` conforme o assignment.
    No modo Custom sem diff, leia as instruções e o workspace, sem exigir patch.
-2. Leia os arquivos modificados ou atribuídos para contexto completo.
+2. Leia os arquivos modificados ou atribuídos para contexto completo; no modo PR, use somente as fontes remotas autorizadas para esse contexto, nunca arquivos do workspace.
 3. Registre cada issue com `yield` incremental usando `type: ["findings"]`.
 4. Registre `overall_correctness`, `explanation` e `confidence` com seções incrementais
    de `yield`, então pare para a finalização.
