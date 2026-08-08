@@ -90,21 +90,21 @@ redact() {
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:]"
-      word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
+      bracket_key = "(" labels ")[[:space:]]*[\047\"]?][[:space:]]*[=:]"
       pending = 0
     }
     {
       lower = tolower($0)
       if (pending) {
-        if ($0 ~ /^[[:space:]]/ || $0 == "") {
+        if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
           print "<REDACTED>"
           next
         }
         pending = 0
       }
-      if (lower ~ key || lower ~ bare_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
+      if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
-        pending = (lower ~ key || lower ~ bare_key) && (lower ~ ("(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
+        pending = (lower ~ key || lower ~ bare_key) && (lower ~ ("(" labels ")[[:space:]]*[\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         next

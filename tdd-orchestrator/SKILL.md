@@ -166,6 +166,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    (`baseline.override_approved: false`, `green.reason_if_skipped: ""`,
    `refactor.reason_if_skipped: ""`) durante a migração. Sem justificativa para
    qualquer `NA`, o estado deve permanecer `NOT_RUN` até nova execução.
+   Ao migrar `red.criteria_to_tests` legado em texto, converta cada linha
+   `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste"] }`;
+   entrada inválida exige nova execução RED e não pode ser tratada como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
