@@ -119,6 +119,7 @@ describe("install-hooks + wrappers gerados", () => {
     const spaced = mkdtempSync(join(tmpdir(), "caminho com espaco "));
     try {
       spawnSync("git", ["init", "-q"], { cwd: spaced });
+      spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: spaced });
       cpSync(join(repoRoot, "scripts"), join(spaced, "scripts"), { recursive: true });
       symlinkSync(join(repoRoot, "node_modules"), join(spaced, "node_modules"), "junction");
       copyFileSync(join(repoRoot, ".commitlintrc.json"), join(spaced, ".commitlintrc.json"));
@@ -142,7 +143,7 @@ describe("install-hooks + wrappers gerados", () => {
       const valida = runHook(dir, "commit-msg", { args: [msgFile(dir, "feat: caminho configurado")] });
       expect(valida.status, valida.stdout + valida.stderr).toBe(0);
     } finally {
-      spawnSync("git", ["config", "--unset", "core.hooksPath"], { cwd: dir });
+      spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: dir });
       rmSync(configured, { recursive: true, force: true });
       expect(existsSync(join(hooksPath(dir), "commit-msg"))).toBe(true);
     }

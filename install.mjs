@@ -48,7 +48,7 @@ function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
-    else if (entry.isFile()) out.push(full);
+    else if (entry.isFile() || entry.isSymbolicLink()) out.push(full);
   }
   return out;
 }
@@ -80,7 +80,7 @@ function syncDir(src, dest) {
     const d = path.join(dest, rel);
     let parentConflict = false;
     let parent = path.dirname(d);
-    const boundary = path.dirname(path.dirname(dest));
+    const boundary = path.dirname(path.dirname(path.dirname(dest)));
     while (true) {
       try {
         const parentStat = lstatSync(parent);

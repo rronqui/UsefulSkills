@@ -70,6 +70,9 @@ describe("extractServedVersion", () => {
   it("não aceita hífen sem identificador", () => {
     expect(extractServedVersion("<p>v1.2.3-</p>")).toBeNull();
   });
+  it("não aceita caracteres inválidos após build metadata", () => {
+    expect(extractServedVersion("<p>v1.2.3+build_extra</p>")).toBeNull();
+  });
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();

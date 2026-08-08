@@ -40,7 +40,7 @@ export function extractServedVersion(html) {
   let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z+.-]|\.(?=$|[^0-9A-Za-z+.-]))/) || [])[1] ?? null;
+  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z_+.-]|\.(?=$|[^0-9A-Za-z_+.-]))/) || [])[1] ?? null;
 }
 
 

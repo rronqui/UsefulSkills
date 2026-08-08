@@ -8,6 +8,13 @@ import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, per
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
+function readConfig() {
+  const value = JSON.parse(readFileSync(CONFIG, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("ship.config.json deve conter um objeto JSON");
+  }
+  return value;
+}
 
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", cwd: root }).trim();
@@ -170,14 +177,19 @@ function cmdShip(argv) {
   if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
   else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
 }
-
 // ---------- deploy ----------
 async function deploy() {
   if (!existsSync(CONFIG)) {
     console.error("ship.config.json ausente — rode 'ship.mjs setup' e preencha.");
     process.exit(1);
   }
-  let cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
+  let cfg;
+  try {
+    cfg = readConfig();
+  } catch {
+    console.error("ship.config.json ausente ou inválido — deploy cancelado.");
+    process.exit(1);
+  }
   const def = defaultBranch();
   const cur = git(["branch", "--show-current"]);
   if (cur !== def) {
@@ -206,7 +218,7 @@ async function deploy() {
     process.exit(1);
   }
   try {
-    cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
+    cfg = readConfig();
   } catch {
     console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
     process.exit(1);
