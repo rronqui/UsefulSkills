@@ -92,7 +92,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
   Em shell POSIX/Git Bash, remova o terminador antes de enviar por stdin:
   `gh auth token | tr -d '\r\n' | gh secret set RELEASE_PLEASE_TOKEN`.
   No PowerShell, escreva o token sem newline no stdin do processo e remova-o após o uso:
-  `$psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write((gh auth token).Trim()); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" }`.
+`$token = (gh auth token).Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); try { $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { if (!$p.HasExited) { $p.Kill(); $p.WaitForExit() } }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 

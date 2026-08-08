@@ -97,7 +97,7 @@ function cmdNew(argv) {
     try {
       if (originalBranch && originalBranch !== def) {
         try {
-          git(["switch", originalBranch]);
+          git(["switch", "--no-guess", originalBranch]);
         } catch {
           git(["switch", "--orphan", originalBranch]);
         }

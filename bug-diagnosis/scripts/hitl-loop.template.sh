@@ -86,6 +86,7 @@ capture_multiline() {
   restore_tty
   trap - EXIT INT TERM HUP QUIT TSTP
   if (( !saw_end )); then
+    printf '    ERROR: multiline capture ended before __END__.\n' >&2
     return 1
   fi
   printf -v "$var" '%s' "$answer"
