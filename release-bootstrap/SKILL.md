@@ -89,8 +89,9 @@ As fases seguintes usam ESSE levantamento, não suposições.
   primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
   nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos.
-  Em shell POSIX/Git Bash, remova o terminador antes de enviar por stdin:
-  `gh auth token | tr -d '\r\n' | gh secret set RELEASE_PLEASE_TOKEN`.
+  Em shell POSIX/Git Bash, valide a saída e remova o terminador antes de enviar por
+  stdin, limpando o token mesmo em falha:
+  `token="$(gh auth token)" || exit 1; [ -n "$token" ] || { unset token; exit 1; }; printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; status=$?; unset token; exit $status`.
   No PowerShell, escreva o token sem newline no stdin do processo e remova-o após o uso:
 `$token = (gh auth token).Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = $null; try { $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() }; $token = $null }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
