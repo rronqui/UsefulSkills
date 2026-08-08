@@ -105,12 +105,18 @@ function cmdNew(argv) {
   try {
     git(["switch", "-c", branch]);
   } catch (err) {
+    let closed = true;
     try {
       gh(["issue", "close", n, "--comment", "Issue fechada automaticamente: não foi possível criar a branch correspondente."]);
     } catch {
+      closed = false;
       console.error(`Não consegui fechar a issue ${n} após a falha de criação da branch.`);
     }
-    console.error(`Não consegui criar a branch ${branch}; a issue ${n} foi fechada para não ficar órfã.`);
+    console.error(
+      closed
+        ? `Não consegui criar a branch ${branch}; a issue ${n} foi fechada para não ficar órfã.`
+        : `Não consegui criar a branch ${branch}; a issue ${n} permanece aberta e requer ação manual.`,
+    );
     process.exit(1);
   }
   console.log(`Issue ${url}`);
