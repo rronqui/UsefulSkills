@@ -76,8 +76,8 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→test não vazio | Se `phase: RED_REVISION`, avance `GREEN_FIX`; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
-| `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e testes não vazios; se inválido, redefina GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→test não vazio | Se `phase: RED_REVISION`, preserve todos os AC e acumule o teste de regressão antes de avançar `GREEN_FIX`; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e testes não vazios; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
 | `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico, normalize o objeto AC→teste atual e substitua `red.criteria_to_tests` |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
@@ -437,7 +437,7 @@ stateDiagram-v2
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
         RED_CHECK --> RED : falha por import-setup, faltam testes ou matriz AC->teste inválida/incompleta
-        RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
+        RED_CHECK --> GREEN : falham por ASSERCAO e matriz AC->teste válida
         RED_CHECK --> RED : testes passam sem comportamento implementado
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
