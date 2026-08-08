@@ -108,6 +108,7 @@ redact() {
       bracket_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*][[:space:]]*[=:]"
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       quote_open = ""
+      here_quote = ""
       quote_pos = 0
       flow_parens = 0
     }
@@ -171,7 +172,10 @@ redact() {
       }
       if (pending == 4) {
         print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*["\047]@[[:space:]]*$/) pending = 0
+        if ((here_quote == "\"" && lower ~ /^"[[:space:]]*@/) || (here_quote == "\047" && lower ~ /^\047[[:space:]]*@/)) {
+          pending = 0
+          here_quote = ""
+        }
         next
       }
       if (pending == 3) {
@@ -204,6 +208,7 @@ redact() {
         }
         if ($0 ~ /^[[:space:]]*@["\047]/) {
           print "<REDACTED>"
+          here_quote = ($0 ~ /^[[:space:]]*@"/) ? "\"" : "\047"
           pending = 4
           next
         }
@@ -213,14 +218,16 @@ redact() {
         }
         print "<REDACTED>"
         pending = 0
-        next
       }
       if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
         pending = (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && (lower ~ ("(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$") || lower ~ ("(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) pending = 4
-        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
+          here_quote = (lower ~ /@"/) ? "\"" : "\047"
+          pending = 4
+        }
+        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) { quote_open = "\""; pending = 6 }
+        if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) { quote_open = "\047"; pending = 6 }
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*@\(/) {
