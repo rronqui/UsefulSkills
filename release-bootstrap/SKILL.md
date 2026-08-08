@@ -88,8 +88,11 @@ As fases seguintes usam ESSE levantamento, não suposições.
   `{".": "X.Y.0"}`, senão o run falha com "Missing required manifest versions". Após o
   primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
-  nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos:
+  nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos.
+  Em shell POSIX/Git Bash, remova o terminador antes de enviar por stdin:
   `gh auth token | tr -d '\r\n' | gh secret set RELEASE_PLEASE_TOKEN`.
+  No PowerShell, grave um arquivo temporário sem newline e apague-o após o uso:
+  `$tmp = New-TemporaryFile; try { [IO.File]::WriteAllText($tmp, (gh auth token).Trim(), [Text.UTF8Encoding]::new($false)); gh secret set RELEASE_PLEASE_TOKEN --body-file $tmp } finally { Remove-Item $tmp -Force }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 
