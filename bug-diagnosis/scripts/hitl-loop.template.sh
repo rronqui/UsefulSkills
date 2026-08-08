@@ -66,8 +66,8 @@ capture_multiline() {
   fi
   while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
-    if [[ "$line" =~ ^\\+__END__$ ]]; then
-      line=${line#\\}
+    if [[ "${line:0:1}" == "\\" && "${line:1}" == "__END__" ]]; then
+      line=${line:1}
     elif [[ "$line" == "__END__" ]]; then
       saw_end=1
       break

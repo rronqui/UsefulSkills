@@ -86,7 +86,12 @@ function cmdNew(argv) {
     process.exit(1);
   }
   const originalBranch = git(["branch", "--show-current"]);
-  const originalHead = git(["rev-parse", "--verify", "HEAD"]);
+  let originalHead = "";
+  try {
+    originalHead = git(["rev-parse", "--verify", "HEAD"]);
+  } catch {
+    // orphan branches have no HEAD to restore
+  }
   const def = defaultBranch();
   const restoreBranch = () => {
     try {
