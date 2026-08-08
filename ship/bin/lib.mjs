@@ -1,7 +1,13 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
+
+const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+export function isValidSemVer(value) {
+  return typeof value === "string" && SEMVER_RE.test(value);
+}
 
 export function slugify(title) {
   return title
@@ -34,7 +40,7 @@ export function extractServedVersion(html) {
   let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/) || [])[1] ?? null;
+  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z+.-])/) || [])[1] ?? null;
 }
 
 
@@ -63,10 +69,22 @@ export function performBackup(cfg, root) {
   for (let attempt = 0; ; attempt++) {
     const dest = attempt === 0 ? base : `${base}-${attempt}`;
     try {
-      writeFileSync(dest, readFileSync(src), { flag: "wx" });
+      const fd = openSync(dest, "wx");
+      closeSync(fd);
+    } catch (err) {
+      if (err?.code === "EEXIST") continue;
+      throw err;
+    }
+    try {
+      copyFileSync(src, dest);
       return dest;
     } catch (err) {
-      if (err?.code !== "EEXIST") throw err;
+      try {
+        unlinkSync(dest);
+      } catch {
+        // preserve the original copy failure
+      }
+      throw err;
     }
   }
 }

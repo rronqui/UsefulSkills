@@ -159,7 +159,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
-   preencha `baseline.status` ausente como `NOT_RUN` antes de avaliar o baseline.
+   preencha `baseline.status` ausente como `FAIL` se `tests` ou `build` for `FAIL`,
+   `PASS` se ambos forem `PASS`, ou `NOT_RUN` nos demais casos.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
 
@@ -201,7 +202,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
           "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {} },
-          "green": { "status": "PENDING|PASS", "changed_files": [] },
+          "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [] },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
           "doc_impact": "none|applied",
           "gates": { "tests": "pending", "rastreabilidade": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
@@ -226,7 +227,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se um fluxo de entrega externo o invocou com respostas fixas contendo a cláusula `delivery: external` (ex.: skill `ship`), registre `repo.delivery: "external"` em `progress.json` e use as respostas fornecidas diretamente, **sem perguntar**. Caso contrário, registre `repo.delivery: "internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok" — o resultado entra em `baseline.status`, `baseline.tests`, `baseline.build` e `known_failures`. Se vermelha, **pare e reporte**; só avance com autorização explícita.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Derive `baseline.status`: `PASS` somente se todos os gates aplicáveis passarem, `FAIL` se qualquer teste/build falhar, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build` e `known_failures`. Se vermelha, **pare e reporte**; só avance com autorização explícita.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -373,7 +374,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 
 > **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
 
-1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim → REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
+1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
 2. **GREEN — `backend-developer` e/ou `frontend-developer`.** Implementa o **requisito completo** (a menor solução que atende **todos** os critérios). O dev reconfirma o vermelho antes de codar. Critério sem teste → para e devolve ao `test-author`. **Testes são read-only.**
 3. **REFACTOR — `refactorer`.** Mantém tudo verde. Se nada relevante a refatorar, registre `refactor.status: SKIPPED` + `reason_if_skipped` — nunca cosmético, nunca silencioso.
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + spec/critérios + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Veredito:
@@ -402,7 +403,7 @@ stateDiagram-v2
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
     PRECHECK --> PRECHECK_GATE : baseline + spec_kit WRITTEN + OK do usuario
-    PRECHECK_GATE --> PRECHECK : baseline VERMELHO, spec_kit PENDING ou sem OK
+    PRECHECK_GATE --> PRECHECK : baseline VERMELHO ou NOT_RUN, spec_kit PENDING ou sem OK
     PRECHECK_GATE --> CICLO_TAREFA : baseline VERDE, spec_kit WRITTEN e OK
 
     %% ============================================================
@@ -414,7 +415,6 @@ stateDiagram-v2
         %% ---------- RED ----------
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
-        RED_CHECK --> RED : passam de imediato ou faltam testes
         RED_CHECK --> RED : falha por import-setup (motivo errado)
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
@@ -506,8 +506,10 @@ stateDiagram-v2
 
     note right of CICLO_TAREFA
         Tarefas independentes da mesma onda
-        percorrem este ciclo em paralelo
-        (escopos allowed_write_globs disjuntos)
+        percorrem o ciclo em paralelo
+        (escopos allowed_write_globs disjuntos);
+        DOC é serializado por onda quando compartilha
+        spec.md/plan.md canônicos
     end note
 
     note right of INTEGRATE
@@ -542,9 +544,8 @@ stateDiagram-v2
 ### Estado por estado
 
 | Estado | Agente | Entra quando | Sai para |
-|---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo (baseline verde + spec_kit WRITTEN + OK) ou volta a si |
-| `RED` | `test-author` | Início da tarefa; bloqueio de origem TESTE; retorno de `GREEN`, `DOC` ou `VALIDATE` (FAIL origem TESTE) | `GREEN` só com falha por **asserção**; ou `REVIEW` se testes passam de imediato e comportamento já implementado |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo somente com `baseline.status: PASS`, `spec_kit WRITTEN` e OK; `FAIL`/`NOT_RUN` exige nova execução ou decisão |
+| `RED` | `test-author` | Início da tarefa ou bloqueio de origem TESTE | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
 | `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor | `DOC` (aprovado) ou `ROUTE_BLOCK` |

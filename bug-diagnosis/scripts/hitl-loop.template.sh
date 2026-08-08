@@ -31,21 +31,28 @@ capture() {
 }
 
 capture_multiline() {
-  local var="$1" question="$2" line answer=""
+  local var="$1" question="$2" line answer="" hidden=0
   printf '\n>>> %s\n' "$question"
   printf '    Paste lines, then enter __END__ on its own line.\n'
+  if [[ -t 0 ]]; then
+    stty -echo
+    hidden=1
+    printf '    [input hidden]\n'
+  fi
   while IFS= read -r line; do
     [[ "$line" == "__END__" ]] && break
     if [[ -n "$answer" ]]; then answer+=$'\n'; fi
     answer+="$line"
   done
+  if ((hidden)); then
+    stty echo
+    printf '\n'
+  fi
   printf -v "$var" '%s' "$answer"
 }
-
 redact() {
   sed -E \
-    -e 's/((authorization|proxy-authorization)[=:][[:space:]]*bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig' \
-    -e 's/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[=:][[:space:]]*)[^[:space:]]+/\1<REDACTED>/Ig' \
+    -e 's/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[=:][[:space:]]*).*/\1<REDACTED>/Ig' \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 

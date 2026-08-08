@@ -168,8 +168,10 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
 `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`.
 
 **Procedimento**:
-1. Ver o patch (diff fornecido inline ou comando indicado no assignment);
-2. Ler os arquivos modificados para contexto completo;
+1. No modo PR, use apenas o diff remoto autorizado; nos demais modos com diff, use o
+   patch fornecido ou o comando indicado no assignment. Em Custom sem diff, leia as
+   instruções e o workspace sem exigir patch.
+2. Ler os arquivos modificados ou atribuídos para contexto completo;
 3. Registrar cada achado com `yield` incremental `type: ["findings"]`;
 4. Registrar o veredito (`overall_correctness`, `explanation`, `confidence`) com
    seções incrementais e parar — a finalização em idle monta o resultado.
@@ -214,7 +216,8 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `priority`: número 0–3 (0 = P0 bloqueia o release; 3 = nice-to-have);
 - `confidence`: 0.0–1.0 de que é bug real;
 - `file_path`: arquivo afetado (não vazio);
-- `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas que SOBREPOE o diff.
+- `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas; em modos com patch
+  sobrepõe o diff e em Custom sem patch ancora linhas atuais do arquivo atribuído.
 
 **Veredito** (por revisor):
 - `overall_correctness`: `correct` (sem bugs/bloqueios) | `incorrect`;
@@ -222,8 +225,9 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `confidence`: 0.0–1.0.
 
 Estilo/docs/nits NÃO contam: corretude ignora questões não bloqueantes. Todo achado
-DEVE ser ancorado no patch e sustentado por evidência. O revisor nunca emite JSON ou
-blocos de código como texto final.
+DEVE ser ancorado no patch, ou nas linhas atuais do arquivo atribuído em Custom sem
+patch, e sustentado por evidência. O revisor nunca emite JSON ou blocos de código
+como texto final.
 
 ## FASE 5 — Consolidação e relatório final
 

@@ -1,6 +1,6 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
 import { describe, it, expect, vi } from "vitest";
-import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,9 +61,21 @@ describe("extractServedVersion", () => {
   it("aceita prerelease e build metadata sem comentário", () => {
     expect(extractServedVersion("<p>v1.2.3-rc.1+build.7</p>")).toBe("1.2.3-rc.1+build.7");
   });
+  it("não aceita versão com sufixo semântico inválido", () => {
+    expect(extractServedVersion("<p>v1.2.3+build+oops</p>")).toBeNull();
+  });
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();
+  });
+});
+
+describe("isValidSemVer", () => {
+  it("aceita prerelease e build metadata válidos", () => {
+    expect(isValidSemVer("1.2.3-rc.1+build.7")).toBe(true);
+  });
+  it("rejeita identificador numérico prerelease com zero à esquerda", () => {
+    expect(isValidSemVer("1.2.3-01")).toBe(false);
   });
 });
 

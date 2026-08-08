@@ -4,7 +4,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
@@ -242,7 +242,7 @@ async function deploy() {
     } catch {
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
-    const validVersion = typeof pkg?.version === "string" && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(pkg.version);
+    const validVersion = isValidSemVer(pkg?.version);
     if (pkg && !validVersion) {
       console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
     }
@@ -255,8 +255,8 @@ async function deploy() {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
           if (!response || response.ok === false || (typeof response.status === "number" && (response.status < 200 || response.status >= 300))) {
+            await response?.body?.cancel();
             throw new Error(`HTTP ${response?.status ?? "desconhecido"}`);
           }
           const html = await response.text();

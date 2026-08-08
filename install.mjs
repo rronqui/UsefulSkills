@@ -181,14 +181,34 @@ if (skillsDestStat && !skillsDestStat.isDirectory()) {
 
 // Conflito de tipo na raiz do destino dos agentes (arquivo onde deveria haver
 // diretório): reporta drift e pula sync/scan — readdirSync/mkdirSync dariam ENOTDIR.
+let agentsParentConflict = false;
+let agentsParent = path.dirname(agentsDest);
+const agentsBoundary = path.dirname(path.dirname(agentsDest));
+while (true) {
+  try {
+    if (!statSync(agentsParent).isDirectory()) {
+      agentsParentConflict = true;
+      break;
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      agentsParentConflict = true;
+      break;
+    }
+  }
+  if (agentsParent === agentsBoundary) break;
+  const next = path.dirname(agentsParent);
+  if (next === agentsParent) break;
+  agentsParent = next;
+}
 let agentsDestStat = null;
 try {
   agentsDestStat = statSync(agentsDest);
 } catch {
   // destino ausente
 }
-if (agentsDestStat && !agentsDestStat.isDirectory()) {
-  console.log("agent (raiz)           drift    conflito de tipo (arquivo onde deveria haver diretório) — remova manualmente");
+if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
+  console.log("agent (raiz)           drift    conflito de tipo no caminho do diretório — remova manualmente");
   drift = true;
 } else {
   for (const [skill, subdir, file] of AGENTS) {
