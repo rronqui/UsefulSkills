@@ -173,7 +173,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
    `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
-   Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de testes; qualquer objeto incompleto dispara o mesmo reset para RED.
+   Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de testes; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [] }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, e `gates` com todos os campos em `"pending"`;
