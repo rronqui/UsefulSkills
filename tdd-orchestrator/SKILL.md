@@ -78,7 +78,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS` | Avance para GREEN |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Avance para REVIEW |
-| `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `green.status: PENDING`, `green.reason_if_skipped: ""`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico |
+| `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`, `red.criteria_to_tests: {}`; `green.status: PENDING`, `green.reason_if_skipped: ""`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
