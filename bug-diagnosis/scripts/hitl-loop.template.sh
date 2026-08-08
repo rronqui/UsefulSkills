@@ -31,28 +31,41 @@ capture() {
 }
 
 capture_multiline() {
-  local var="$1" question="$2" line answer="" hidden=0
+  local var="$1" question="$2" line answer="" hidden=0 saw_end=0
+  local restore_tty
+  restore_tty() {
+    if ((hidden)); then
+      stty echo
+      hidden=0
+    fi
+  }
   printf '\n>>> %s\n' "$question"
   printf '    Paste lines, then enter __END__ on its own line.\n'
   if [[ -t 0 ]]; then
-    stty -echo
+    stty -echo || return 1
     hidden=1
+    trap 'restore_tty; exit 130' INT TERM
     printf '    [input hidden]\n'
   fi
   while IFS= read -r line; do
-    [[ "$line" == "__END__" ]] && break
+    if [[ "$line" == "__END__" ]]; then
+      saw_end=1
+      break
+    fi
     if [[ -n "$answer" ]]; then answer+=$'\n'; fi
     answer+="$line"
   done
-  if ((hidden)); then
-    stty echo
-    printf '\n'
+  restore_tty
+  trap - INT TERM
+  if (( !saw_end )); then
+    printf '    ERROR: multiline capture ended before __END__.\n' >&2
+    return 1
   fi
   printf -v "$var" '%s' "$answer"
 }
 redact() {
   sed -E \
-    -e 's/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[=:][[:space:]]*).*/\1<REDACTED>/Ig' \
+    -e "s/((authorization|proxy-authorization|cookie|set-cookie|x-api-key|token|password|secret)[[:space:]]*[\"']?[=:][[:space:]]*[\"']?)[^\"']*/\1<REDACTED>/Ig" \
     -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1<REDACTED>/Ig'
 }
 
@@ -61,7 +74,7 @@ redact() {
 step "Open the app at http://localhost:3000 and sign in."
 
 capture ERRORED "Click the 'Export' button. Did it throw an error? (y/n)"
-capture_multiline ERROR_MSG "Paste the error message (or 'none'):"
+capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"

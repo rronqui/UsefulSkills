@@ -415,7 +415,7 @@ stateDiagram-v2
         %% ---------- RED ----------
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
-        RED_CHECK --> RED : falha por import-setup (motivo errado)
+        RED_CHECK --> RED : falha por import-setup, faltam testes ou comportamento nao implementado
         RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
         RED_CHECK --> REVIEW : passam de imediato E comportamento ja implementado
 
@@ -544,6 +544,7 @@ stateDiagram-v2
 ### Estado por estado
 
 | Estado | Agente | Entra quando | Sai para |
+|---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo somente com `baseline.status: PASS`, `spec_kit WRITTEN` e OK; `FAIL`/`NOT_RUN` exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa ou bloqueio de origem TESTE | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
