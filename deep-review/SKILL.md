@@ -149,11 +149,13 @@ completo no assignment).
    arquivos relacionados para contexto e checagem cross-boundary, mas não registra
    achados fora dos arquivos atribuídos;
 2. Instrução de acesso ao diff:
+   - Custom sem diff: não inclua hunks nem ordene `git diff`/`git show`; inclua somente
+     a lista exata de arquivos do inventário atribuídos e peça leitura do workspace atual.
    - Diff pequeno (≤ 50.000 caracteres E ≤ 20 arquivos): inclua os hunks dos arquivos
      dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff";
    - Diff grande: apenas uma prévia por arquivo (primeiras ~`max(5, floor(100/fileCount))`
-     linhas de conteúdo de cada hunk) + a ordem "RODE `git diff`/`git show` para os
-     arquivos atribuídos" (modo não-commitado: ambos `git diff -- <path>` e
+     linhas de conteúdo de cada hunk) + a ordem "RODE `git diff`/`git show` para
+     os arquivos atribuídos" (modo não-commitado: ambos `git diff -- <path>` e
      `git diff --cached -- <path>`; modo jj: `jj --ignore-working-copy diff --git -- <path>`);
    - Modo PR com diff grande: "leia os diffs de `pr://<owner>/<repo>/<N>/diff/all` ou
      por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local
