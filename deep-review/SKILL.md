@@ -85,8 +85,9 @@ por conta própria e ancoram achados nas linhas atuais.
 - **Commit**: liste os últimos 20 com `git log --oneline -20`, pergunte qual
   (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
 - **Custom**: peça as instruções. Se houver mudanças não commitadas no working tree,
-  colete-as também e inclua as estatísticas e o diff (as instruções customizadas vão
-  como "instruções adicionais"). Sem mudanças → mapeie e particione o workspace,
+  colete-as também; aplique exclusões e as restrições customizadas antes de calcular
+  estatísticas, particionar e montar assignments. Sem mudanças → mapeie o workspace,
+  aplique as mesmas exclusões/restrições, e particione o inventário resultante;
   inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
   por conta própria e ancora achados nas linhas atuais.
 
