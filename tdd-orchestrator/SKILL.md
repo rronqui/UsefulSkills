@@ -171,7 +171,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    entrada inválida exige nova execução RED: marque a tarefa como `phase: RED` e `red.status: PENDING`,
    limpe `red.failing_tests`, `red.failure_reason_expected`, `red.criteria_to_tests`,
    `green`, `refactor`, `implemented_by`, `reviewed_by`, `gates` (todos `pending`),
-   `blockers` e `evidence`; não trate a entrada inválida como rastreabilidade válida.
+   `blockers` e `evidence`; redefina a onda como `status: in_progress`,
+   `integration.status: pending` e `integration.evidence: ""`; não trate a entrada inválida como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.

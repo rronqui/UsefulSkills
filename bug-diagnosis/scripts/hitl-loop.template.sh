@@ -86,13 +86,12 @@ capture_multiline() {
   restore_tty
   trap - EXIT INT TERM HUP QUIT TSTP
   if (( !saw_end )); then
-    printf '    ERROR: multiline capture ended before __END__.\n' >&2
     return 1
   fi
   printf -v "$var" '%s' "$answer"
 }
 redact() {
-  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token|session[[:space:]_-]*token|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token[a-z]*|password[a-z]*|passphrase|credential|credentials|secret[a-z]*' '
+  awk -v labels='authorization|proxy[[:space:]_-]*authorization|cookie|set[[:space:]_-]*cookie|x[[:space:]_-]*api[[:space:]_-]*key|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token|private[[:space:]_-]*key|secret[[:space:]_-]*key|client[[:space:]_-]*secret|refresh[[:space:]_-]*token|session[[:space:]_-]*token|aws[[:space:]_-]*secret[[:space:]_-]*access[[:space:]_-]*key|jwt|token[[:alnum:]]*|password[[:alnum:]]*|passphrase|credential|credentials|secret[[:alnum:]]*' '
     BEGIN {
       key = "(^|[^[:alnum:]])(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
       bare_key = "(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:]"
@@ -114,6 +113,16 @@ redact() {
         if (flow_depth <= 0) pending = 0
         next
       }
+      if (pending == 3) {
+        print "<REDACTED>"
+        if (lower ~ /^-----end[[:space:]].*-----[[:space:]]*$/) pending = 0
+        next
+      }
+      if (lower ~ /^-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
+        print "<REDACTED>"
+        pending = 3
+        next
+      }
       if (pending) {
         if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
           print "<REDACTED>"
@@ -128,7 +137,7 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{]/) {
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{]/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
