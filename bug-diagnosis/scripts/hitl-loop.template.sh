@@ -66,7 +66,7 @@ capture_multiline() {
   fi
   while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
-    if [[ "$line" != "__END__" && "${line//\\/}" == "__END__" ]]; then
+    if [[ "$line" =~ ^\\+__END__$ ]]; then
       line=${line#\\}
     elif [[ "$line" == "__END__" ]]; then
       saw_end=1
@@ -96,6 +96,11 @@ redact() {
     }
     {
       lower = tolower($0)
+      if (pending == 2) {
+        print "<REDACTED>"
+        if ($0 ~ /^[[:space:]]*]/ || $0 ~ /^[[:space:]]*}/) pending = 0
+        next
+      }
       if (pending) {
         if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
           print "<REDACTED>"
@@ -109,8 +114,8 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /"/ && lower !~ /"[^"\\]*"[[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[\[{][[:space:]]*$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[\[{][[:space:]]*(#.*)?$/) pending = 2
         next
       }
       print

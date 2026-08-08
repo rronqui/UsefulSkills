@@ -86,14 +86,17 @@ function cmdNew(argv) {
     process.exit(1);
   }
   const originalBranch = git(["branch", "--show-current"]);
+  const originalHead = git(["rev-parse", "--verify", "HEAD"]);
   const def = defaultBranch();
   const restoreBranch = () => {
-    if (originalBranch && originalBranch !== def) {
-      try {
+    try {
+      if (originalBranch && originalBranch !== def) {
         git(["switch", originalBranch]);
-      } catch {
-        // preserve the original failure if restoration is unavailable
+      } else if (!originalBranch && originalHead) {
+        git(["switch", "--detach", originalHead]);
       }
+    } catch {
+      // preserve the original failure if restoration is unavailable
     }
   };
   try {

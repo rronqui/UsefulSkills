@@ -169,7 +169,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Ao migrar `red.criteria_to_tests` legado em texto, converta cada linha
    `AC-NNN -> arquivo::teste` para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando
    entrada inválida exige nova execução RED: marque a tarefa como `phase: RED` e `red.status: PENDING`,
-   limpe `green`, `refactor`, `implemented_by`, `reviewed_by`, `gates` (todos `pending`),
+   limpe `red.failing_tests`, `red.failure_reason_expected`, `red.criteria_to_tests`,
+   `green`, `refactor`, `implemented_by`, `reviewed_by`, `gates` (todos `pending`),
    `blockers` e `evidence`; não trate a entrada inválida como rastreabilidade válida.
    Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
@@ -557,7 +558,7 @@ stateDiagram-v2
 
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override exige nova execução ou decisão |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override, Spec Kit pendente ou sem OK exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção**; `REVIEW` se testes passam de imediato e comportamento já implementado; reexecute RED se faltar teste ou comportamento |
 | `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
 | `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
