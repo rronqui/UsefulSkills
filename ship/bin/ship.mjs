@@ -188,10 +188,9 @@ function cmdShip(argv) {
           process.exit(1);
         }
       } catch {
-        console.error("Nada para commitar.");
-        process.exit(1);
+        console.warn("Não consegui comparar com a branch default local; tentando criar o PR mesmo assim.");
+        console.log("Árvore limpa — branch já publicada; tentando criar o PR.");
       }
-      console.log("Árvore limpa — branch já publicada; tentando criar o PR.");
     } else {
       console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
     }
