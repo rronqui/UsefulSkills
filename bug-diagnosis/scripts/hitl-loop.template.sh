@@ -109,8 +109,8 @@ redact() {
         gsub(/"([^"\\]|\\.)*"/, "", scan)
         gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
         gsub(/#.*/, "", scan)
-        flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
-        flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+        flow_depth += gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
+        flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
         if (flow_depth <= 0) pending = 0
         next
       }
@@ -130,14 +130,14 @@ redact() {
         next
       }
       if (pending) {
-        if ($0 ~ /^[[:space:]]*[\[{]/ || $0 ~ /^[[:space:]]*@\{/) {
+        if ($0 ~ /^[[:space:]]*[\[{]/ || $0 ~ /^[[:space:]]*@[\{(]/) {
           print "<REDACTED>"
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
-          gsub(/\047([^\\\047]|\\.)*\047/, "", scan)
+          gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
-          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
-          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
           if (flow_depth > 0) pending = 2
           else pending = 0
           next
@@ -161,14 +161,18 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key) && lower ~ /\047/ && lower !~ /\047[^\047\\]*\047[[:space:]]*$/) pending = 1
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
         if (pending && lower ~ /[=:][[:space:]]*@[\047"]/) pending = 4
+        if (pending && lower ~ /[=:][[:space:]]*@\(/) {
+          pending = 2
+          flow_depth = 1
+        }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1
-        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{]/) {
+        if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key) && lower ~ /[=:][[:space:]]*[^#]*[\[{(]/) {
           scan = $0
           gsub(/"([^"\\]|\\.)*"/, "", scan)
           gsub(/\047([^[:cntrl:]]|\047\047)*\047/, "", scan)
           gsub(/#.*/, "", scan)
-          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
-          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan) + gsub(/\(/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan) + gsub(/\)/, "", scan)
           if (flow_depth > 0) pending = 2
         }
         next
