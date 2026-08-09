@@ -77,8 +77,8 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija `red.revision_delta` com `ac` pertencente à tarefa, `test` no formato `arquivo::teste`, presente em `red.criteria_to_tests[ac]` e ausente de `red.revision_baseline_tests[ac]`, além de `evidence` nova; preserve todos os AC, acumule o teste de regressão e confirme `red.failing_tests`/`failure_reason_expected` antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
-| `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
-| `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
+| `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
+| `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
 | `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico, normalize o objeto AC→teste atual e substitua `red.criteria_to_tests` |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
@@ -173,7 +173,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`,
    `red.revision_baseline_tests: {}`, `green.tooling_evidence: ""`,
-   `green.tooling_suite_evidence: ""`).
+   `green.tooling_suite_evidence: ""`, `gate_evidence: {}`).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
@@ -192,9 +192,10 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
    Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de strings no formato `arquivo::teste`; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
+   `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `red.revision_delta` como `{ "ac": "", "test": "", "evidence": "" }` e
    `red.revision_baseline_tests` como `{}`,
-   `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, `gates` com todos os campos em `"pending"`, e `gate_origins` com todos os campos vazios;
+   `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, `gates` com todos os campos em `"pending"`, `gate_origins` e `gate_evidence` como objetos com todos os gates vazios;
    redefina para `PENDING` o `status` de cada AC em `acceptance_criteria` referenciado pela tarefa;
    limpe `blockers` e `evidence`; redefina a onda como `status: in_progress`,
    `integration.status: pending` e `integration.evidence: ""`; não trate a entrada inválida como rastreabilidade válida.
@@ -236,14 +237,14 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
           "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
-          "acceptance_criteria": ["AC-001"],
           "implemented_by": "backend-developer",
+          "reviewed_by": "peer-reviewer",
           "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {}, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
           "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
-          "doc_impact": "none|applied",
           "gates": { "tests": "pending", "traceability": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
           "gate_origins": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
+          "gate_evidence": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
           "blockers": [],
           "evidence": ""
         }
@@ -254,8 +255,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ```
 
 > Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
-
-Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `FAIL`, persista `gate_origins.<gate>` junto com a evidência antes de qualquer reentrada; renove `updated_at`.
+Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `FAIL`, persista `gate_origins.<gate>` e `gate_evidence.<gate>` junto com a evidência antes de qualquer reentrada; renove `updated_at`.
 
 ---
 
