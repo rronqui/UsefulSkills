@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/rronqui/UsefulSkills/compare/v0.2.3...v0.2.4) (2026-08-09)
+
+
+### Bug Fixes
+
+* corrigir sobre-redação de quotes ([#13](https://github.com/rronqui/UsefulSkills/issues/13)) ([#17](https://github.com/rronqui/UsefulSkills/issues/17)) ([76be7b6](https://github.com/rronqui/UsefulSkills/commit/76be7b6843264269f045de446d70091ec8e1b1f9))
+
 ## [0.2.3](https://github.com/rronqui/UsefulSkills/compare/v0.2.2...v0.2.3) (2026-08-09)
 
 
