@@ -202,8 +202,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    se a fase anterior era `VALIDATE`, `TOOLING_FIX` ou `DONE`, retome em `VALIDATE`.
    Nunca retome `DONE` sem evidência por gate.
    Ao migrar `red.criteria_to_tests` legado em formato texto, valide cada linha
-   no formato `arquivo::teste`, remova entradas vazias e converta-a para o objeto
-   `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando somente após a validação;
+   no formato `AC-NNN -> arquivo::teste` (aceite também `AC-NNN: arquivo::teste`),
+   remova entradas vazias e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`,
+   acumulando somente após a validação;
    se qualquer linha for inválida ou algum AC referenciado
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
    `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
