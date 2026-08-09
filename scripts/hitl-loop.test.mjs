@@ -402,6 +402,18 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts a bare flow opener in a continuation", () => {
+    const result = runCapture([
+      "password:",
+      "(",
+      "  second-secret",
+      ")",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps outer redaction for an inline PEM block", () => {
     const result = runCapture([
       "password: { private_key: -----BEGIN PRIVATE KEY-----",

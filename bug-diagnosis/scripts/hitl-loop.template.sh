@@ -430,12 +430,12 @@ redact() {
           pem_label_value = pem_label(lower)
           next
         }
-        if ($0 ~ /^[[:space:]]*[\[{]/ || $0 ~ /^[[:space:]]*@[\{(]/) {
+        if ($0 ~ /^[[:space:]]*[\[{(]/ || $0 ~ /^[[:space:]]*@[\{(]/) {
           print "<REDACTED>"
           scan = $0
           scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
-          flow_parens = ($0 ~ /^[[:space:]]*@\(/)
+          flow_parens = ($0 ~ /^[[:space:]]*@?\(/)
           flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
           flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
           if (flow_parens) {
