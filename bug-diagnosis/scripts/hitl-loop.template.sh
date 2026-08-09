@@ -285,12 +285,20 @@ redact() {
       pem_label_value = ""
       pem_parent_depth = 0
       pem_parent_pending = 0
+      here_parent_depth = 0
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
       lower = tolower($0)
       if (pending == 2) {
         print "<REDACTED>"
+        if (flow_depth > 0 && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
+          here_quote = (lower ~ /@"/) ? "\"" : "\047"
+          here_parent_depth = flow_depth
+          quote_open = ""
+          pending = 4
+          next
+        }
         scan = $0
         if (quote_open == "\"") {
           quote_pos = unescaped_double(scan)
@@ -326,7 +334,7 @@ redact() {
           if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(\{|\[|@\{|@\(|\()/) {
             scan = strip_quoted($0)
             gsub(/#.*/, "", scan)
-            flow_parens = (scan ~ /@\(/)
+            flow_parens = (scan ~ /[()]/)
             flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
             flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
             if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
@@ -379,16 +387,16 @@ redact() {
         if (!pending && lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) { pending = 3; pem_label_value = pem_label(lower) }
         next
       }
-      if (pending == 5) {
-        print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*`[[:space:]]*[,;\]\}\)]?[[:space:]]*$/) pending = 0
-        else pending = 5
-        next
-      }
       if (pending == 4) {
         print "<REDACTED>"
         if ((here_quote == "\"" && lower ~ /^"@[[:space:]]*$/) || (here_quote == "\047" && lower ~ /^\047@[[:space:]]*$/)) {
-          pending = 0
+          if (here_parent_depth > 0) {
+            flow_depth = here_parent_depth
+            pending = 2
+            here_parent_depth = 0
+          } else {
+            pending = 0
+          }
           here_quote = ""
         }
         next
