@@ -133,7 +133,7 @@ redact() {
           continue
         }
         if (quote == "\047") {
-          if (ch == "\047") {
+          if (ch == "\047" && !quote_escaped(s, i)) {
             if (substr(s, i + 1, 1) == "\047") i++
             else quote = ""
           }
@@ -172,7 +172,7 @@ redact() {
           continue
         }
         if (quote == "\047") {
-          if (ch == "\047") {
+          if (ch == "\047" && !quote_escaped(s, i)) {
             if (substr(s, i + 1, 1) == "\047") i++
             else quote = ""
           }
@@ -192,7 +192,7 @@ redact() {
     }
     function single_close_pos(s, i, prev, nxt) {
       for (i = 1; i <= length(s); i++) {
-        if (substr(s, i, 1) != "\047") continue
+        if (substr(s, i, 1) != "\047" || quote_escaped(s, i)) continue
         prev = (i > 1) ? substr(s, i - 1, 1) : ""
         nxt = (i < length(s)) ? substr(s, i + 1, 1) : ""
         if (prev ~ /[[:alnum:]]/ && nxt ~ /[[:alnum:]]/) continue
@@ -204,8 +204,8 @@ redact() {
     function single_unclosed_text(s, i, count) {
       count = 0
       for (i = 1; i <= length(s); i++) {
-        if (substr(s, i, 1) != "\047") continue
-        if ((i > 1 && substr(s, i - 1, 1) ~ /[[:alnum:]]/) && (i < length(s) && substr(s, i + 1, 1) ~ /[[:alnum:]]/)) continue
+        if (substr(s, i, 1) != "\047" || quote_escaped(s, i)) continue
+        if ((i > 1 && substr(s, i - 1, 1) ~ /[[:alnum:]]/) && (i < length(s) && substr(s, i + 1, 1) ~ /[[:alnum:]]/) ) continue
         if (substr(s, i + 1, 1) == "\047") { i++; continue }
         count++
       }
@@ -239,6 +239,7 @@ redact() {
       count = 0
       for (i = start + 1; i <= length(s); i++) {
         if (substr(s, i, 1) != wanted) continue
+        if (wanted == "\047" && quote_escaped(s, i)) continue
         prev = (i > 1) ? substr(s, i - 1, 1) : ""
         nxt = (i < length(s)) ? substr(s, i + 1, 1) : ""
         if (wanted == "\047" && prev ~ /[[:alnum:]]/ && nxt ~ /[[:alnum:]]/) continue
@@ -418,15 +419,15 @@ redact() {
           print "<REDACTED>"
           next
         }
-        if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {
-          pending = 0
-          print
-          next
-        }
         if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
           print "<REDACTED>"
           pending = 3
           pem_label_value = pem_label(lower)
+          next
+        }
+        if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {
+          pending = 0
+          print
           next
         }
         if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) {

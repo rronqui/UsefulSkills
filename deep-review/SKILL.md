@@ -87,7 +87,7 @@ por conta própria e ancoram achados nas linhas atuais.
  - **Custom**: peça as instruções. Se houver mudanças não commitadas (staged ou
    unstaged), colete um único patch final com `git diff HEAD --`; liste também arquivos
    untracked via `git status --short --untracked-files=all` e, para cada arquivo não
-   excluído, acrescente um patch `/dev/null`→arquivo usando `git diff --no-index -- /dev/null <path>`
+   excluído, acrescente um patch `/dev/null`→arquivo usando `git diff --no-index -- /dev/null "<path>"`
    (ignore o exit code 1 esperado). Aplique exclusões e restrições customizadas antes de calcular
    estatísticas, particionar e montar assignments. Se o inventário resultante
    ficar vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie

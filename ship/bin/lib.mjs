@@ -77,7 +77,7 @@ export function performBackup(cfg, root) {
       copyFileSync(src, temp);
       try {
         linkSync(temp, dest);
-        unlinkSync(temp);
+        try { unlinkSync(temp); } catch {}
       } catch (err) {
         if (!["EPERM", "EOPNOTSUPP", "ENOTSUP", "EXDEV"].includes(err?.code)) throw err;
         try {
@@ -88,7 +88,7 @@ export function performBackup(cfg, root) {
           }
           throw copyErr;
         }
-        unlinkSync(temp);
+        try { unlinkSync(temp); } catch {}
       }
       return dest;
     } catch (err) {

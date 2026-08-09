@@ -172,8 +172,10 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`,
-   `red.revision_baseline_tests: {}`, `green.tooling_evidence: ""`,
-   `green.tooling_suite_evidence: ""`, `gate_evidence: {}`).
+   `red.revision_baseline_tests`: se a tarefa já estiver em `RED_REVISION`, copie
+   `red.criteria_to_tests`; caso contrário, `{}`,
+   `green.tooling_evidence: ""`, `green.tooling_suite_evidence: ""`,
+   `gate_evidence: {}`).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
@@ -237,11 +239,13 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
           "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
+          "acceptance_criteria": ["AC-001"],
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
           "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {}, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
           "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
+          "doc_impact": "none|applied",
           "gates": { "tests": "pending", "traceability": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
           "gate_origins": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
           "gate_evidence": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },

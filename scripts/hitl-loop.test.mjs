@@ -333,6 +333,30 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts a PEM block following scalar continuation", () => {
+    const result = runCapture([
+      "password:",
+      "normal: -----BEGIN PRIVATE KEY-----",
+      "base64-secret",
+      "-----END PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("base64-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts escaped apostrophes in multiline quoted values", () => {
+    const result = runCapture([
+      "password: 'first-secret\\'still",
+      "final-secret'",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still");
+    expect(result.stdout).not.toContain("final-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("redacts a new quoted field after a flow closes", () => {
     const result = runCapture([
       "password: {",
