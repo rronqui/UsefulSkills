@@ -779,6 +779,18 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("abc123");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps explicit YAML flow redaction across PowerShell comments", () => {
+    const result = runCapture([
+      "? password",
+      ": @(#)",
+      "leaked-after-comment",
+      ")",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("leaked-after-comment");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("redacts explicit YAML quoted values after a question-mark key", () => {
     const result = runCapture([
       "? password",

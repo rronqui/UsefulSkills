@@ -589,6 +589,7 @@ redact() {
             } else pending = 0
           } else if (flow_scan ~ /[\[{(]/) {
             scan = flow_scan
+            gsub(/#.*/, "", scan)
             flow_parens = (scan ~ /[()]/)
             flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
             flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
