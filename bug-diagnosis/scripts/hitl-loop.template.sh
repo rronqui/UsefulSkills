@@ -271,6 +271,7 @@ redact() {
       sub(/^.*-----begin[[:space:]]+/, "", marker)
       sub(/^.*-----end[[:space:]]+/, "", marker)
       sub(/[[:space:]]+private[[:space:]]+key-----.*$/, "", marker)
+      sub(/^private[[:space:]]+key-----.*$/, "", marker)
       return marker
     }
     BEGIN {
@@ -320,7 +321,16 @@ redact() {
             quote_open = ""
             pending = 4
           }
-          if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ /[=:][[:space:]]*$/ || lower ~ /[=:][[:space:]]*(\{|\[|@|\||>)/)) pending = 1
+          if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(\{|\[|@\{|@\()/) {
+            scan = strip_quoted($0)
+            gsub(/#.*/, "", scan)
+            flow_parens = (scan ~ /@\(/)
+            flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+            flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+            if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
+            pending = (flow_depth > 0) ? 2 : 0
+          }
+          if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ /[=:][[:space:]]*$/ || lower ~ /[=:][[:space:]]*(\||>)/)) pending = 1
           if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
           if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_plain_scalar(lower)) pending = 1
           if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) { pending = 3; pem_label_value = pem_label(lower) }
@@ -386,13 +396,19 @@ redact() {
         }
         next
       }
-      if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*$/) {
+      if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*(#.*)?$/) {
         print "<REDACTED>"
         pending = 3
         pem_label_value = pem_label(lower)
         next
       }
       if (pending) {
+        if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
+          print "<REDACTED>"
+          pending = 3
+          pem_label_value = pem_label(lower)
+          next
+        }
         if ($0 ~ /^[[:space:]]*[\[{]/ || $0 ~ /^[[:space:]]*@[\{(]/) {
           print "<REDACTED>"
           scan = $0
@@ -417,12 +433,6 @@ redact() {
         }
         if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
           print "<REDACTED>"
-          next
-        }
-        if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
-          print "<REDACTED>"
-          pending = 3
-          pem_label_value = pem_label(lower)
           next
         }
         if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]/ && !(lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/)) {

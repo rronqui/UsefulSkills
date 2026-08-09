@@ -76,7 +76,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija `red.revision_delta` com `ac` pertencente à tarefa, `test` no formato `arquivo::teste`, presente em `red.criteria_to_tests[ac]` e ausente de `red.revision_baseline_tests[ac]`, além de `evidence` nova; preserve todos os AC, acumule o teste de regressão e confirme `red.failing_tests`/`failure_reason_expected` antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
@@ -88,8 +88,8 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `refactorer` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
-| `validator` | PASSOU | `gates.*: PASS` | Avance para DONE |
-| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate persistido em `gate_origins` | Roteie por `origin` do FAIL (`TOOLING` vai a `TOOLING_FIX`); ausência de `origin` torna o output inválido e exige reexecução |
+| `validator` | PASSOU | `gates.*: PASS|NA` com `gate_evidence.<gate>` e, para `NA`, justificativa persistidas | Avance para DONE somente quando cada gate tiver status e evidência/justificativa válidos |
+| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate e `gate_evidence.<gate>` persistidos | Roteie por `origin` do FAIL (`TOOLING` vai a `TOOLING_FIX`); ausência de `origin` ou evidência torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
 | `spec-kit-author` | CONCLUÍDO | `spec_kit.status: WRITTEN` | Confirme artefatos em disco, registre paths e `written_at` |
@@ -175,7 +175,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `red.revision_baseline_tests`: se a tarefa já estiver em `RED_REVISION`, copie
    `red.criteria_to_tests`; caso contrário, `{}`,
    `green.tooling_evidence: ""`, `green.tooling_suite_evidence: ""`,
-   `gate_evidence: {}`).
+   `gate_evidence`: quando ausente, objeto com `tests`, `traceability`, `spec_kit`,
+   `coverage`, `lint`, `type_check`, `build`, `security`, `contract` e `git_sanity`
+   mapeados para strings vazias).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
@@ -256,10 +258,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
     }
   ]
 }
-```
 
 > Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
-Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `FAIL`, persista `gate_origins.<gate>` e `gate_evidence.<gate>` junto com a evidência antes de qualquer reentrada; renove `updated_at`.
+Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` (e `gate_origins.<gate>` quando `FAIL`) antes de qualquer reentrada; renove `updated_at`.
 
 ---
 

@@ -91,7 +91,7 @@ As fases seguintes usam ESSE levantamento, não suposições.
   nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos.
   Em shell POSIX/Git Bash, valide a saída e remova o terminador antes de enviar por
   stdin, limpando o token mesmo em falha:
-  `token="$(gh auth token)" || exit 1; [ -n "$token" ] || { unset token; exit 1; }; if printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; then status=0; else status=$?; fi; unset token; exit $status`.
+  `status=1; token="$(gh auth token)" && [ -n "$token" ] && { if printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; then status=0; else status=$?; fi; }; unset token; [ "$status" -eq 0 ]`.
   No PowerShell, adquira o token dentro do `try`, escreva-o sem newline no stdin do processo e remova-o no `finally`:
 `$token = $null; $p = $null; try { $token = gh auth token; if ($LASTEXITCODE -ne 0) { throw "gh auth token falhou" }; $token = $token.Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { $token = $null; try { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() } } catch { } }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,

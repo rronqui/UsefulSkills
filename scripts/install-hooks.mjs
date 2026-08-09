@@ -26,7 +26,7 @@ const hooksInsideProject = hooksRelative === "" || (!parentTraversal && !isAbsol
 
 let ancestor = hooksDir;
 while (true) {
-  if ((hooksInsideProject && ancestor === root) || (!hooksInsideProject && ancestor !== hooksDir)) break;
+  if ((hooksInsideProject && relative(root, ancestor) === "") || (!hooksInsideProject && ancestor !== hooksDir)) break;
   // hook destinations and may legitimately be symlinks (for example /var).
   try {
     if (lstatSync(ancestor).isSymbolicLink()) {

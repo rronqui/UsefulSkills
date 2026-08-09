@@ -15,6 +15,10 @@ function readConfig() {
   }
   return value;
 }
+function backupDirFor(cfg) {
+  if (!cfg.dbPath) return null;
+  return path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
+}
 
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", cwd: root }).trim();
@@ -273,6 +277,7 @@ async function deploy() {
   }
   const oldHead = git(["rev-parse", "HEAD"]);
   const prePullDbPath = cfg.dbPath;
+  const prePullBackupDir = backupDirFor(cfg);
   const backupDest = performBackup(cfg, root);
   if (backupDest) console.log(`Backup: ${backupDest}`);
   else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
@@ -288,7 +293,7 @@ async function deploy() {
     console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
     process.exit(1);
   }
-  if (cfg.dbPath !== prePullDbPath) {
+  if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
     const postPullBackup = performBackup(cfg, root);
     if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
     else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
