@@ -283,6 +283,7 @@ redact() {
       quote_pos = 0
       pem_label_value = ""
       pem_parent_depth = 0
+      pem_parent_pending = 0
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
@@ -395,16 +396,20 @@ redact() {
           if (pem_parent_depth > 0) {
             flow_depth = pem_parent_depth
             pending = 2
-            pem_parent_depth = 0
+          } else if (pem_parent_pending > 0) {
+            pending = pem_parent_pending
           } else {
             pending = 0
           }
+          pem_parent_depth = 0
+          pem_parent_pending = 0
           pem_label_value = ""
         }
         next
       }
       if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*(#.*)?$/) {
         print "<REDACTED>"
+        pem_parent_pending = (pending && pending != 3) ? pending : 0
         scan = strip_quoted($0)
         gsub(/#.*/, "", scan)
         pem_parent_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)

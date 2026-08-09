@@ -1,6 +1,6 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -58,6 +58,22 @@ export function resolveSchemaWatch(value) {
 // retorna o destino escrito. Caminhos absolutos são honrados; diretórios relativos
 // são resolvidos a partir da raiz do repositório. O nome é reservado atomicamente
 // para que chamadas no mesmo instante nunca sobrescrevam um snapshot anterior.
+function copyFileAtomically(src, dest) {
+  const staging = `${dest}.copy-${process.pid}`;
+  let reserved = false;
+  try {
+    const fd = openSync(staging, "wx");
+    closeSync(fd);
+    reserved = true;
+    copyFileSync(src, staging);
+    renameSync(staging, dest);
+    reserved = false;
+  } finally {
+    if (reserved) {
+      try { unlinkSync(staging); } catch {}
+    }
+  }
+}
 export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
   const src = path.resolve(root, cfg.dbPath);
@@ -81,12 +97,10 @@ export function performBackup(cfg, root) {
       } catch (err) {
         if (!["EPERM", "EACCES", "EOPNOTSUPP", "ENOTSUP", "EXDEV"].includes(err?.code)) throw err;
         try {
-          copyFileSync(temp, dest, constants.COPYFILE_EXCL);
-        } catch (copyErr) {
-          if (copyErr?.code !== "EEXIST") {
-            try { unlinkSync(dest); } catch {}
-          }
-          throw copyErr;
+          renameSync(temp, dest);
+        } catch (renameErr) {
+          if (!["EPERM", "EACCES", "EOPNOTSUPP", "ENOTSUP", "EXDEV"].includes(renameErr?.code)) throw renameErr;
+          copyFileAtomically(temp, dest);
         }
         try { unlinkSync(temp); } catch {}
       }

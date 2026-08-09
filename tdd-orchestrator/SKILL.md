@@ -177,7 +177,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
    após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
-   em `RED_REVISION`, copie o objeto normalizado para `red.revision_baseline_tests`;
+   em `RED_REVISION`, inicialize `red.revision_baseline_tests` com o mapa normalizado
+   somente quando o campo estiver ausente ou inválido; preserve um mapa válido existente.
    caso contrário, `{}`. Inicialize `green.tooling_evidence: ""`,
    `green.tooling_suite_evidence: ""` e `gate_evidence`: quando ausente, objeto com
    os dez gates canônicos mapeados para strings vazias).
@@ -266,7 +267,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ```
 
 > Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
-Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` (e `gate_origins.<gate>` quando `FAIL`) antes de qualquer reentrada; renove `updated_at`.
+Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` antes de qualquer reentrada, grave `gate_origins.<gate>` quando o status for `FAIL` e limpe essa origem quando o novo status for `PASS` ou `NA`; renove `updated_at`.
 
 ---
 
