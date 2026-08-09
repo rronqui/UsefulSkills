@@ -26,8 +26,9 @@ const hooksInsideProject = hooksRelative === "" || (!parentTraversal && !isAbsol
 
 let ancestor = hooksDir;
 while (true) {
-  if ((hooksInsideProject && relative(root, ancestor) === "") || (!hooksInsideProject && ancestor !== hooksDir)) break;
-  // hook destinations and may legitimately be symlinks (for example /var).
+  if (hooksInsideProject && relative(root, ancestor) === "") break;
+  // Recusar symlinks em qualquer componente do caminho evita que mkdir/cópia
+  // atravesse um destino externo redirecionado.
   try {
     if (lstatSync(ancestor).isSymbolicLink()) {
       console.error(`Caminho de hooks contém symlink; recusando escrever: ${ancestor}`);
