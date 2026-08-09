@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/rronqui/UsefulSkills/compare/v0.2.4...v0.2.5) (2026-08-09)
+
+
+### Bug Fixes
+
+* fechar redaction de comments em pending7 ([#16](https://github.com/rronqui/UsefulSkills/issues/16)) ([#20](https://github.com/rronqui/UsefulSkills/issues/20)) ([e15c9fe](https://github.com/rronqui/UsefulSkills/commit/e15c9fe3cc82193b209cb163ba009e900edd0eb4))
+
 ## [0.2.4](https://github.com/rronqui/UsefulSkills/compare/v0.2.3...v0.2.4) (2026-08-09)
 
 
