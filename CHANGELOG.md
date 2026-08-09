@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/rronqui/UsefulSkills/compare/v0.2.1...v0.2.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* corrigir achados do deep-review integral ([#11](https://github.com/rronqui/UsefulSkills/issues/11)) ([7367c88](https://github.com/rronqui/UsefulSkills/commit/7367c88cd76e59a09146ee24219a18adc1570abb))
+
 ## [0.2.1](https://github.com/rronqui/UsefulSkills/compare/v0.2.0...v0.2.1) (2026-08-07)
 
 
