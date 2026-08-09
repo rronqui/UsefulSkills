@@ -76,7 +76,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija `red.revision_delta` com `ac` pertencente à tarefa, `test` no formato `arquivo::teste` e presente em `red.criteria_to_tests[ac]`, além de `evidence` nova; preserve todos os AC, acumule o teste de regressão e confirme `red.failing_tests`/`failure_reason_expected` antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija `red.revision_delta` com `ac` pertencente à tarefa, `test` no formato `arquivo::teste`, presente em `red.criteria_to_tests[ac]` e ausente de `red.revision_baseline_tests[ac]`, além de `evidence` nova; preserve todos os AC, acumule o teste de regressão e confirme `red.failing_tests`/`failure_reason_expected` antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
@@ -172,7 +172,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`,
-   `green.tooling_evidence: ""`, `green.tooling_suite_evidence: ""`).
+   `red.revision_baseline_tests: {}`, `green.tooling_evidence: ""`,
+   `green.tooling_suite_evidence: ""`).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
@@ -191,8 +192,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
    Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de strings no formato `arquivo::teste`; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
-   `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
-   `red.revision_delta` como `{ "ac": "", "test": "", "evidence": "" }`,
+   `red.revision_delta` como `{ "ac": "", "test": "", "evidence": "" }` e
+   `red.revision_baseline_tests` como `{}`,
    `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, `gates` com todos os campos em `"pending"`, e `gate_origins` com todos os campos vazios;
    redefina para `PENDING` o `status` de cada AC em `acceptance_criteria` referenciado pela tarefa;
    limpe `blockers` e `evidence`; redefina a onda como `status: in_progress`,
@@ -237,8 +238,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
           "allowed_write_globs": ["src/backend/**"],
           "acceptance_criteria": ["AC-001"],
           "implemented_by": "backend-developer",
-          "reviewed_by": "peer-reviewer",
-          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {}, "revision_delta": { "ac": "", "test": "", "evidence": "" } },
+          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {}, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
           "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
           "doc_impact": "none|applied",
@@ -411,9 +411,11 @@ Sem critério de aceite explícito, **não delegue**.
 Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
 
 > **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `TOOLING_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
-> Ao iniciar nova entrada em `RED_REVISION`, incremente `attempt` e limpe
+> Ao iniciar nova entrada em `RED_REVISION`, incremente `attempt`, copie o mapa
+> anterior de `red.criteria_to_tests` para `red.revision_baseline_tests` e limpe
 > `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected`; a nova
-> execução deve registrar falha de asserção e evidência própria antes de `GREEN_FIX`.
+> execução deve registrar uma falha de asserção, adicionar um `arquivo::teste` ausente
+> do mapa-base e produzir evidência própria antes de `GREEN_FIX`.
 > Ao iniciar `TOOLING_FIX`, incremente `attempt` e limpe `green.tooling_evidence` e
 > `green.tooling_suite_evidence`. Só aceite os campos preenchidos pelo resultado dessa
 > execução; evidência de uma tentativa anterior não autoriza a transição.
