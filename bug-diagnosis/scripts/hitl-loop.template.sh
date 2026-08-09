@@ -281,8 +281,8 @@ redact() {
       word = "(^|[^[:alnum:]])(" labels ")[[:space:]]+"
       quote_open = ""
       quote_pos = 0
-      flow_parens = 0
       pem_label_value = ""
+      pem_parent_depth = 0
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
@@ -392,13 +392,24 @@ redact() {
       if (pending == 3) {
         print "<REDACTED>"
         if (lower ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/ && pem_label(lower) == pem_label_value) {
-          pending = 0
+          if (pem_parent_depth > 0) {
+            flow_depth = pem_parent_depth
+            pending = 2
+            pem_parent_depth = 0
+          } else {
+            pending = 0
+          }
           pem_label_value = ""
         }
         next
       }
       if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key.*-----[[:space:]]*(#.*)?$/) {
         print "<REDACTED>"
+        scan = strip_quoted($0)
+        gsub(/#.*/, "", scan)
+        pem_parent_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+        pem_parent_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+        if (scan ~ /@\(/) pem_parent_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
         pending = 3
         pem_label_value = pem_label(lower)
         next
@@ -406,6 +417,7 @@ redact() {
       if (pending) {
         if (lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) {
           print "<REDACTED>"
+          pem_parent_depth = (flow_depth > 0) ? flow_depth : 0
           pending = 3
           pem_label_value = pem_label(lower)
           next
@@ -432,7 +444,7 @@ redact() {
           pending = 4
           next
         }
-        if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/) {
+        if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/ || $0 ~ /^[[:space:]]*#/) {
           print "<REDACTED>"
           next
         }

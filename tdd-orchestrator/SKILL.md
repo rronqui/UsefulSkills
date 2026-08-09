@@ -169,9 +169,10 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
    preencha `baseline.status` ausente como `NOT_RUN` se qualquer gate estiver `NOT_RUN`
-   ou for `NA` sem justificativa correspondente em `known_failures`; caso contrário,
-   como `FAIL` se algum gate for `FAIL`, `PASS` se cada gate for `PASS` ou `NA` com
-   justificativa correspondente em `known_failures`, ou `NOT_RUN` nos demais casos.
+   ou for `NA` sem uma entrada correspondente em `known_failures` com `reason` e
+   `evidence` não vazios; caso contrário, como `FAIL` se algum gate for `FAIL`,
+   `PASS` se cada gate for `PASS` ou `NA` com justificativa correspondente e não vazia,
+   ou `NOT_RUN` nos demais casos.
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
@@ -183,19 +184,16 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
-   Se um objeto de tarefa legado tiver `gates.*` em `PASS`, `FAIL` ou `NA` mas
-   `gate_evidence` ausente ou incompleto, preserve o diagnóstico apenas como
-   histórico, redefina os dez `gates` para `pending`, limpe `gate_origins` e
-   `gate_evidence`, e retome a tarefa em `VALIDATE`; nunca retome `DONE` sem
-   evidência por gate.
    Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
    legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline
    antes de continuar.
-   Mesmo quando `schema_version` já for `2.2`, aplique essa normalização ao
-   `progress.json` inteiro (inclusive `baseline.known_failures`) e aos objetos de
-   tarefa legados antes de retomar; a versão não dispensa migração de campos ausentes ou da chave antiga.
-   Ao migrar `red.criteria_to_tests` legado em texto, valide cada linha inteira no
-   formato `AC-NNN -> arquivo::teste` (sem descartar linhas vazias, parciais ou extras)
+   Se um objeto de tarefa legado tiver `gates.*` em `PASS`, `FAIL` ou `NA` mas
+   `gate_evidence` ausente ou incompleto, preserve o diagnóstico apenas como
+   histórico, redefina os dez `gates` para `pending`, limpe `gate_origins` e
+   `gate_evidence`, preserve a fase ativa e reabra a onda (`status: in_progress`,
+   `integration.status: pending`, `integration.evidence: ""`); se a fase anterior
+   era `VALIDATE` ou `DONE`, retome em `VALIDATE`. Nunca retome `DONE` sem evidência
+   por gate.
    e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando
    somente após a validação; se qualquer linha for inválida ou algum AC referenciado
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
