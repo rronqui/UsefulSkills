@@ -323,7 +323,7 @@ redact() {
             quote_open = ""
             pending = 4
           }
-          if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(\{|\[|@\{|@\()/) {
+          if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(\{|\[|@\{|@\(|\()/) {
             scan = strip_quoted($0)
             gsub(/#.*/, "", scan)
             flow_parens = (scan ~ /@\(/)
