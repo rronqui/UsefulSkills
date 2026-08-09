@@ -210,6 +210,11 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
    `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
+   Se `implemented_by: existing-code` e `reviewed_by` estiver vazio ou inválido,
+   não preserve o atalho legado em `VALIDATE`/`DONE`: defina `phase: REVIEW`,
+   reabra a onda (`status: in_progress`, `integration.status: pending`,
+   `integration.evidence: ""`) e exija o `peer-reviewer` antes de retomar a
+   validação.
    Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de strings no formato `arquivo::teste`; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
