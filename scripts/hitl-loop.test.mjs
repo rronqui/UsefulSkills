@@ -720,6 +720,17 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("leaked-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("does not over-redact a double quote inside a closed single-quoted flow", () => {
+    const result = runCapture([
+      "password: {",
+      ' value: \'secret "\'',
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps literal hash characters inside a quoted scalar", () => {
     const result = runCapture([
       'password: "secret # literal"',
