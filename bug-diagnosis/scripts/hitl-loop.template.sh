@@ -376,8 +376,10 @@ redact() {
           pending = 4
           next
         }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_double_unclosed(lower)) { quote_open = "\""; pending = 6 }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_quote_count(lower, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
+        value_scan = lower
+        value_scan = strip_comment(value_scan)
+        if (!pending && (value_scan ~ key || value_scan ~ bare_key || value_scan ~ bracket_key || value_scan ~ quoted_key) && value_has_quote(value_scan, "\"") && value_double_unclosed(value_scan)) { quote_open = "\""; pending = 6 }
+        if (!pending && (value_scan ~ key || value_scan ~ bare_key || value_scan ~ bracket_key || value_scan ~ quoted_key) && value_quote_count(value_scan, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(@\(|@\{|[\[{(])/) {
           scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
@@ -497,6 +499,18 @@ redact() {
           next
         }
       }
+      question_key = strip_comment(lower)
+      sub(/^[[:space:]]*\?[[:space:]]*/, "", question_key)
+      while (question_key ~ /^[[:space:]]*(!+[^[:space:]]*|&[^[:space:]]+)[[:space:]]*/) sub(/^[[:space:]]*(!+[^[:space:]]*|&[^[:space:]]+)[[:space:]]*/, "", question_key)
+      sub(/^[[:space:]]*\[[[:space:]]*[\047"]?/, "[", question_key)
+      sub(/[\047"]?[[:space:]]*\][[:space:]]*$/, "]", question_key)
+      sub(/^[[:space:]]*[\047"]/, "", question_key)
+      sub(/[\047"][[:space:]]*$/, "", question_key)
+      if (!pending && lower ~ /^[[:space:]]*\?[[:space:]]*/ && (question_key ~ ("^(" labels ")[[:space:]]*$") || question_key ~ ("^\\[(" labels ")\\][[:space:]]*$"))) {
+        print "<REDACTED>"
+        pending = 7
+        next
+      }
       if (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key || lower ~ word || lower ~ /bearer[[:space:]]+/) {
         print "<REDACTED>"
         pending = (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && (lower ~ ("(" labels ")[[:space:]]*[\\\\]?[\047\"]?[[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$") || lower ~ ("(" labels ")[[:space:]]*[\047\"]?[[:space:]]*][[:space:]]*[=:][[:space:]]*(#.*|([&!][^[:space:]]+[[:space:]]*)*[|>][[:space:]]*[-+0-9]*[[:space:]]*(#.*)?)?$"))
@@ -504,19 +518,36 @@ redact() {
         if (!pending && lower ~ quoted_key && lower ~ /[=:][[:space:]]*$/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
           here_quote = (lower ~ /@"/) ? "\"" : "\047"
+          scan = strip_comment(strip_quoted($0))
+          here_parent_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          here_parent_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          paren_depth = gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
+          here_parent_depth += paren_depth
+          flow_parens = (here_parent_depth > 0 && paren_depth > 0)
           pending = 4
         }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_has_quote(lower, "\"") && value_double_unclosed(lower)) { quote_open = "\""; pending = 6 }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_quote_count(lower, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
         if (!pending && lower ~ bracket_key && lower ~ /[\047"][[:space:]]*][[:space:]]*[=:][[:space:]]*[\047"]$/) pending = 1
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) {
+          scan = strip_comment(strip_quoted($0))
+          backtick_parent_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          backtick_parent_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          paren_depth = gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
+          backtick_parent_depth += paren_depth
+          flow_parens = (backtick_parent_depth > 0 && paren_depth > 0)
+          pending = 5
+        }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_plain_scalar(lower)) pending = 1
         if ((lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@\(/) {
-          scan = $0
-          scan = strip_quoted(scan)
+          scan = strip_quoted($0)
           gsub(/#.*/, "", scan)
-          flow_depth = gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
-          flow_parens = (flow_depth > 0)
+          paren_depth = gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
+          flow_parens = (paren_depth > 0)
+          flow_depth = gsub(/\[/, "", scan) + gsub(/\{/, "", scan)
+          flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
+          flow_depth += paren_depth
+          flow_parens = (flow_depth > 0 && flow_parens)
           pending = (flow_depth > 0) ? 2 : 0
         }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*[&!][^[:space:]]+[[:space:]]*(#.*)?$/) pending = 1

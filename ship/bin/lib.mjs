@@ -1,6 +1,7 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -70,27 +71,48 @@ export function performBackup(cfg, root) {
     const dest = attempt === 0 ? base : `${base}-${attempt}`;
     const temp = `${dest}.tmp-${process.pid}`;
     let tempReserved = false;
+    let publishedDest = dest;
     try {
-      const tempFd = openSync(temp, "wx");
-      closeSync(tempFd);
-      tempReserved = true;
-      copyFileSync(src, temp);
+      let tempFd = null;
+      try {
+        tempFd = openSync(temp, "wx");
+        tempReserved = true;
+        let srcFd = null;
+        try {
+          srcFd = openSync(src, "r");
+          const buffer = Buffer.allocUnsafe(64 * 1024);
+          let position = 0;
+          let bytesRead;
+          do {
+            bytesRead = readSync(srcFd, buffer, 0, buffer.length, position);
+            let written = 0;
+            while (written < bytesRead) {
+              written += writeSync(tempFd, buffer, written, bytesRead - written, position + written);
+            }
+            position += bytesRead;
+          } while (bytesRead > 0);
+        } finally {
+          if (srcFd !== null) closeSync(srcFd);
+        }
+      } finally {
+        if (tempFd !== null) closeSync(tempFd);
+      }
       try {
         linkSync(temp, dest);
         try { unlinkSync(temp); } catch {}
       } catch (err) {
         if (!["EPERM", "EACCES", "EOPNOTSUPP", "ENOTSUP", "EXDEV"].includes(err?.code)) throw err;
-        try {
-          copyFileSync(temp, dest, constants.COPYFILE_EXCL);
-        } catch (copyErr) {
-          if (copyErr?.code !== "EEXIST") {
-            try { unlinkSync(dest); } catch {}
-          }
-          throw copyErr;
+        if (existsSync(dest)) {
+          const collision = new Error(`Backup destination already exists: ${dest}`);
+          collision.code = "EEXIST";
+          throw collision;
         }
-        try { unlinkSync(temp); } catch {}
+        do {
+          publishedDest = `${dest}-${randomUUID()}`;
+        } while (existsSync(publishedDest));
+        renameSync(temp, publishedDest);
       }
-      return dest;
+      return publishedDest;
     } catch (err) {
       if (tempReserved) {
         try { unlinkSync(temp); } catch {}

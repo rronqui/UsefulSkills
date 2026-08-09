@@ -562,4 +562,287 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("next-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps an unclosed quote inside a sensitive flow redacted", () => {
+    const result = runCapture([
+      'password: { api_key: "first-secret',
+      "  } still-secret",
+      'after-secret"',
+      "leaked-secret",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still-secret");
+    expect(result.stdout).not.toContain("after-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("keeps nested non-sensitive here-strings redacted inside a sensitive flow", () => {
+    const result = runCapture([
+      "password: {",
+      '  note: @"',
+      "  nested-secret",
+      '"@',
+      "leaked-secret",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("nested-secret");
+    expect(result.stdout).not.toContain("leaked-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("keeps standalone backtick continuations redacted", () => {
+    const result = runCapture([
+      "password:",
+      "`",
+      "backtick-secret",
+      "`",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("backtick-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("redacts explicit YAML mapping values after a sensitive key", () => {
+    const result = runCapture([
+      "? password # comment",
+      ": explicit-secret",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("explicit-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts PEM data after a scalar continuation mapping", () => {
+    const result = runCapture([
+      "password:",
+      "normal: -----BEGIN PRIVATE KEY-----",
+      "  QkFC",
+      "-----END PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("QkFC");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("redacts quoted and bracketed explicit YAML keys", () => {
+    const result = runCapture([
+      '? "password"',
+      ": abc123",
+      "? [api_key]",
+      ": def456",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("abc123");
+    expect(result.stdout).not.toContain("def456");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("redacts tagged and anchored explicit YAML keys", () => {
+    const cases = [
+      ["? !!str password", ": tagged-secret", "tagged-secret"],
+      ["? ! password", ": non-specific-tag-secret", "non-specific-tag-secret"],
+      ["? &key api_key", ": anchored-secret", "anchored-secret"],
+      ['? ["password"]', ": bracket-quoted-secret", "bracket-quoted-secret"],
+      ["? ['api_key']", ": bracket-single-quoted-secret", "bracket-single-quoted-secret"],
+      ["? [ api_key ]", ": bracket-spaced-secret", "bracket-spaced-secret"],
+    ];
+    for (const [key, value, secret] of cases) {
+      const result = runCapture([key, value, "normal: visible"]);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).not.toContain(secret);
+      expect(result.stdout).toContain("normal: visible");
+    }
+  });
+  it("keeps outer flow redaction around nested parenthesized values", () => {
+    const result = runCapture([
+      "password: { api_key: @(",
+      "nested-value",
+      ")",
+      "leaked-value",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("nested-value");
+    expect(result.stdout).not.toContain("leaked-value");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("closes outer flow after nested here and backtick values", () => {
+    for (const lines of [
+      ["password: ( api_key: @\"", "nested-here-secret", "\"@", "nested-here-leaked", ")", "normal: visible"],
+      ["password: ( api_key: `", "nested-backtick-secret", "`", "nested-backtick-leaked", ")", "normal: visible"],
+    ]) {
+      const result = runCapture(lines);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).not.toContain("nested-here-secret");
+      expect(result.stdout).not.toContain("nested-backtick-secret");
+      expect(result.stdout).not.toContain("nested-here-leaked");
+      expect(result.stdout).not.toContain("nested-backtick-leaked");
+      expect(result.stdout).toContain("normal: visible");
+    }
+  });
+  it("does not retain depth for balanced nested @() containers", () => {
+    for (const line of ["password: @({ foo: bar })", "password: @([value])"]) {
+      const result = runCapture([line, "normal: visible"]);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("normal: visible");
+    }
+  });
+  it("keeps PowerShell comment delimiters inside nested flow redacted", () => {
+    const result = runCapture([
+      "password: @(",
+      "value#)",
+      "leaked-after-comment",
+      ")",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("leaked-after-comment");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("does not close a multiline quote on an inline comment quote", () => {
+    const result = runCapture([
+      'password: "first-secret',
+      "continuation # comment",
+      "leaked-secret",
+      '"',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("leaked-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("keeps literal hash characters inside a quoted scalar", () => {
+    const result = runCapture([
+      'password: "secret # literal"',
+      'normal: "visible"',
+      "raw-secret",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("secret # literal");
+    expect(result.stdout).toContain('normal: "visible"');
+    expect(result.stdout).toContain("raw-secret");
+  });
+  it("keeps literal hash characters in a multiline quoted flow", () => {
+    const result = runCapture([
+      "password: {",
+      ' value: "first-secret',
+      ' still # literal"',
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still # literal");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts explicit YAML block values after a question-mark key", () => {
+    const result = runCapture([
+      "? password",
+      ": |",
+      "  abc123",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("abc123");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts explicit YAML flow values after a question-mark key", () => {
+    const result = runCapture([
+      "? password",
+      ": {",
+      "  label: value",
+      "  abc123",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("abc123");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts explicit YAML quoted values after a question-mark key", () => {
+    const result = runCapture([
+      "? password",
+      ': "first-secret',
+      "still-secret",
+      '"',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("keeps apostrophe contractions inside multiline single-quoted flows", () => {
+    const result = runCapture([
+      "password: {",
+      "  value: 'first-secret",
+      "  it's }",
+      "  still-secret'",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("does not keep pending state after a closed explicit quote", () => {
+    const result = runCapture([
+      "? password",
+      ': "first-secret"',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("keeps same-line nested here-strings redacted inside a flow", () => {
+    const result = runCapture([
+      'password: { api_key: @"',
+      "nested-value",
+      '"@',
+      "leaked-value",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("nested-value");
+    expect(result.stdout).not.toContain("leaked-value");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
+  it("keeps same-line nested backticks redacted inside a flow", () => {
+    const result = runCapture([
+      "password: { api_key: `",
+      "nested-value",
+      "`",
+      "leaked-value",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("nested-value");
+    expect(result.stdout).not.toContain("leaked-value");
+    expect(result.stdout).toContain("normal: visible");
+  });
+  it("closes a multiline quoted scalar after a literal hash", () => {
+    const result = runCapture([
+      'password: "first-secret',
+      'still # literal"',
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("still # literal");
+    expect(result.stdout).toContain("normal: visible");
+  });
 });
