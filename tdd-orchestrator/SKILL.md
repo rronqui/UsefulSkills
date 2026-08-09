@@ -193,8 +193,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    histórico, redefina os dez `gates` para `pending`, limpe `gate_origins` e
    `gate_evidence`, preserve a fase ativa e reabra a onda (`status: in_progress`,
    `integration.status: pending`, `integration.evidence: ""`); se a fase anterior
-   era `VALIDATE` ou `DONE`, retome em `VALIDATE`. Nunca retome `DONE` sem evidência
-   por gate.
+   era `VALIDATE`, `TOOLING_FIX` ou `DONE`, retome em `VALIDATE`. Nunca retome
+   `DONE` sem evidência por gate.
    e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando
    somente após a validação; se qualquer linha for inválida ou algum AC referenciado
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
