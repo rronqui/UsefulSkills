@@ -442,6 +442,20 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("closes a nested backtick delimiter with trailing whitespace", () => {
+    const result = runCapture([
+      "password: {",
+      "  api_key: `",
+      "  first-secret",
+      "  `}" + "   ",
+      "  api_key: second-secret",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("first-secret");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps a nested here-string inside an outer flow", () => {
     const result = runCapture([
       "password: {",

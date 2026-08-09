@@ -476,7 +476,9 @@ redact() {
         if (lower ~ /^[[:space:]]*`[[:space:]]*[,;\]\}\)]?[[:space:]]*$/) {
           if (backtick_parent_depth > 0) {
             flow_depth = backtick_parent_depth
-            last = substr(lower, length(lower), 1)
+            delimiter_line = lower
+            sub(/[[:space:]]+$/, "", delimiter_line)
+            last = substr(delimiter_line, length(delimiter_line), 1)
             if (last == "}" || last == "]" || last == ")") flow_depth--
             pending = (flow_depth > 0) ? 2 : 0
             backtick_parent_depth = 0
