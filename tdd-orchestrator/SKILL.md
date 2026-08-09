@@ -169,13 +169,19 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
-   derive/recalcule `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN`
-   ou for `NA` sem uma entrada correspondente em `known_failures` com `reason` e
-   `evidence` não vazios; caso contrário, `FAIL` se algum gate for `FAIL`,
-   `PASS` se cada gate for `PASS` ou `NA` com justificativa correspondente e não vazia,
-   ou `NOT_RUN` nos demais casos. Não preserve um `baseline.status` anterior sem
-   validar novamente os gates, justificativas e evidências.
+   derive/recalcule `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN`,
+   se um gate estiver `PASS` sem `baseline.tests_evidence`/`baseline.build_evidence`
+   correspondente não vazia, ou se for `NA` sem uma entrada correspondente em
+   `known_failures` com `reason` e `evidence` não vazios; caso contrário, `FAIL` se
+   algum gate for `FAIL`, `PASS` se cada gate for `PASS` com evidência correspondente
+   ou `NA` com justificativa correspondente e não vazia, ou `NOT_RUN` nos demais
+   casos. Não preserve um `baseline.status` anterior sem validar novamente os gates,
+   justificativas e evidências.
+   Se `attempt >= 3` em `REVIEW`, `VALIDATE`, `RED_REVISION`, `GREEN_FIX` ou
+   `TOOLING_FIX`, preserve histórico, defina a tarefa como `BLOCKED` e escale ao
+   usuário; não delegue uma nova tentativa sem decisão explícita.
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
+   `baseline.tests_evidence: ""`, `baseline.build_evidence: ""`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
    após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
@@ -185,8 +191,9 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `green.tooling_suite_evidence: ""` e `gate_evidence`: quando ausente, objeto com
    os dez gates canônicos mapeados para strings vazias).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
-   e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
-   ausente, preservando origens já registradas.
+   e remova a chave antiga; crie `gate_origins` com todos os gates vazios, preservando
+   uma origem existente somente quando o gate correspondente estiver `FAIL`; limpe
+   origens associadas a `PASS`, `NA` ou `pending`.
    Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
    legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline
    antes de continuar.
@@ -206,16 +213,30 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    no formato `AC-NNN -> arquivo::teste` (aceite também `AC-NNN: arquivo::teste`),
    remova entradas vazias e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`,
    acumulando somente após a validação;
-   se qualquer linha for inválida ou algum AC referenciado
-   não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
-   `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
-   `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
-   Se `implemented_by: existing-code` e `reviewed_by` estiver vazio ou inválido,
-   não preserve o atalho legado em `VALIDATE`/`DONE`: defina `phase: REVIEW`,
-   reabra a onda (`status: in_progress`, `integration.status: pending`,
-   `integration.evidence: ""`) e exija o `peer-reviewer` antes de retomar a
-   validação.
-   Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de strings no formato `arquivo::teste`; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
+   se qualquer linha for inválida ou algum AC referenciado não tiver entrada:
+   Se a tarefa já estiver `BLOCKED` e `attempt < 3`, preserve bloqueio, `blockers`,
+   `evidence` e decisão pendente; não reabra RED nem delegue sem decisão explícita.
+   Se `attempt >= 3`, mantenha `BLOCKED`, preserve histórico e escale ao usuário; caso
+   contrário, se a tarefa já estiver `RED_REVISION`, preserve essa fase e
+   `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base, limpe
+   apenas `red.revision_delta`, marque `red.status: PENDING` e reexecute a revisão; não
+   aplique o reset de RED.
+   Caso contrário, a entrada inválida exige nova execução RED: marque `phase: RED` e
+   `red.status: PENDING`, limpe `red.failing_tests`, `red.failure_reason_expected` e
+   redefina `red.criteria_to_tests` como `{}`.
+   Antes de qualquer ramificação de normalização, se a tarefa estiver em `REVIEW`,
+   `VALIDATE`, `RED_REVISION`, `GREEN_FIX` ou `TOOLING_FIX` com `attempt >= 3`,
+   preserve o histórico, marque `phase: BLOCKED` e escale ao usuário; não delegue
+   nova tentativa.
+   Somente se não houve o reset RED e a tarefa estiver em `VALIDATE` ou `DONE`: em
+   estado legado `schema_version: "2.1"`, ou se `reviewed_by`
+   estiver vazio, inválido ou igual a `implemented_by`, não preserve o atalho legado,
+   independentemente do implementador; defina `phase: REVIEW`, reabra a onda
+   (`status: in_progress`, `integration.status: pending`, `integration.evidence: ""`) e
+   exija o `peer-reviewer` antes de retomar a validação.
+   Para o formato já objetual, valide que as chaves sejam exatamente os `AC-NNN` de `acceptance_criteria` (sem ausentes ou extras) e que cada valor seja uma lista não vazia de strings `arquivo::teste`; qualquer objeto incompleto segue as mesmas exceções: preserve `BLOCKED` com `attempt < 3`, preserve `RED_REVISION` e seu baseline restaurando `red.criteria_to_tests` ao mapa-base, limpando `red.revision_delta` e evidências de falha, marcando `red.status: PENDING`, e escale quando `attempt >= 3`; somente os demais casos disparam o reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
+   Se `attempt >= 3`, não redefina a fase nem zere o histórico: mantenha `BLOCKED` e
+   escale ao usuário antes de qualquer nova execução.
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
    `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
    `red.revision_delta` como `{ "ac": "", "test": "", "evidence": "" }` e
@@ -237,7 +258,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
- "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [{ "gate": "tests|build", "reason": "", "evidence": "" }] },
+ "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "tests_evidence": "", "build": "PASS|FAIL|NA|NOT_RUN", "build_evidence": "", "override_approved": false, "known_failures": [{ "gate": "tests|build", "reason": "", "evidence": "" }] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -293,6 +314,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
    Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
 4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
+   Para cada gate `PASS`, registre em `baseline.tests_evidence`/`baseline.build_evidence` o comando executado e um trecho não vazio da saída que comprova o resultado; ao iniciar nova rodada, limpe também esses dois campos.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -499,7 +521,8 @@ stateDiagram-v2
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
         TOOLING_FIX --> REFACTOR : gate tooling corrigido, diff não comportamental e suíte preservada com evidência
-        TOOLING_FIX --> RED_REVISION : diff comportamental ou suíte ausente
+        TOOLING_FIX --> RED_REVISION : diff comportamental
+        TOOLING_FIX --> BLOCKED : suíte ausente (escalar ao usuario)
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>

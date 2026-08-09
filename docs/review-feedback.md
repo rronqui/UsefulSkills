@@ -19,3 +19,7 @@
 - 2026-08-07 [P2] installer-agents-root: o guard de tipo precisa cobrir também a raiz do destino dos AGENTES — bloco novo de scan chamava readdirSync sem o guard e reintroduzia o ENOTDIR (arquivo: install.mjs)
 - 2026-08-07 [P2] test-home-isolation: testes de CLI que isolam home precisam sobrescrever HOME e USERPROFILE (os.homedir lê HOME no POSIX — CI ubuntu bateria na instalação real) (arquivo: scripts/install.test.mjs)
 - 2026-08-07 [P2] state-schema-parity: o schema do progress.json precisa conter TODO campo que o fluxo manda registrar (pr_url exigido na Entrega final/diagrama mas ausente do objeto repo) — estado fora do schema documentado se perde em retomada (arquivo: tdd-orchestrator/SKILL.md)
+
+- 2026-08-09 [P1] redaction-helper: toda função chamada pelo programa AWK deve permanecer definida no mesmo template; chamadas órfãs fazem qualquer captura falhar antes de processar entrada (arquivo: bug-diagnosis/scripts/hitl-loop.template.sh)
+- 2026-08-09 [P1] explicit-yaml-dispatch: cada novo estado de redaction (`pending=7`) precisa de branch consumidor explícito para despachar valores block, flow e quoted sem vazamento (arquivo: bug-diagnosis/scripts/hitl-loop.template.sh)
+- 2026-08-09 [P1] baseline-evidence-schema: campos exigidos pela derivação de `baseline.status` devem existir no schema e ser inicializados na migração (`tests_evidence`/`build_evidence`) (arquivo: tdd-orchestrator/SKILL.md)

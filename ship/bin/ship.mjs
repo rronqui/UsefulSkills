@@ -240,6 +240,17 @@ function cmdShip(argv) {
       "--title", `${type}: ${description}`,
       "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
     ]);
+  } else if (bodyExtra) {
+    const existingBodyJson = gh(["pr", "view", prUrl, "--json", "body"]);
+    const existingBody = JSON.parse(existingBodyJson).body ?? "";
+    const comparableBody = existingBody.trimEnd();
+    const payload = bodyExtra.trim();
+    const alreadyAppended = comparableBody === payload ||
+      comparableBody.includes(`\n\n${payload}\n`) ||
+      comparableBody.endsWith(`\n\n${payload}`);
+    if (!alreadyAppended) {
+      gh(["pr", "edit", prUrl, "--body", `${existingBody}${bodyExtra}`]);
+    }
   }
   console.log(`PR ${prUrl}`);
   const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
