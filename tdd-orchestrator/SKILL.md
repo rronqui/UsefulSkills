@@ -77,7 +77,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
-| `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe `red.revision_delta` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
+| `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe conjuntamente `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
@@ -184,10 +184,14 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `baseline.tests_evidence: ""`, `baseline.build_evidence: ""`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
-   após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
-   em `RED_REVISION`, inicialize `red.revision_baseline_tests` com o mapa normalizado
-   somente quando o campo estiver ausente ou inválido; preserve um mapa válido existente.
-   caso contrário, `{}`. Inicialize `green.tooling_evidence: ""`,
+   Após converter e validar `red.criteria_to_tests` abaixo, para tarefas que não foram
+   bloqueadas pela regra `attempt >= 3` acima: se a tarefa já estiver em `RED_REVISION`,
+   inicialize `red.revision_baseline_tests` com o mapa normalizado somente quando o campo
+   estiver ausente ou inválido; preserve um mapa válido existente. Em toda migração ou
+   retomada de uma tarefa já em `RED_REVISION`, limpe conjuntamente `red.revision_delta`,
+   `red.failing_tests` e `red.failure_reason_expected`; preserve a fase `RED_REVISION` e
+   o mapa-base válido, sem aplicar o reset da fase `RED`; caso contrário, inicialize
+   `red.revision_baseline_tests` como `{}`. Inicialize `green.tooling_evidence: ""`,
    `green.tooling_suite_evidence: ""` e `gate_evidence`: quando ausente, objeto com
    os dez gates canônicos mapeados para strings vazias).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
@@ -218,12 +222,14 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `evidence` e decisão pendente; não reabra RED nem delegue sem decisão explícita.
    Se `attempt >= 3`, mantenha `BLOCKED`, preserve histórico e escale ao usuário; caso
    contrário, se a tarefa já estiver `RED_REVISION`, preserve essa fase e
-   `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base, limpe
-   apenas `red.revision_delta`, marque `red.status: PENDING` e reexecute a revisão; não
-   aplique o reset de RED.
+   `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe
+   conjuntamente `red.revision_delta`, `red.failing_tests` e
+   `red.failure_reason_expected`, marque `red.status: PENDING` e reexecute a revisão;
+   não aplique o reset de RED.
    Caso contrário, a entrada inválida exige nova execução RED: marque `phase: RED` e
-   `red.status: PENDING`, limpe `red.failing_tests`, `red.failure_reason_expected` e
-   redefina `red.criteria_to_tests` como `{}`.
+   `red.status: PENDING`, limpe conjuntamente `red.revision_delta`,
+   `red.failing_tests` e `red.failure_reason_expected` e redefina
+   `red.criteria_to_tests` como `{}`.
    Antes de qualquer ramificação de normalização, se a tarefa estiver em `REVIEW`,
    `VALIDATE`, `RED_REVISION`, `GREEN_FIX` ou `TOOLING_FIX` com `attempt >= 3`,
    preserve o histórico, marque `phase: BLOCKED` e escale ao usuário; não delegue
@@ -234,7 +240,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    independentemente do implementador; defina `phase: REVIEW`, reabra a onda
    (`status: in_progress`, `integration.status: pending`, `integration.evidence: ""`) e
    exija o `peer-reviewer` antes de retomar a validação.
-   Para o formato já objetual, valide que as chaves sejam exatamente os `AC-NNN` de `acceptance_criteria` (sem ausentes ou extras) e que cada valor seja uma lista não vazia de strings `arquivo::teste`; qualquer objeto incompleto segue as mesmas exceções: preserve `BLOCKED` com `attempt < 3`, preserve `RED_REVISION` e seu baseline restaurando `red.criteria_to_tests` ao mapa-base, limpando `red.revision_delta` e evidências de falha, marcando `red.status: PENDING`, e escale quando `attempt >= 3`; somente os demais casos disparam o reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
+   Para o formato já objetual, valide que as chaves sejam exatamente os `AC-NNN` de `acceptance_criteria` (sem ausentes ou extras) e que cada valor seja uma lista não vazia de strings `arquivo::teste`; qualquer objeto incompleto segue as mesmas exceções: preserve `BLOCKED` com `attempt < 3`, preserve `RED_REVISION` e seu baseline restaurando `red.criteria_to_tests` ao mapa-base, limpando conjuntamente `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected`, marcando `red.status: PENDING`, e escale quando `attempt >= 3`; somente os demais casos disparam o reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
    Se `attempt >= 3`, não redefina a fase nem zere o histórico: mantenha `BLOCKED` e
    escale ao usuário antes de qualquer nova execução.
    redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
@@ -467,8 +473,9 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 > do mapa-base e produzir evidência própria antes de `GREEN_FIX`.
 > Se a tentativa `RED_REVISION` for inválida ou não demonstrar a falha exigida,
 > descarte o mapa candidato, restaure `red.criteria_to_tests` a partir de
-> `red.revision_baseline_tests`, limpe `red.revision_delta` e não substitua o
-> mapa-base até uma nova tentativa válida.
+> `red.revision_baseline_tests`, limpe conjuntamente `red.revision_delta`,
+> `red.failing_tests` e `red.failure_reason_expected` e não substitua o mapa-base até
+> uma nova tentativa válida.
 > Ao iniciar `TOOLING_FIX`, incremente `attempt` e limpe `green.tooling_evidence` e
 > `green.tooling_suite_evidence`. Só aceite os campos preenchidos pelo resultado dessa
 > execução; evidência de uma tentativa anterior não autoriza a transição.

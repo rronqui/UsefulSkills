@@ -196,7 +196,8 @@ function cmdShip(argv) {
       console.error(`--body-file: arquivo não encontrado: ${bodyFile}`);
       process.exit(1);
     }
-    bodyExtra = `\n\n${readFileSync(bodyPath, "utf8").trim()}`;
+    const rawPayload = readFileSync(bodyPath, "utf8");
+    if (rawPayload.trim()) bodyExtra = `\n\n${rawPayload}`;
   }
   git(["add", "-A"]);
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
