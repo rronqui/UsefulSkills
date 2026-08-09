@@ -390,6 +390,18 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).toContain(String.raw`ERROR_MSG=<REDACTED>\npath: C:\\temp\\secret`);
     expect(result.stdout.match(/^ERROR_MSG=.*$/m)?.[0]).not.toContain("\n");
   });
+  it("redacts a flow opened after closing a multiline quote", () => {
+    const result = runCapture([
+      'password: "first-secret',
+      '", api_key: (',
+      "  second-secret",
+      ")",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps outer redaction for an inline PEM block", () => {
     const result = runCapture([
       "password: { private_key: -----BEGIN PRIVATE KEY-----",

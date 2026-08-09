@@ -359,7 +359,7 @@ redact() {
         }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_double_unclosed(lower)) { quote_open = "\""; pending = 6 }
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_quote_count(lower, "\047") % 2 == 1) { quote_open = "\047"; pending = 6 }
-        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(@\(|@\{|[\[{])/) {
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(@\(|@\{|[\[{(])/) {
           scan = strip_quoted(scan)
           gsub(/#.*/, "", scan)
           flow_parens = (scan ~ /[()]/)
@@ -368,6 +368,8 @@ redact() {
           if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
           pending = (flow_depth > 0) ? 2 : 0
         }
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*$/) pending = 1
+        if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*(\||>)/) pending = 1
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
           here_quote = (lower ~ /@"/) ? "\"" : "\047"
           pending = 4
