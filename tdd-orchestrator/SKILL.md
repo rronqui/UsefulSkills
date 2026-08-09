@@ -104,6 +104,9 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 > Roteie somente a primeira origem nessa ordem, corrija-a, reexecute todos os gates
 > e só então processe a próxima falha ainda presente. Nunca escolha a origem por
 > ordem incidental do output do validator.
+> Regra adicional de `RED_REVISION`: `red.revision_delta.ac` deve pertencer à lista
+> `acceptance_criteria` da tarefa; uma chave inexistente invalida o delta e mantém
+> a fase em `RED_REVISION`.
 
 **Tratamento de output inválido.** Se o output de qualquer subagente **não contiver um Status válido** (CONCLUÍDO, BLOQUEADO, FALHOU, APROVADO, PASSOU, SKIPPED) — output vazio, malformado, sem campo Status, ou com texto que não se enquadra em nenhum status — **trate como BLOQUEADO** e reexecute **uma vez** com briefing mais claro. Se a 2ª execução também não retornar status válido, **escale ao usuário** com o output recebido.
 
@@ -171,16 +174,20 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    justificativa correspondente em `known_failures`, ou `NOT_RUN` nos demais casos.
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
-   `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`,
-   `red.revision_baseline_tests`: se a tarefa já estiver em `RED_REVISION`, copie
-   `red.criteria_to_tests`; caso contrário, `{}`,
-   `green.tooling_evidence: ""`, `green.tooling_suite_evidence: ""`,
-   `gate_evidence`: quando ausente, objeto com `tests`, `traceability`, `spec_kit`,
-   `coverage`, `lint`, `type_check`, `build`, `security`, `contract` e `git_sanity`
-   mapeados para strings vazias).
+   `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
+   após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
+   em `RED_REVISION`, copie o objeto normalizado para `red.revision_baseline_tests`;
+   caso contrário, `{}`. Inicialize `green.tooling_evidence: ""`,
+   `green.tooling_suite_evidence: ""` e `gate_evidence`: quando ausente, objeto com
+   os dez gates canônicos mapeados para strings vazias).
    Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
    e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
    ausente, preservando origens já registradas.
+   Se um objeto de tarefa legado tiver `gates.*` em `PASS`, `FAIL` ou `NA` mas
+   `gate_evidence` ausente ou incompleto, preserve o diagnóstico apenas como
+   histórico, redefina os dez `gates` para `pending`, limpe `gate_origins` e
+   `gate_evidence`, e retome a tarefa em `VALIDATE`; nunca retome `DONE` sem
+   evidência por gate.
    Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
    legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline
    antes de continuar.
@@ -258,6 +265,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
     }
   ]
 }
+```
 
 > Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
 Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` (e `gate_origins.<gate>` quando `FAIL`) antes de qualquer reentrada; renove `updated_at`.

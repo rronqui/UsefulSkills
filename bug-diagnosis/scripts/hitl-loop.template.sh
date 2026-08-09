@@ -338,6 +338,7 @@ redact() {
         next
       }
       if (pending == 6) {
+        print "<REDACTED>"
         scan = $0
         if (quote_open == "\"") {
           quote_pos = unescaped_double(scan)
