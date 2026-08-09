@@ -205,6 +205,7 @@ function cmdShip(argv) {
       let def;
       try {
         def = defaultBranch();
+        git(["fetch", "origin", def]);
         const branchCommits = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
         if (!branchCommits) {
           console.error("Nada para commitar.");
