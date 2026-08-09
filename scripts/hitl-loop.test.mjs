@@ -427,6 +427,21 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps nested backtick redaction inside a flow", () => {
+    const result = runCapture([
+      "password: {",
+      "  api_key: `",
+      "  first-secret",
+      "  }",
+      "  second-secret",
+      "  `",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("keeps outer redaction for an inline PEM block", () => {
     const result = runCapture([
       "password: { private_key: -----BEGIN PRIVATE KEY-----",

@@ -286,6 +286,7 @@ redact() {
       pem_parent_depth = 0
       pem_parent_pending = 0
       here_parent_depth = 0
+      backtick_parent_depth = 0
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
@@ -321,6 +322,11 @@ redact() {
           here_parent_depth = flow_depth
           quote_open = ""
           pending = 4
+          next
+        }
+        if (flow_depth > 0 && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) {
+          backtick_parent_depth = flow_depth
+          pending = 5
           next
         }
         if (flow_depth <= 0) {
@@ -386,6 +392,19 @@ redact() {
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*`[[:space:]]*$/) pending = 5
         if (!pending && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && value_plain_scalar(lower)) pending = 1
         if (!pending && lower ~ /-----begin[[:space:]].*private[[:space:]]+key/) { pending = 3; pem_label_value = pem_label(lower) }
+        next
+      }
+      if (pending == 5) {
+        print "<REDACTED>"
+        if (lower ~ /^[[:space:]]*`[[:space:]]*[,;\]\}\)]?[[:space:]]*$/) {
+          if (backtick_parent_depth > 0) {
+            flow_depth = backtick_parent_depth
+            pending = 2
+            backtick_parent_depth = 0
+          } else {
+            pending = 0
+          }
+        }
         next
       }
       if (pending == 4) {
