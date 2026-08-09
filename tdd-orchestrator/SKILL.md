@@ -77,6 +77,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
 | `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe `red.revision_delta` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
@@ -493,6 +494,7 @@ stateDiagram-v2
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
         GREEN_FIX --> REFACTOR : verde com requisito corrigido
         TOOLING_FIX --> REFACTOR : gate tooling corrigido, diff não comportamental e suíte preservada com evidência
+        TOOLING_FIX --> RED_REVISION : diff comportamental ou suíte ausente
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>
@@ -676,7 +678,7 @@ Após todas as tarefas da onda em `DONE`: delegue ao `integrator` (lista de tare
 > veredito de cada um é só dele; item 6 = gates `lint` + `type-check`, item 8 =
 > `contract`, item 9 = `security`, item 11 = `git-sanity`). Os itens 5, 10 e 12 são
 > verificados pelo ORQUESTRADOR, fora do validator.
-Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; falha de ferramenta sem mudança comportamental → TOOLING_FIX, que reconfirma o gate antes/depois sem exigir RED; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada ou contrato divergente → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
+Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → RED; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; falha de ferramenta sem mudança comportamental → TOOLING_FIX, que reconfirma o gate antes/depois sem exigir RED; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada ou contrato divergente → DOC**; divergência da spec ...
 
 ---
 
