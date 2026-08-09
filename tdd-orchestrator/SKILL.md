@@ -181,6 +181,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    `TOOLING_FIX`, preserve histórico, defina a tarefa como `BLOCKED` e escale ao
    usuário; não delegue uma nova tentativa sem decisão explícita.
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
+   `baseline.tests_evidence: ""`, `baseline.build_evidence: ""`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
    após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
@@ -257,7 +258,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
- "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [{ "gate": "tests|build", "reason": "", "evidence": "" }] },
+ "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "tests_evidence": "", "build": "PASS|FAIL|NA|NOT_RUN", "build_evidence": "", "override_approved": false, "known_failures": [{ "gate": "tests|build", "reason": "", "evidence": "" }] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -313,6 +314,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
    Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
 4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
+   Para cada gate `PASS`, registre em `baseline.tests_evidence`/`baseline.build_evidence` o comando executado e um trecho não vazio da saída que comprova o resultado; ao iniciar nova rodada, limpe também esses dois campos.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
