@@ -1,10 +1,10 @@
 // Testes de regressão do instalador de hooks e dos wrappers gerados.
-// Costura: repo git temporário + cópia de scripts/; os wrappers são exercitados
+// Costura: repo git temporário + cópia de scripts; os wrappers são exercitados
 // com sh real (o mesmo que o git usa) e cwd na raiz do repo (para o hook
 // commit-msg resolver o commitlint em node_modules/.bin).
+import { execFileSync, spawnSync } from "node:child_process";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,7 +28,10 @@ const sh = findSh();
 function initRepo(name) {
   const dir = mkdtempSync(join(tmpdir(), `hooks-${name}-`));
   spawnSync("git", ["init", "-q"], { cwd: dir });
+  spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: dir });
   cpSync(join(repoRoot, "scripts"), join(dir, "scripts"), { recursive: true });
+  symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+  copyFileSync(join(repoRoot, ".commitlintrc.json"), join(dir, ".commitlintrc.json"));
   return dir;
 }
 
@@ -37,13 +40,15 @@ function install(dir) {
 }
 
 // Roda o hook INSTALADO (wrapper sh) como o git rodaria.
+function hooksPath(dir) {
+  const configured = execFileSync("git", ["rev-parse", "--git-path", "hooks"], { cwd: dir, encoding: "utf8" }).trim();
+  return /^[A-Za-z]:[\\/]/.test(configured) || configured.startsWith("/") ? configured : join(dir, configured);
+}
+
+// Roda o hook INSTALADO (wrapper sh) como o git rodaria.
 function runHook(dir, hook, opts = {}) {
   const { args = [], ...rest } = opts;
-  return spawnSync(sh, [join(dir, ".git", "hooks", hook), ...args], {
-    cwd: repoRoot, // commit-msg resolve commitlint daqui
-    encoding: "utf8",
-    ...rest,
-  });
+  return spawnSync(sh, [join(hooksPath(dir), hook), ...args], { cwd: dir, encoding: "utf8", ...rest });
 }
 
 function msgFile(dir, text) {
@@ -65,6 +70,10 @@ describe("install-hooks + wrappers gerados", () => {
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
   });
+  it("instala wrappers executáveis em POSIX", () => {
+    if (process.platform === "win32") return;
+    expect(statSync(join(hooksPath(dir), "commit-msg")).mode & 0o111).not.toBe(0);
+  });
 
   it("wrapper repassa argumentos: mensagem inválida é rejeitada (exit 1)", () => {
     const r = runHook(dir, "commit-msg", { args: [msgFile(dir, "isto nao e convencional")] });
@@ -79,6 +88,8 @@ describe("install-hooks + wrappers gerados", () => {
   it("isenta Merge/Revert do git, mas não prefixos parecidos", () => {
     const isento = runHook(dir, "commit-msg", { args: [msgFile(dir, "Merge branch 'x' into main")] });
     expect(isento.status).toBe(0);
+    const revert = runHook(dir, "commit-msg", { args: [msgFile(dir, "Revert \"feat: algo\"")] });
+    expect(revert.status).toBe(0);
     const parecido = runHook(dir, "commit-msg", { args: [msgFile(dir, "Mergeable stuff")] });
     expect(parecido.status).toBe(1);
   });
@@ -105,26 +116,36 @@ describe("install-hooks + wrappers gerados", () => {
   });
 
   it("commit-msg funciona com cwd em caminho com espaços", () => {
-    // Repo git em caminho com espaços + commitlint resolvível nele
-    // (junction de node_modules = cenário real de 'C:\Users\Ana Silva\repo',
-    // onde npm install já rodou).
     const spaced = mkdtempSync(join(tmpdir(), "caminho com espaco "));
-    spawnSync("git", ["init", "-q"], { cwd: spaced });
-    symlinkSync(join(repoRoot, "node_modules"), join(spaced, "node_modules"), "junction");
-    copyFileSync(join(repoRoot, ".commitlintrc.json"), join(spaced, ".commitlintrc.json"));
     try {
-      const valida = runHook(dir, "commit-msg", {
-        args: [msgFile(dir, "feat: msg valida")],
-        cwd: spaced,
-      });
+      spawnSync("git", ["init", "-q"], { cwd: spaced });
+      spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: spaced });
+      cpSync(join(repoRoot, "scripts"), join(spaced, "scripts"), { recursive: true });
+      symlinkSync(join(repoRoot, "node_modules"), join(spaced, "node_modules"), "junction");
+      copyFileSync(join(repoRoot, ".commitlintrc.json"), join(spaced, ".commitlintrc.json"));
+      const installed = install(spaced);
+      expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+      const valida = runHook(spaced, "commit-msg", { args: [msgFile(spaced, "feat: msg valida")] });
       expect(valida.status, valida.stdout + valida.stderr).toBe(0);
-      const invalida = runHook(dir, "commit-msg", {
-        args: [msgFile(dir, "nao convencional")],
-        cwd: spaced,
-      });
+      const invalida = runHook(spaced, "commit-msg", { args: [msgFile(spaced, "nao convencional")] });
       expect(invalida.status).toBe(1);
     } finally {
       rmSync(spaced, { recursive: true, force: true });
+    }
+  });
+
+  it("honra core.hooksPath configurado pelo Git", () => {
+    const configured = mkdtempSync(join(tmpdir(), "hooks-config-"));
+    try {
+      spawnSync("git", ["config", "core.hooksPath", configured], { cwd: dir });
+      const installed = install(dir);
+      expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+      const valida = runHook(dir, "commit-msg", { args: [msgFile(dir, "feat: caminho configurado")] });
+      expect(valida.status, valida.stdout + valida.stderr).toBe(0);
+    } finally {
+      spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: dir });
+      rmSync(configured, { recursive: true, force: true });
+      expect(existsSync(join(hooksPath(dir), "commit-msg"))).toBe(true);
     }
   });
 

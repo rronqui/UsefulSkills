@@ -23,12 +23,19 @@ if (existsSync(cli)) {
   process.exit(r.status ?? 1);
 }
 const cmd = join(cwd, "node_modules", ".bin", process.platform === "win32" ? "commitlint.cmd" : "commitlint");
-const bin = existsSync(cmd) ? cmd : "commitlint";
-// Windows: .cmd exige cmd.exe, mas NUNCA shell:true com argv separado
-// (cmd divide caminhos com espaços). Uma string única /c "<comando>" mantém
-// o quoting — cmd não interpreta &|<> dentro de aspas.
+const bin = existsSync(cmd) ? cmd : process.platform === "win32" ? "commitlint.cmd" : "commitlint";
+// Windows: .cmd exige cmd.exe, mas NUNCA interpolamos os caminhos no comando.
+// Variáveis de ambiente fazem uma única expansão; sem `call`, um `%VAR%` contido
+// no valor do caminho não é reinterpretado como outra variável.
 const r =
   process.platform === "win32"
-    ? spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${bin}" --edit "${file}"`], { stdio: "inherit" })
+    ? spawnSync(
+        process.env.ComSpec ?? "cmd.exe",
+        ["/d", "/v:off", "/s", "/c", `"%COMMITLINT_BIN%" --edit "%COMMIT_MSG_FILE%"`],
+        {
+          stdio: "inherit",
+          env: { ...process.env, COMMITLINT_BIN: bin, COMMIT_MSG_FILE: file },
+        },
+      )
     : spawnSync(bin, ["--edit", file], { stdio: "inherit" });
 process.exit(r.status ?? 1);

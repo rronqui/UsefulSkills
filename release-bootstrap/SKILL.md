@@ -88,8 +88,12 @@ As fases seguintes usam ESSE levantamento, não suposições.
   `{".": "X.Y.0"}`, senão o run falha com "Missing required manifest versions". Após o
   primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
-  nunca rodaria no PR de release. Crie o secret com um PAT:
-  `gh secret set RELEASE_PLEASE_TOKEN --body "$(gh auth token)"`.
+  nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos.
+  Em shell POSIX/Git Bash, valide a saída e remova o terminador antes de enviar por
+  stdin, limpando o token mesmo em falha:
+  `status=1; token="$(gh auth token)" && [ -n "$token" ] && { if printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; then status=0; else status=$?; fi; }; unset token; [ "$status" -eq 0 ]`.
+  No PowerShell, adquira o token dentro do `try`, escreva-o sem newline no stdin do processo e remova-o no `finally`:
+`$token = $null; $p = $null; try { $token = gh auth token; if ($LASTEXITCODE -ne 0) { throw "gh auth token falhou" }; $token = $token.Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { $token = $null; try { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() } } catch { } }`.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 
@@ -103,13 +107,12 @@ As fases seguintes usam ESSE levantamento, não suposições.
   - `commit-msg`: valida o título (isenta Merge/Revert/fixup!/squash!).
   - `pre-push`: bloqueia push direto na branch default. PROTOCOLO CORRETO: o git passa as
     refs pela STDIN, formato `<local ref> <local sha> <remote ref> <remote sha>` (uma
-    linha por ref). Leia a stdin e rejeite se o local ref for `refs/heads/<default>`.
-    NUNCA use variáveis de ambiente — o git não as define e o hook vira um no-op
-    silencioso. Bypass documentado: `git push --no-verify`.
+    linha por ref). Leia a stdin e rejeite se o local **ou** o remote ref for
+    `refs/heads/<default>`. NUNCA use variáveis de ambiente — o git não as define e o hook
+    vira um no-op silencioso. Bypass documentado: `git push --no-verify`.
 - TESTE REAL (não pule):
   - commit-msg: arquivo temporário de mensagem; entrada válida → exit 0, inválida → exit 1.
-  - pre-push: `printf 'refs/heads/<default> 0 0 0\n' | <hook>` → exit 1; com outra
-    branch → exit 0; stdin vazia → exit 0.
+  - pre-push: `printf 'refs/heads/<default> 0 0 0\n' | <hook>` → exit 1; local feature + remote default → exit 1; local default + remote feature → exit 1; local e remote não-default → exit 0; stdin vazia → exit 0.
 - Adicione `.omp/` ao `.gitignore` (estado do tdd-orchestrator, se usado no projeto).
 
 ## FASE 5 — Versão visível na aplicação

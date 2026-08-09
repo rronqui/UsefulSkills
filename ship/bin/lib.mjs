@@ -1,7 +1,13 @@
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { closeSync, constants, copyFileSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
+
+const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
+
+export function isValidSemVer(value) {
+  return typeof value === "string" && SEMVER_RE.test(value);
+}
 
 export function slugify(title) {
   return title
@@ -28,13 +34,13 @@ export function extractIssueNumber(url) {
 }
 
 // Parse da versão servida a partir do HTML: remove comentários, procura
-// v(X.Y.Z) a partir do texto âncora "Versão da aplicação" (se presente)
-// senão a primeira ocorrência. Retorna a versão ou null.
+// v(X.Y.Z[-prerelease][+build]) a partir do texto âncora "Versão da aplicação"
+// (se presente) senão a primeira ocorrência. Retorna a versão ou null.
 export function extractServedVersion(html) {
   let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+)/) || [])[1] ?? null;
+  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^\p{L}\p{N}_+.-]|\.(?=$|[^\p{L}\p{N}_+.-]))/u) || [])[1] ?? null;
 }
 
 
@@ -49,15 +55,48 @@ export function resolveSchemaWatch(value) {
 
 // Etapa de backup do deploy. Sem dbPath → null; arquivo ausente → null (o chamador
 // emite o aviso). Cria o diretório de backup se necessário e copia o arquivo;
-// retorna o destino escrito. backupDir absoluto é honrado via path.resolve.
+// retorna o destino escrito. Caminhos absolutos são honrados; diretórios relativos
+// são resolvidos a partir da raiz do repositório. O nome é reservado atomicamente
+// para que chamadas no mesmo instante nunca sobrescrevam um snapshot anterior.
 export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
-  const src = path.join(root, cfg.dbPath);
+  const src = path.resolve(root, cfg.dbPath);
   if (!existsSync(src)) return null;
   const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
   mkdirSync(dir, { recursive: true });
   const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-  const dest = path.join(dir, `${path.basename(cfg.dbPath)}-${ts}`);
-  copyFileSync(src, dest);
-  return dest;
+  const base = path.join(dir, `${path.basename(src)}-${ts}`);
+  for (let attempt = 0; ; attempt++) {
+    const dest = attempt === 0 ? base : `${base}-${attempt}`;
+    const temp = `${dest}.tmp-${process.pid}`;
+    let tempReserved = false;
+    try {
+      const tempFd = openSync(temp, "wx");
+      closeSync(tempFd);
+      tempReserved = true;
+      copyFileSync(src, temp);
+      try {
+        linkSync(temp, dest);
+        try { unlinkSync(temp); } catch {}
+      } catch (err) {
+        if (!["EPERM", "EACCES", "EOPNOTSUPP", "ENOTSUP", "EXDEV"].includes(err?.code)) throw err;
+        try {
+          copyFileSync(temp, dest, constants.COPYFILE_EXCL);
+        } catch (copyErr) {
+          if (copyErr?.code !== "EEXIST") {
+            try { unlinkSync(dest); } catch {}
+          }
+          throw copyErr;
+        }
+        try { unlinkSync(temp); } catch {}
+      }
+      return dest;
+    } catch (err) {
+      if (tempReserved) {
+        try { unlinkSync(temp); } catch {}
+      }
+      if (err?.code === "EEXIST") continue;
+      throw err;
+    }
+  }
 }

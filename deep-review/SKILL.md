@@ -63,8 +63,15 @@ Sem escopo explícito, pergunte ao usuário (ferramenta `ask`) qual modo quer:
 
 ### Coleta do diff por modo
 
-Rode os comandos via `bash` a partir da raiz do repo. Diff vazio em qualquer modo →
-informe o usuário e PARE (não dispare revisores sem material).
+Para PR, branch base, não commitadas e commit, diff vazio → informe o usuário e PARE
+*(não dispare revisores sem material). **Custom é a exceção:** sem mudanças, o
+orquestrador deve mapear o workspace, particionar arquivos revisáveis e incluir em
+cada assignment a lista exata de arquivos atribuídos; os revisores leem esses arquivos
+por conta própria e ancoram achados nas linhas atuais.
+  No Custom sem diff, aplique exclusões e as restrições do usuário ao inventário
+  antes de particionar; se o conjunto resultante estiver vazio, informe "nenhum arquivo revisável" e pare.
+  Caso contrário, `totalLines` é a soma das linhas atuais e `fileCount` o tamanho do
+  inventário já restrito; só então a tabela de dimensionamento define a equipe.
 
 - **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
   Falha ao buscar → reporte o erro e pare.
@@ -77,10 +84,16 @@ informe o usuário e PARE (não dispare revisores sem material).
   `jj diff --git` no lugar dos dois.
 - **Commit**: liste os últimos 20 com `git log --oneline -20`, pergunte qual
   (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
-- **Custom**: peça as instruções. Se houver mudanças não commitadas no working tree,
-  colete-as também e inclua as estatísticas e o diff (as instruções customizadas vão
-  como "instruções adicionais"). Sem mudanças → o assignment do revisor contém apenas
-  as instruções e ele lê o workspace por conta própria.
+ - **Custom**: peça as instruções. Se houver mudanças não commitadas (staged ou
+   unstaged), colete um único patch final com `git diff HEAD --`; liste também arquivos
+   untracked via `git status --short --untracked-files=all` e, para cada arquivo não
+   excluído, acrescente um patch `/dev/null`→arquivo usando `git diff --no-index -- /dev/null "<path>"`
+   (ignore o exit code 1 esperado). Aplique exclusões e restrições customizadas antes de calcular
+   estatísticas, particionar e montar assignments. Se o inventário resultante
+   ficar vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie
+   o workspace, aplique as mesmas exclusões/restrições, e particione o inventário;
+   inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
+   por conta própria e ancora achados nas linhas atuais.
 
 Instruções adicionais do usuário (texto além do ref do PR, ou foco explícito) são
 SEMPRE repassadas aos revisores.
@@ -136,18 +149,28 @@ do usuário, e as regras do protocolo da FASE 4 quando o ambiente não tiver o a
 completo no assignment).
 
 **Por revisor (`task` do item)** — assignment com:
-1. Lista EXATA dos arquivos atribuídos ("Focus ONLY on assigned files");
+1. Lista EXATA dos arquivos atribuídos como alvos de achados. O revisor pode ler
+   arquivos relacionados para contexto e checagem cross-boundary, mas não registra
+   achados fora dos arquivos atribuídos;
 2. Instrução de acesso ao diff:
+   - Custom sem diff: não inclua hunks nem ordene `git diff`/`git show`; inclua somente
+     a lista exata de arquivos do inventário atribuídos e peça leitura do workspace atual.
    - Diff pequeno (≤ 50.000 caracteres E ≤ 20 arquivos): inclua os hunks dos arquivos
-     dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff";
+     dele inline no assignment, com a ordem "use estes hunks; NUNCA rode git diff; no
+     modo PR, nunca trate o workspace como fonte do patch; MAY leia arquivos inalterados
+     apenas como contexto do consumidor para a checagem cross-boundary";
    - Diff grande: apenas uma prévia por arquivo (primeiras ~`max(5, floor(100/fileCount))`
-     linhas de conteúdo de cada hunk) + a ordem "RODE `git diff`/`git show` para os
-     arquivos atribuídos" (modo não-commitado: ambos `git diff -- <path>` e
-     `git diff --cached -- <path>`; modo jj: `jj --ignore-working-copy diff --git -- <path>`);
-   - Modo PR com diff grande: "leia os diffs de `pr://<owner>/<repo>/<N>/diff/all` ou
-     por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local
-     e NUNCA leia arquivos do workspace para contexto do PR".
-3. "MAY read full file context as needed via `read`" (exceto na restrição de PR acima);
+     linhas de conteúdo de cada hunk) + a ordem adequada ao modo: em **Custom**, rode
+     `git diff HEAD -- "<path>"` para cada arquivo e, para untracked, `git diff --no-index -- /dev/null "<path>"`;
+     em **Não commitadas**, rode ambos `git diff -- "<path>"` e `git diff --cached -- "<path>"`; em
+     branch/commit, rode `git diff`/`git show` para os arquivos atribuídos; em jj, rode
+     `jj --ignore-working-copy diff --git -- "<path>"`.
+   - Modo PR, qualquer tamanho: "leia o patch somente de `pr://<owner>/<repo>/<N>/diff/all` ou
+     por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local nem
+     trate o workspace como fonte do patch. Para a checagem cross-boundary obrigatória, MAY
+     ler arquivos inalterados do workspace somente como contexto do consumidor; não registre
+     achados fora dos arquivos atribuídos";
+3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
 4. Registro de achados e veredito via seções incrementais de `yield`
    (`type: ["findings"]`, `type: ["overall_correctness"]`, `type: ["explanation"]`,
    `type: ["confidence"]`); jamais uma ferramenta separada de finding.
@@ -165,8 +188,10 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
 `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`.
 
 **Procedimento**:
-1. Ver o patch (diff fornecido inline ou comando indicado no assignment);
-2. Ler os arquivos modificados para contexto completo;
+1. No modo PR, use apenas o diff remoto autorizado; nos demais modos com diff, use o
+   patch fornecido ou o comando indicado no assignment. Em Custom sem diff, leia as
+   instruções e o workspace sem exigir patch.
+2. Ler os arquivos modificados ou atribuídos para contexto completo;
 3. Registrar cada achado com `yield` incremental `type: ["findings"]`;
 4. Registrar o veredito (`overall_correctness`, `explanation`, `confidence`) com
    seções incrementais e parar — a finalização em idle monta o resultado.
@@ -175,14 +200,15 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
 - **Impacto provável**: apontar caminhos de código concretamente afetados (sem especulação);
 - **Acionável**: fix discreto; nunca "considere melhorar X";
 - **Não-intencional**: claramente não é escolha deliberada de design;
-- **Introduzido pelo patch**: nunca reportar bug pré-existente;
+- **Evidência no escopo**: em modos com patch, o defeito foi introduzido pelo patch;
+  em Custom sem patch, o defeito está no estado atual revisado;
 - **Sem suposições não declaradas**: o bug não depende de suposição sobre o resto do
   codebase ou sobre a intenção do autor;
 - **Rigor proporcional**: o fix não exige um rigor ausente no resto do codebase.
-
 **Checagem cross-boundary (obrigatória)**: para cada novo tipo, variante ou valor que
-o patch introduz cruzando fronteira de função/módulo (evento, mensagem, comando,
-frame, variante de enum, item de fila, payload de IPC):
+cruza fronteira de função/módulo — introduzido pelo patch quando há patch, ou presente
+no estado atual em Custom sem patch (evento, mensagem, comando, frame, variante de
+enum, item de fila, payload de IPC):
 1. Localizar o **ponto de despacho** no lado CONSUMIDOR — o switch, router, cadeia de
    filtros, registro de handlers ou loop que recebe e roteia valores desse tipo.
 2. Confirmar que o novo tipo tem branch explícito, ou que o catch-all existente o
@@ -211,7 +237,8 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `priority`: número 0–3 (0 = P0 bloqueia o release; 3 = nice-to-have);
 - `confidence`: 0.0–1.0 de que é bug real;
 - `file_path`: arquivo afetado (não vazio);
-- `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas que SOBREPOE o diff.
+- `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas; em modos com patch
+  sobrepõe o diff e em Custom sem patch ancora linhas atuais do arquivo atribuído.
 
 **Veredito** (por revisor):
 - `overall_correctness`: `correct` (sem bugs/bloqueios) | `incorrect`;
@@ -219,8 +246,9 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `confidence`: 0.0–1.0.
 
 Estilo/docs/nits NÃO contam: corretude ignora questões não bloqueantes. Todo achado
-DEVE ser ancorado no patch e sustentado por evidência. O revisor nunca emite JSON ou
-blocos de código como texto final.
+DEVE ser ancorado no patch, ou nas linhas atuais do arquivo atribuído em Custom sem
+patch, e sustentado por evidência. O revisor nunca emite JSON ou blocos de código
+como texto final.
 
 ## FASE 5 — Consolidação e relatório final
 
@@ -242,12 +270,14 @@ Com os resultados de todos os revisores:
   é o esperado para diffs pequenos.
 - Nunca inclua diff inteiro inline acima dos limites (50.000 caracteres ou 20
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
-- Revisor lê APENOS os arquivos atribuídos; sobreposição de escopo entre revisores
-  gera achados duplicados.
-- Modo PR nunca usa git local nem arquivos do workspace como fonte de contexto.
+- Revisor registra achados apenas nos arquivos atribuídos; pode ler contexto fora deles
+  para checagens cross-boundary. Sobreposição de ownership gera achados duplicados.
+ - Modo PR nunca usa git local nem trata o workspace como fonte do patch; arquivos inalterados
+   do workspace podem ser lidos apenas como contexto do consumidor para a checagem cross-boundary.
 - Não passe `outputSchema` na chamada `task` para o agente `deep-reviewer`: a saída
   nativa dele (seções incrementais de `yield`) é o contrato que a TUI renderiza
   como veredito + achados.
 - Use sempre o `deep-reviewer` desta skill — nunca o agente embutido `reviewer` do
   omp (evita conflito de comportamento e dependência do binário).
-- Diff vazio ou 100% filtrado em qualquer modo: pare antes de disparar revisores.
+- Diff vazio ou 100% filtrado em modos que exigem diff: pare antes de disparar revisores;
+  Custom sem diff segue com leitura do workspace.

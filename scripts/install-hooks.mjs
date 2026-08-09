@@ -1,7 +1,7 @@
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,8 +20,39 @@ try {
   process.exit(0);
 }
 if (!/^([A-Za-z]:)?[\\/]/.test(hooksDir)) hooksDir = join(root, hooksDir);
+const hooksRelative = relative(root, hooksDir);
+const parentTraversal = hooksRelative === ".." || hooksRelative.startsWith(`..${sep}`);
+const hooksInsideProject = hooksRelative === "" || (!parentTraversal && !isAbsolute(hooksRelative));
 
+let ancestor = hooksDir;
+while (true) {
+  if ((hooksInsideProject && relative(root, ancestor) === "") || (!hooksInsideProject && ancestor !== hooksDir)) break;
+  // hook destinations and may legitimately be symlinks (for example /var).
+  try {
+    if (lstatSync(ancestor).isSymbolicLink()) {
+      console.error(`Caminho de hooks contém symlink; recusando escrever: ${ancestor}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
+  }
+  const parent = dirname(ancestor);
+  if (parent === ancestor) break;
+  ancestor = parent;
+}
 if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+
+const destinations = HOOKS.flatMap((name) => [join(hooksDir, name), `${join(hooksDir, name)}.mjs`]);
+for (const dest of destinations) {
+  try {
+    if (lstatSync(dest).isSymbolicLink()) {
+      console.error(`Destino de hook é symlink; recusando sobrescrever: ${dest}`);
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
+  }
+}
 
 for (const name of HOOKS) {
   const dest = join(hooksDir, name);

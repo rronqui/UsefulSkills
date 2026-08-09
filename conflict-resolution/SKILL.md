@@ -7,6 +7,10 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
 
 1. **Veja o estado atual** do merge/rebase: histórico do git e os arquivos em
    conflito.
+   Antes de iniciar um merge/rebase, confirme que alterações locais não relacionadas
+   foram commitadas ou guardadas. Se a operação já estiver em conflito e essas alterações
+   existirem, não tente commitá-las nem guardá-las no índice não resolvido: pare e peça
+   uma worktree separada ou um backup externo antes de editar.
 
 2. **Encontre as fontes primárias** de cada conflito. Entenda profundamente por que
    cada mudança foi feita e qual era a intenção original: leia as mensagens de
@@ -27,8 +31,10 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
    (Em repo da solução ship/release-bootstrap: os comandos do CI e/ou do manifesto
    `ship.config.json`.)
 
-5. **Finalize o merge/rebase.** Stage de tudo e commit. Em rebase, continue o
-   processo até todos os commits rebasados.
+5. **Finalize o merge/rebase.** Faça stage apenas dos caminhos resolvidos. Inspecione
+   `git diff --cached` e `git status --short` para garantir que não há alterações não
+   relacionadas no índice e commit. Em rebase, continue o processo até todos os commits
+   rebasados.
 
 **Integração com a solução UsefulSkills:**
 - Merge local do `tdd-orchestrator` (Entrega final, caminho "merge local"): em

@@ -4,10 +4,21 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
+function readConfig() {
+  const value = JSON.parse(readFileSync(CONFIG, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("ship.config.json deve conter um objeto JSON");
+  }
+  return value;
+}
+function backupDirFor(cfg) {
+  if (!cfg.dbPath) return null;
+  return path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
+}
 
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", cwd: root }).trim();
@@ -78,19 +89,85 @@ function cmdNew(argv) {
     console.error("Working tree sujo — commit ou descarte as mudanças antes.");
     process.exit(1);
   }
+  const originalBranch = git(["branch", "--show-current"]);
+  let originalHead = "";
+  try {
+    originalHead = git(["rev-parse", "--verify", "HEAD"]);
+  } catch {
+    // orphan branches have no HEAD to restore
+  }
   const def = defaultBranch();
+  const restoreBranch = () => {
+    try {
+      if (originalBranch && originalBranch !== def) {
+        try {
+          git(["switch", "--no-guess", originalBranch]);
+        } catch {
+          if (originalHead) {
+            try {
+              git(["switch", "--discard-changes", "--no-guess", originalBranch]);
+            } catch {
+              git(["switch", "--detach", originalHead]);
+            }
+          } else {
+            git(["symbolic-ref", "HEAD", `refs/heads/${originalBranch}`]);
+            git(["read-tree", "--empty"]);
+            git(["clean", "-fd"]);
+          }
+        }
+      } else if (!originalBranch && originalHead) {
+        git(["switch", "--detach", originalHead]);
+      }
+    } catch {
+      // preserve the original failure if restoration is unavailable
+    }
+  };
+  try {
+    git(["switch", def]);
+    git(["pull", "--ff-only"]);
+  } catch {
+    restoreBranch();
+    console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
+    process.exit(1);
+  }
   const label = type === "fix" ? "bug" : "enhancement";
-  const url = gh([
-    "issue", "create",
-    "--title", `[${type === "fix" ? "bug" : "feat"}] ${title}`,
-    "--label", label,
-    "--body", desc || "—",
-  ]);
-  const n = issueNumberOrDie(url);
+  let url;
+  try {
+    url = gh([
+      "issue", "create",
+      "--title", `[${type === "fix" ? "bug" : "feat"}] ${title}`,
+      "--label", label,
+      "--body", desc || "—",
+    ]);
+  } catch (err) {
+    restoreBranch();
+    throw err;
+  }
+  const n = extractIssueNumber(url);
+  if (n === null) {
+    restoreBranch();
+    console.error(`Não consegui extrair o número da issue/PR de: ${url}`);
+    process.exit(1);
+  }
   const branch = `${type}/${n}-${slugify(title)}`;
-  git(["switch", def]);
-  git(["pull", "--ff-only"]);
-  git(["switch", "-c", branch]);
+  try {
+    git(["switch", "-c", branch]);
+  } catch (err) {
+    restoreBranch();
+    let closed = true;
+    try {
+      gh(["issue", "close", n, "--comment", "Issue fechada automaticamente: não foi possível criar a branch correspondente."]);
+    } catch {
+      closed = false;
+      console.error(`Não consegui fechar a issue ${n} após a falha de criação da branch.`);
+    }
+    console.error(
+      closed
+        ? `Não consegui criar a branch ${branch}; a issue ${n} foi fechada para não ficar órfã.`
+        : `Não consegui criar a branch ${branch}; a issue ${n} permanece aberta e requer ação manual.`,
+    );
+    process.exit(1);
+  }
   console.log(`Issue ${url}`);
   console.log(`Branch ${branch} criada a partir de ${def}.`);
 }
@@ -125,52 +202,113 @@ function cmdShip(argv) {
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
     const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
     if (!unpublished) {
-      console.error("Nada para commitar.");
-      process.exit(1);
+      let def;
+      try {
+        def = defaultBranch();
+        git(["fetch", "origin", def]);
+        const branchCommits = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
+        if (!branchCommits) {
+          console.error("Nada para commitar.");
+          process.exit(1);
+        }
+      } catch {
+        console.warn("Não consegui comparar com a branch default local; tentando criar o PR mesmo assim.");
+        console.log("Árvore limpa — branch já publicada; tentando criar o PR.");
+      }
+    } else {
+      console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
     }
-    console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
   } else {
     git(["commit", "-m", `${type}: ${description} (#${n})`]);
   }
   git(["push", "-u", "origin", branch]);
-  const prUrl = gh([
-    "pr", "create",
-    "--title", `${type}: ${description}`,
-    "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
-  ]);
+  let prUrl = "";
+  let def = "";
+  const repository = repoSlug();
+  try {
+    def = defaultBranch();
+    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url,headRepository", "-q", `map(select(.headRepository.nameWithOwner == "${repository}")) | .[0].url`]);
+    if (prUrl === "null") prUrl = "";
+  } catch {
+    console.error("Não consegui determinar a branch default; PR não criado automaticamente.");
+    process.exit(1);
+  }
+  if (!prUrl) {
+    prUrl = gh([
+      "pr", "create",
+      "--base", def,
+      "--title", `${type}: ${description}`,
+      "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
+    ]);
+  }
   console.log(`PR ${prUrl}`);
-  const auto = spawnSync("gh", ["pr", "merge", "--auto", "--squash"], { cwd: root, encoding: "utf8" });
+  const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
   if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
   else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
 }
-
 // ---------- deploy ----------
 async function deploy() {
   if (!existsSync(CONFIG)) {
     console.error("ship.config.json ausente — rode 'ship.mjs setup' e preencha.");
     process.exit(1);
   }
-  const cfg = JSON.parse(readFileSync(CONFIG, "utf8"));
+  let cfg;
+  try {
+    cfg = readConfig();
+  } catch {
+    console.error("ship.config.json ausente ou inválido — deploy cancelado.");
+    process.exit(1);
+  }
   const def = defaultBranch();
   const cur = git(["branch", "--show-current"]);
   if (cur !== def) {
     console.error(`Deploy roda na branch default (${def}); a atual é '${cur}'.`);
     process.exit(1);
   }
+  try {
+    git(["fetch", "origin", def]);
+    const ahead = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
+    if (ahead > 0) {
+      console.error(`Deploy bloqueado: a branch '${def}' tem ${ahead} commit(s) local(is) à frente de origin/${def}. Publique ou reconcilie antes de tentar o deploy.`);
+      process.exit(1);
+    }
+  } catch {
+    console.error(`Não consegui verificar se '${def}' está alinhada com origin/${def}; deploy cancelado por segurança.`);
+    process.exit(1);
+  }
   const oldHead = git(["rev-parse", "HEAD"]);
+  const prePullDbPath = cfg.dbPath;
+  const prePullBackupDir = backupDirFor(cfg);
   const backupDest = performBackup(cfg, root);
   if (backupDest) console.log(`Backup: ${backupDest}`);
   else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   try {
-    git(["pull", "--ff-only"]);
+    git(["pull", "--ff-only", "origin", def]);
   } catch {
     console.error(`git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`);
     process.exit(1);
   }
-  const changed = git(["diff", "--name-only", oldHead, "HEAD"]).split("\n");
-  // schemaWatchPaths opcional no manifesto (string[]); omitido → default legado.
+  try {
+    cfg = readConfig();
+  } catch {
+    console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
+    process.exit(1);
+  }
+  if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
+    const postPullBackup = performBackup(cfg, root);
+    if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
+    else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
+  }
+  const changed = git(["diff", "--name-only", oldHead, "HEAD"])
+    .split("\n")
+    .map((file) => file.replace(/\r$/, "").replaceAll("\\", "/"))
+    .filter(Boolean);
   const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
-  const hits = watch.filter((p) => typeof p === "string" && changed.includes(p));
+  const hits = watch.filter((watched) => {
+    const absolute = path.resolve(root, watched);
+    const relative = path.relative(root, absolute).replaceAll("\\", "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+    return changed.some((file) => !relative || file === relative || file.startsWith(`${relative}/`));
+  });
   if (hits.length) {
     console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
   }
@@ -187,16 +325,33 @@ async function deploy() {
   }
   if (cfg.versionCheckUrl) {
     let pkg = null;
+    let packageRead = true;
     try {
       pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
     } catch {
+      packageRead = false;
       console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
     }
-    if (pkg) {
+    const validVersion = isValidSemVer(pkg?.version);
+    if (packageRead && !validVersion) {
+      console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
+    }
+    if (validVersion) {
       let ok = false;
+      const timeoutValue = cfg.versionCheckTimeoutMs;
+      const timeoutMs = typeof timeoutValue === "number" && Number.isFinite(timeoutValue) && timeoutValue > 0
+        ? Math.min(timeoutValue, 2_147_483_647)
+        : 10_000;
       for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const html = await (await fetch(cfg.versionCheckUrl)).text();
+          const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
+          if (!response || response.ok === false || (typeof response.status === "number" && (response.status < 200 || response.status >= 300))) {
+            await response?.body?.cancel();
+            throw new Error(`HTTP ${response?.status ?? "desconhecido"}`);
+          }
+          const html = await response.text();
           const served = extractServedVersion(html);
           console.log(
             served === pkg.version
@@ -205,7 +360,9 @@ async function deploy() {
           );
           ok = true;
         } catch {
-          if (attempt < 4) await new Promise((r) => setTimeout(r, 2000));
+          if (attempt < 4) await new Promise((r) => setTimeout(r, 2_000));
+        } finally {
+          clearTimeout(timer);
         }
       }
       if (!ok) console.warn(`Não consegui checar versão em ${cfg.versionCheckUrl} após 5 tentativas.`);

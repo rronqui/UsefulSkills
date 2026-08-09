@@ -1,6 +1,6 @@
 // Testes das funções puras do motor ship.mjs (lib.mjs).
-import { describe, it, expect } from "vitest";
-import { extractIssueNumber, extractServedVersion, flagValue, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { describe, it, expect, vi } from "vitest";
+import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,9 +58,36 @@ describe("extractServedVersion", () => {
   it("ignora versões dentro de comentários HTML", () => {
     expect(extractServedVersion("<!-- v8.8.8 --> <p>v2.0.1</p>")).toBe("2.0.1");
   });
+  it("aceita prerelease e build metadata sem comentário", () => {
+    expect(extractServedVersion("<p>v1.2.3-rc.1+build.7</p>")).toBe("1.2.3-rc.1+build.7");
+  });
+  it("aceita pontuação após a versão", () => {
+    expect(extractServedVersion("<p>v1.2.3.</p>")).toBe("1.2.3");
+  });
+  it("não aceita versão com sufixo semântico inválido", () => {
+    expect(extractServedVersion("<p>v1.2.3+build+oops</p>")).toBeNull();
+  });
+  it("não aceita hífen sem identificador", () => {
+    expect(extractServedVersion("<p>v1.2.3-</p>")).toBeNull();
+  });
+  it("não aceita caracteres inválidos após build metadata", () => {
+    expect(extractServedVersion("<p>v1.2.3+build_extra</p>")).toBeNull();
+  });
   it("retorna null quando não há versão", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();
+  });
+});
+
+describe("isValidSemVer", () => {
+  it("aceita prerelease e build metadata válidos", () => {
+    expect(isValidSemVer("1.2.3-rc.1+build.7")).toBe(true);
+  });
+  it("rejeita identificador numérico prerelease com zero à esquerda", () => {
+    expect(isValidSemVer("1.2.3-01")).toBe(false);
+  });
+  it("rejeita newline final fora do valor SemVer", () => {
+    expect(isValidSemVer("1.2.3\n")).toBe(false);
   });
 });
 
@@ -89,6 +116,37 @@ describe("performBackup", () => {
       expect(existsSync(dest)).toBe(true);
       expect(readFileSync(dest, "utf8")).toBe("v1");
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it("honra dbPath absoluto", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    const outside = mkdtempSync(join(tmpdir(), "bkp-external-"));
+    const db = join(outside, "app.db");
+    writeFileSync(db, "externo");
+    try {
+      const dest = performBackup({ dbPath: db, backupDir: join(root, "backup") }, root);
+      expect(dest).not.toBeNull();
+      expect(readFileSync(dest, "utf8")).toBe("externo");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("não sobrescreve backup existente no mesmo instante", () => {
+    const root = mkdtempSync(join(tmpdir(), "bkp-"));
+    writeFileSync(join(root, "db.sqlite"), "v1");
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    try {
+      const first = performBackup({ dbPath: "db.sqlite" }, root);
+      writeFileSync(join(root, "db.sqlite"), "v2");
+      const second = performBackup({ dbPath: "db.sqlite" }, root);
+      expect(second).not.toBe(first);
+      expect(readFileSync(first, "utf8")).toBe("v1");
+      expect(readFileSync(second, "utf8")).toBe("v2");
+    } finally {
+      vi.useRealTimers();
       rmSync(root, { recursive: true, force: true });
     }
   });

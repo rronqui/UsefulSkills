@@ -76,19 +76,21 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS` | Avance para GREEN |
-| `test-author` | FALHOU | (verifique se já implementado) | Se sim → VALIDATE; se não → reexecute |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste` | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe `red.revision_delta` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
+| `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
+| `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
+| `test-author` | FALHOU + comportamento já implementado | `red.status: PASS`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `green.changed_files: []`; `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"`; `implemented_by: existing-code` | Valide que `red.criteria_to_tests` é objeto com todos os AC e listas não vazias de strings `arquivo::teste`; se inválido, redefina `red.status: PENDING`, `red.criteria_to_tests: {}`, GREEN/REFACTOR/implemented_by para o estado inicial e reexecute RED; caso válido, normalize e preserve o objeto produzido pelo RED e avance para REVIEW |
+| `test-author` | FALHOU + comportamento ausente | `red.status: PENDING`; `red.failing_tests: []`, `red.failure_reason_expected: false`; `green.status: PENDING`, `green.reason_if_skipped: ""`, `green.changed_files: []`; `refactor.status: PENDING`, `refactor.reason_if_skipped: ""`; `implemented_by: ""` | Reexecute RED com briefing mais específico, normalize o objeto AC→teste atual e substitua `red.criteria_to_tests` |
 | `test-author` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
-| `backend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
-| `frontend-developer` | CONCLUÍDO | `green.status: PASS` | Avance para REFACTOR |
 | `backend/frontend` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `refactorer` | CONCLUÍDO | `refactor.status: PASS` | Avance para REVIEW |
 | `refactorer` | SKIPPED | `refactor.status: SKIPPED` | Avance para REVIEW |
 | `refactorer` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
-| `validator` | PASSOU | `gates.*: PASS` | Avance para DONE |
-| `validator` | FALHOU | `gates.*: FAIL` | Roteie por origem do FAIL |
+| `validator` | PASSOU | `gates.*: PASS ou NA` com `gate_evidence.<gate>` e, para `NA`, justificativa persistidas | Avance para DONE somente quando cada gate tiver status e evidência/justificativa válidos |
+| `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate e `gate_evidence.<gate>` persistidos | Roteie por `origin` do FAIL (`TOOLING` vai a `TOOLING_FIX`); ausência de `origin` ou evidência torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
 | `spec-kit-author` | CONCLUÍDO | `spec_kit.status: WRITTEN` | Confirme artefatos em disco, registre paths e `written_at` |
@@ -98,6 +100,14 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `frontend-developer` | FALHOU | (nenhum) | Diagnostique e reexecute a tarefa uma vez; persistindo, escale ao usuário |
 | `refactorer` | FALHOU | (nenhum) | Diagnostique e reexecute uma vez; persistindo, avance para REVIEW registrando o achado |
 | `integrator` | FALHOU | `wave.integration: FAIL` | Devolva à tarefa/agente responsável com o diagnóstico |
+> **Múltiplas falhas:** persista todos os `gate_origins` e evidências; ordene o
+> re-trabalho por `SPEC-CONTRATO`, `TESTE`, `CODIGO`, `TOOLING`, `REFACTOR`.
+> Roteie somente a primeira origem nessa ordem, corrija-a, reexecute todos os gates
+> e só então processe a próxima falha ainda presente. Nunca escolha a origem por
+> ordem incidental do output do validator.
+> Regra adicional de `RED_REVISION`: `red.revision_delta.ac` deve pertencer à lista
+> `acceptance_criteria` da tarefa; uma chave inexistente invalida o delta e mantém
+> a fase em `RED_REVISION`.
 
 **Tratamento de output inválido.** Se o output de qualquer subagente **não contiver um Status válido** (CONCLUÍDO, BLOQUEADO, FALHOU, APROVADO, PASSOU, SKIPPED) — output vazio, malformado, sem campo Status, ou com texto que não se enquadra em nenhum status — **trate como BLOQUEADO** e reexecute **uma vez** com briefing mais claro. Se a 2ª execução também não retornar status válido, **escale ao usuário** com o output recebido.
 
@@ -142,7 +152,7 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 **Run:** <run_id> | **Branch:** <branch_work> → <merge_target> | **Entrega:** <delivery: internal/external> | **Atualizado:** <timestamp>
 
 ## Status Geral
-- Spec Kit: ✅ WRITTEN | Baseline: ✅ PASS | Contrato: DRAFT/APPROVED/NA
+- Spec Kit: <spec_kit.status> | Baseline: <baseline.status> | Contrato: <contract.status>
 
 ## Ondas
 ### Onda 1 — status: completed/integrating/in_progress/pending
@@ -158,6 +168,63 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ### Passo 0 — Retomada (antes de tudo)
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
+   Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
+   derive/recalcule `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN`
+   ou for `NA` sem uma entrada correspondente em `known_failures` com `reason` e
+   `evidence` não vazios; caso contrário, `FAIL` se algum gate for `FAIL`,
+   `PASS` se cada gate for `PASS` ou `NA` com justificativa correspondente e não vazia,
+   ou `NOT_RUN` nos demais casos. Não preserve um `baseline.status` anterior sem
+   validar novamente os gates, justificativas e evidências.
+   Inicialize campos novos ausentes (`baseline.override_approved: false`,
+   `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
+   `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
+   após converter e validar `red.criteria_to_tests` abaixo, se a tarefa já estiver
+   em `RED_REVISION`, inicialize `red.revision_baseline_tests` com o mapa normalizado
+   somente quando o campo estiver ausente ou inválido; preserve um mapa válido existente.
+   caso contrário, `{}`. Inicialize `green.tooling_evidence: ""`,
+   `green.tooling_suite_evidence: ""` e `gate_evidence`: quando ausente, objeto com
+   os dez gates canônicos mapeados para strings vazias).
+   Migre `gates.rastreabilidade` para `gates.traceability` (preservando o valor)
+   e remova a chave antiga; crie `gate_origins` com todos os gates vazios quando
+   ausente, preservando origens já registradas.
+   Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
+   legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline
+   antes de continuar.
+   Para `schema_version: "2.2"` também revalide `baseline.status` antes de retomar:
+   derive-o com as mesmas regras de `NOT_RUN`/`FAIL`/`PASS`, sem confiar em um
+   `PASS` persistido quando `tests` ou `build` estiverem `NOT_RUN` ou `NA` sem
+   `known_failures` com `reason` e `evidence` não vazios.
+   Se um objeto de tarefa legado tiver `phase: DONE` com algum gate diferente de
+   `PASS`/`NA` ou evidência inválida, ou tiver `gates.*` em `PASS`, `FAIL` ou `NA`
+   mas `gate_evidence` ausente, não-string, vazio ou incompleto, preserve o diagnóstico
+   apenas como histórico, redefina os dez `gates` para `pending`, limpe
+   `gate_origins` e `gate_evidence`, preserve a fase ativa e reabra a onda
+   (`status: in_progress`, `integration.status: pending`, `integration.evidence: ""`);
+   se a fase anterior era `VALIDATE`, `TOOLING_FIX` ou `DONE`, retome em `VALIDATE`.
+   Nunca retome `DONE` sem evidência por gate.
+   Ao migrar `red.criteria_to_tests` legado em formato texto, valide cada linha
+   no formato `AC-NNN -> arquivo::teste` (aceite também `AC-NNN: arquivo::teste`),
+   remova entradas vazias e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`,
+   acumulando somente após a validação;
+   se qualquer linha for inválida ou algum AC referenciado
+   não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
+   `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
+   `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
+   Se `implemented_by: existing-code` e `reviewed_by` estiver vazio ou inválido,
+   não preserve o atalho legado em `VALIDATE`/`DONE`: defina `phase: REVIEW`,
+   reabra a onda (`status: in_progress`, `integration.status: pending`,
+   `integration.evidence: ""`) e exija o `peer-reviewer` antes de retomar a
+   validação.
+   Para o formato já objetual, valide igualmente que cada AC referenciado tem uma lista não vazia de strings no formato `arquivo::teste`; qualquer objeto incompleto dispara o mesmo reset para RED. Os passos seguintes são aplicados somente quando esse reset for disparado:
+   redefina `green` como `{ "status": "PENDING", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" }`,
+   `refactor` como `{ "status": "PENDING", "reason_if_skipped": "" }`,
+   `red.revision_delta` como `{ "ac": "", "test": "", "evidence": "" }` e
+   `red.revision_baseline_tests` como `{}`,
+   `implemented_by` e `reviewed_by` como `""`, `doc_impact: none`, `attempt: 0`, `gates` com todos os campos em `"pending"`, `gate_origins` e `gate_evidence` como objetos com todos os gates vazios;
+   redefina para `PENDING` o `status` de cada AC em `acceptance_criteria` referenciado pela tarefa;
+   limpe `blockers` e `evidence`; redefina a onda como `status: in_progress`,
+   `integration.status: pending` e `integration.evidence: ""`; não trate a entrada inválida como rastreabilidade válida.
+   Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
 
@@ -165,12 +232,12 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 
 ```json
 {
-  "schema_version": "2.1",
+  "schema_version": "2.2",
   "run_id": "<ISO timestamp>",
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
   "repo": { "branch_start": "", "branch_work": "", "merge_target": "", "delivery": "internal|external", "merge_status": "", "pr_url": "", "head_start": "", "head_current": "", "dirty_at_start": false },
-  "baseline": { "tests": "PASS|FAIL|NOT_RUN", "build": "PASS|FAIL|NOT_RUN", "known_failures": [] },
+ "baseline": { "status": "PASS|FAIL|NOT_RUN", "tests": "PASS|FAIL|NA|NOT_RUN", "build": "PASS|FAIL|NA|NOT_RUN", "override_approved": false, "known_failures": [{ "gate": "tests|build", "reason": "", "evidence": "" }] },
   "spec_kit": {
     "spec": "./specs/<feature>/spec.md",
     "plan": "./specs/<feature>/plan.md",
@@ -192,17 +259,19 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
         {
           "id": "T-001",
           "title": "...",
-          "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
+          "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
           "acceptance_criteria": ["AC-001"],
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
-          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {} },
-          "green": { "status": "PENDING|PASS", "changed_files": [] },
+          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": {}, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
+          "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
           "doc_impact": "none|applied",
-          "gates": { "tests": "pending", "rastreabilidade": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
+          "gates": { "tests": "pending", "traceability": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
+          "gate_origins": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
+          "gate_evidence": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
           "blockers": [],
           "evidence": ""
         }
@@ -212,9 +281,8 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 }
 ```
 
-> **Nota:** Os caminhos com `<feature>` no schema acima são placeholders — substitua pelo nome real da feature (ex.: `specs001-mdc-core`) ao criar o `progress.json`.
-
-Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; renove `updated_at`.
+> Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
+Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` antes de qualquer reentrada, grave `gate_origins.<gate>` quando o status for `FAIL` e limpe essa origem quando o novo status for `PASS` ou `NA`; renove `updated_at`.
 
 ---
 
@@ -222,9 +290,9 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 
 1. **Subagentes presentes?** Confirme os **8** agentes (`test-author`, `backend-developer`, `frontend-developer`, `refactorer`, `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`) disponíveis em projeto (`./.omp/agents/`) **ou** usuário (`~/.omp/agent/agents/`) — o runtime resolve projeto antes de usuário em colisão de nome. Se algum faltar nos DOIS escopos: **pare e avise**. Ver Pré-requisito.
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
-   Se um fluxo de entrega externo o invocou com respostas fixas contendo a cláusula `delivery: external` (ex.: skill `ship`), registre `repo.delivery: "external"` em `progress.json` e use as respostas fornecidas diretamente, **sem perguntar**. Caso contrário, registre `repo.delivery: "internal"`.
+   Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok" — o resultado **entra no plano que você apresenta**. Se vermelha, **pare e reporte** (`baseline.status = FAIL`); só avance com `known_failures` registrados e autorização explícita.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -367,23 +435,32 @@ Sem critério de aceite explícito, **não delegue**.
 > ### 🛑 CHECKPOINT POR TAREFA
 > Antes da fase 1: recebi o "ok"; **`spec_kit.status = WRITTEN`**; esta tarefa vai como `task` a um **subagente** (eu não codo); começo pela fase **RED**. Sem exceção de "rápido demais para delegar".
 
-Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos). A próxima onda só começa após a integração da atual.
+Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
 
-> **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
+> **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `TOOLING_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
+> Ao iniciar nova entrada em `RED_REVISION`, incremente `attempt`, copie o mapa
+> anterior de `red.criteria_to_tests` para `red.revision_baseline_tests` e limpe
+> `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected`; a nova
+> execução deve registrar uma falha de asserção, adicionar um `arquivo::teste` ausente
+> do mapa-base e produzir evidência própria antes de `GREEN_FIX`.
+> Se a tentativa `RED_REVISION` for inválida ou não demonstrar a falha exigida,
+> descarte o mapa candidato, restaure `red.criteria_to_tests` a partir de
+> `red.revision_baseline_tests`, limpe `red.revision_delta` e não substitua o
+> mapa-base até uma nova tentativa válida.
+> Ao iniciar `TOOLING_FIX`, incremente `attempt` e limpe `green.tooling_evidence` e
+> `green.tooling_suite_evidence`. Só aceite os campos preenchidos pelo resultado dessa
+> execução; evidência de uma tentativa anterior não autoriza a transição.
 
-1. **RED — `test-author`.** Testes que falham cobrindo **todos** os critérios (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, avance para VALIDATE; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
+1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
 2. **GREEN — `backend-developer` e/ou `frontend-developer`.** Implementa o **requisito completo** (a menor solução que atende **todos** os critérios). O dev reconfirma o vermelho antes de codar. Critério sem teste → para e devolve ao `test-author`. **Testes são read-only.**
 3. **REFACTOR — `refactorer`.** Mantém tudo verde. Se nada relevante a refatorar, registre `refactor.status: SKIPPED` + `reason_if_skipped` — nunca cosmético, nunca silencioso.
-4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + spec/critérios + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Veredito:
+4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + tarefa (id/título, `implemented_by` e `reviewed_by`) + `spec.md`, `plan.md`, `tasks.md`/critérios + contrato `interface-contract.md`/versão quando aplicável + `red.criteria_to_tests` (objeto AC→test) + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Quando `implemented_by: existing-code`, trate sempre a tarefa como revisão de implementação existente: leia os arquivos de produção e testes atuais referenciados pelos critérios, independentemente de o diff isolado estar vazio ou conter apenas os testes RED; não bloqueie por ausência de patch de produção.
    - **APROVADO** → DOC.
-   - **BLOQUEADO** → roteie por tipo: *código* → GREEN; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
-5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. O `spec-kit-author` atualiza in-place `./specs/<feature>/spec.md`/`plan.md` (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** — se foram pulados na Fase 0, delegue ao `spec-kit-author` agora antes de validar (gate `spec_kit` depende disto). (Verificação redundante com o gate `spec_kit` em VALIDATE — defesa em profundidade.) Se o `spec-kit-author` reportar ambiguidades nas **OBSERVAÇÕES**, avalie: se bloqueante, pergunte ao usuário; se menor, registre em `progress.json` e resolva.
-   - **Mudança de contrato**: se o `spec-kit-author` reportar nas OBSERVAÇÕES que a
-     entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e
-     pergunte ao usuário se aprova a mudança. Aprovada → volte a RED para ajustar a
-     implementação ao novo contrato. NÃO aprovada → BLOCKED (escale com o conflito).
+   - **BLOQUEADO** → roteie por tipo: *código* → `RED_REVISION` para o `test-author` criar primeiro o teste de regressão; só depois `GREEN_FIX`; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
+5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
+   - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
-7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, **regenere `progress.md`** a partir do `progress.json` atualizado (ele fica fora do git, junto com o resto do estado), faça `git add` **apenas dos arquivos da tarefa (incluindo os artefatos Spec Kit atualizados — nunca o estado/`progress.md`)**, faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push. **Ao final de TODAS as tarefas da última onda**, execute a seção Entrega final abaixo.
+7. **DONE/COMMIT — você.** Só com todos os gates verdes: marque a tarefa em `tasks.md`, regenere `progress.md` a partir do `progress.json` atualizado (ele fica fora do git), faça `git add` **apenas dos arquivos da tarefa e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**. Se o fluxo criou a entrada `.omp/state/` no `.gitignore`, isole apenas esse hunk em um commit de bootstrap separado; se o `.gitignore` for novo e não houver hunk selecionável, permita stage do arquivo inteiro somente nesse commit separado. Caso contrário, use `git add -p`; nunca faça stage do `.gitignore` inteiro junto com a tarefa. Faça commit local `feat(T-NNN): título`. Atualize `progress.json` para `DONE`. Sem push.
 
 ---
 
@@ -399,12 +476,12 @@ stateDiagram-v2
     %% ============================================================
 
     [*] --> PRECHECK
+    PRECHECK --> PRECHECK_GATE : precondições avaliadas + OK do usuario
 
     %% ---------- Pré-condições (orquestrador) ----------
     state PRECHECK_GATE <<choice>>
-    PRECHECK --> PRECHECK_GATE : baseline + spec_kit WRITTEN + OK do usuario
-    PRECHECK_GATE --> PRECHECK : baseline VERMELHO, spec_kit PENDING ou sem OK
-    PRECHECK_GATE --> CICLO_TAREFA : baseline VERDE, spec_kit WRITTEN e OK
+    PRECHECK_GATE --> CICLO_TAREFA : (baseline PASS ou FAIL com override_approved e known_failures correspondentes aos gates) e spec_kit WRITTEN e OK
+    PRECHECK_GATE --> PRECHECK : baseline NOT_RUN, FAIL sem override/known_failures correspondentes, spec_kit PENDING ou sem OK
 
     %% ============================================================
     %% CICLO POR TAREFA (TDD)
@@ -415,10 +492,14 @@ stateDiagram-v2
         %% ---------- RED ----------
         state RED_CHECK <<choice>>
         RED --> RED_CHECK : rodar testes
-        RED_CHECK --> RED : passam de imediato ou faltam testes
-        RED_CHECK --> RED : falha por import-setup (motivo errado)
-        RED_CHECK --> GREEN : falham por ASSERCAO (motivo certo)
-        RED_CHECK --> VALIDATE : passam de imediato E comportamento ja implementado
+        RED_CHECK --> RED : falha por import-setup, faltam testes ou matriz AC->teste inválida/incompleta
+        RED_CHECK --> GREEN : falham por ASSERCAO e matriz AC->teste válida
+        RED_CHECK --> RED : testes passam sem comportamento implementado
+        RED_CHECK --> REVIEW : passam de imediato, comportamento ja implementado e matriz AC->teste válida
+        RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
+        GREEN_FIX --> REFACTOR : verde com requisito corrigido
+        TOOLING_FIX --> REFACTOR : gate tooling corrigido, diff não comportamental e suíte preservada com evidência
+        TOOLING_FIX --> RED_REVISION : diff comportamental ou suíte ausente
 
         %% ---------- GREEN ----------
         state GREEN_CHECK <<choice>>
@@ -438,7 +519,7 @@ stateDiagram-v2
         %% ---------- Roteamento de bloqueio por origem ----------
         state ROUTE_BLOCK <<choice>>
         ROUTE_BLOCK --> RED : origem TESTE
-        ROUTE_BLOCK --> GREEN : origem CODIGO
+        ROUTE_BLOCK --> RED_REVISION : origem CODIGO
         ROUTE_BLOCK --> REFACTOR : origem REFACTOR
         ROUTE_BLOCK --> DOC : origem SPEC-CONTRATO
         ROUTE_BLOCK --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
@@ -458,9 +539,11 @@ stateDiagram-v2
         %% ---------- VALIDATE ----------
         state VALIDATE_GATES <<choice>>
         VALIDATE --> VALIDATE_GATES : rodar gates (inclui spec_kit)
-        VALIDATE_GATES --> DOC : FAIL gate spec_kit (ausente, desatualizado ou conteudo divergente)
-        VALIDATE_GATES --> RED : FAIL origem TESTE
-        VALIDATE_GATES --> GREEN : FAIL origem CODIGO
+        VALIDATE_GATES --> DOC : FAIL origin SPEC-CONTRATO (inclui spec_kit e contract)
+        VALIDATE_GATES --> RED : FAIL origin TESTE
+        VALIDATE_GATES --> RED_REVISION : FAIL origin CODIGO
+        VALIDATE_GATES --> TOOLING_FIX : FAIL origin TOOLING
+        VALIDATE_GATES --> REFACTOR : FAIL origin REFACTOR
         VALIDATE_GATES --> BLOCKED : 3 tentativas esgotadas (escalar ao usuario)
         VALIDATE_GATES --> DONE : todos PASS ou NA justificado
 
@@ -501,14 +584,16 @@ stateDiagram-v2
     %% ============================================================
     note right of PRECHECK
         Orquestrador
-        Baseline verde + spec_kit WRITTEN + OK do usuario antes de delegar
+        Baseline PASS ou FAIL com override_approved + spec_kit WRITTEN + OK
         delivery registrado na Fase 0 passo 2 (internal/external)
     end note
 
     note right of CICLO_TAREFA
         Tarefas independentes da mesma onda
-        percorrem este ciclo em paralelo
-        (escopos allowed_write_globs disjuntos)
+        percorrem o ciclo em paralelo
+        (escopos allowed_write_globs disjuntos);
+        DOC é serializado por onda quando compartilha
+        spec.md/plan.md canônicos
     end note
 
     note right of INTEGRATE
@@ -544,13 +629,15 @@ stateDiagram-v2
 
 | Estado | Agente | Entra quando | Sai para |
 |---|---|---|---|
-| `PRECHECK` | Orquestrador | Início / retomada | Ciclo (baseline verde + spec_kit WRITTEN + OK) ou volta a si |
-| `RED` | `test-author` | Início da tarefa; bloqueio de origem TESTE; retorno de `GREEN` (critério sem teste), `DOC` (contrato aprovado) ou `VALIDATE` (FAIL origem TESTE) | `GREEN` só com falha por **asserção**; ou `VALIDATE` se testes passam de imediato e comportamento já implementado |
-| `GREEN` | `backend`/`frontend-developer` | RED válido ou bloqueio de origem CÓDIGO | `REFACTOR`; volta a `RED` se faltar teste |
-| `REFACTOR` | `refactorer` | GREEN verde | `REVIEW` (mesmo se `SKIPPED`) |
-| `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor | `DOC` (aprovado) ou `ROUTE_BLOCK` |
-| `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC/CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit` falhou em `VALIDATE` | `VALIDATE` (spec em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `BLOCKED` se contrato mudou e NÃO foi aprovado |
-| `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` falhar; rota por origem do FAIL |
+| `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures correspondentes aos gates)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures correspondentes, Spec Kit pendente ou sem OK exige nova execução ou decisão |
+| `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção** e matriz AC→teste válida; `REVIEW` se testes passam de imediato, comportamento já implementado e matriz válida; reexecute RED se faltar teste ou matriz |
+| `RED_REVISION` | `test-author` | Bloqueio de REVIEW ou FAIL de VALIDATE por origem CODIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
+| `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
+| `GREEN_FIX` | `backend`/`frontend-developer` | `RED_REVISION` com `revision_delta` validado | `REFACTOR` após teste de regressão verde e requisito corrigido; volta a `RED_REVISION` se faltar evidência |
+| `TOOLING_FIX` | `backend`/`frontend-developer` | FAIL de VALIDATE com `origin: TOOLING`, evidência do gate, `allowed_write_globs` cobrindo o alvo e escopo de configuração/ferramenta (sem arquivos de comportamento) | `REFACTOR` após corrigir o gate e registrar a suíte completa PASSOU; se o diff tocar produção/comportamento ou faltar suíte, `RED_REVISION`/`BLOCKED` |
+| `REVIEW` | `peer-reviewer` (≠ implementador) | Pós-refactor ou comportamento já implementado com fases GREEN/REFACTOR registradas como SKIPPED | `DOC` (aprovado) ou `ROUTE_BLOCK` |
+| `DOC` | Orquestrador | Review aprovado (ou direto) ou bloqueio de origem SPEC-CONTRATO (via `ROUTE_BLOCK`) ou gate `spec_kit` falhou em `VALIDATE`, ou gate `contract` com `gate_origins.contract: SPEC-CONTRATO` | `VALIDATE` (spec/contrato em disco e coerente); volta a `RED` se contrato mudou e foi aprovado; `contract` com origem `CODIGO` segue `RED_REVISION`/`GREEN_FIX`; `BLOCKED` se contrato mudou e NÃO foi aprovado |
+| `VALIDATE` | `validator` | Doc coerente | `DONE` (gates verdes); `DOC` se gate `spec_kit` falhar ou `contract` falhar com origem `SPEC-CONTRATO`; rota por `gate_origins` para demais origens |
 | `DONE` | Orquestrador | Todos os gates verdes | Commit da tarefa; encerra o ciclo |
 | `BLOCKED` | Orquestrador → Usuário | 3 tentativas ou mudança não aprovada | Escala; reentra em `RED` após decisão |
 | `INTEGRATE` | `integrator` | Todas as tarefas DONE | Commit de onda (verde) ou devolve ao ciclo |
@@ -558,7 +645,7 @@ stateDiagram-v2
 | `MERGE` | Orquestrador | Última onda concluída | `delivery: external` → SKIPPED (encerra sem perguntar); senão pergunta ao usuário: criar PR (sem auto-merge) / merge local (aviso se repo bootstrapped) / manter aberta (SKIPPED) |
 
 > **Notas de fidelidade ao fluxo:** (1) o limite de **3 tentativas** está nos rótulos `ROUTE_BLOCK`/`VALIDATE_GATES` porque o contador real é do orquestrador; (2) `REFACTOR` sempre transita para `REVIEW`, inclusive quando `SKIPPED` (estado registrado, nunca pulado em silêncio); (3) a re-entrada `INTEGRATE_CHECK --> CICLO_TAREFA` parte do **estado composto inteiro** — forma mais compatível com o renderizador do GitHub do que apontar para um sub-estado específico; (4) o gate `spec_kit` no `VALIDATE` devolve a `DOC`, não a um agente — porque a documentação é responsabilidade do orquestrador.
-> (5) `BLOCKED --> [*]` no diagrama marca a escalada ao usuário; a reentrada em `RED` após a decisão (tabela "Estado por estado") acontece como novo ingresso no ciclo — não como aresta do diagrama. (6) A aresta `RED_CHECK --> VALIDATE` cobre a exceção do passo 1: testes passam de imediato E o comportamento já está implementado.
+> (5) `BLOCKED --> [*]` no diagrama marca a escalada ao usuário; a reentrada em `RED` após a decisão (tabela "Estado por estado") acontece como novo ingresso no ciclo — não como aresta do diagrama. (6) A aresta `RED_CHECK --> REVIEW` cobre a exceção do passo 1: testes passam de imediato E o comportamento já está implementado.
 
 ---
 
@@ -596,8 +683,7 @@ Após todas as tarefas da onda em `DONE`: delegue ao `integrator` (lista de tare
 > veredito de cada um é só dele; item 6 = gates `lint` + `type-check`, item 8 =
 > `contract`, item 9 = `security`, item 11 = `git-sanity`). Os itens 5, 10 e 12 são
 > verificados pelo ORQUESTRADOR, fora do validator.
-
-Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → GREEN; teste fraco/ausente/adulterado → RED; bloqueio de design no review → GREEN/RED; **spec ausente/desatualizada → DOC**; divergência da spec → DOC (ou GREEN se o código está errado). **Não declare conclusão com gate vermelho.**
+Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido → RED; teste fraco/ausente/adulterado → RED; bloqueio de código no review ou VALIDATE → RED_REVISION para teste de regressão e depois GREEN_FIX; falha de ferramenta sem mudança comportamental → TOOLING_FIX, que reconfirma o gate antes/depois sem exigir RED; bloqueio de design no review → RED_REVISION ou RED conforme a origem; **spec ausente/desatualizada ou contrato divergente → DOC**; divergência da spec ...
 
 ---
 
