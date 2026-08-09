@@ -347,6 +347,21 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("nested-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps the outer flow redaction after an embedded PEM block", () => {
+    const result = runCapture([
+      "password: {",
+      "private_key: -----BEGIN PRIVATE KEY-----",
+      "base64-embedded",
+      "-----END PRIVATE KEY-----",
+      "other: second-secret",
+      "}",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("base64-embedded");
+    expect(result.stdout).not.toContain("second-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
   it("redacts annotated PEM headers", () => {
     const result = runCapture([
       "private_key: -----BEGIN PRIVATE KEY----- # note",
