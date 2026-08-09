@@ -172,6 +172,7 @@ redact() {
           continue
         }
         if (quote == "\047") {
+          if (ch == "\047" && i > 1 && i < length(s) && substr(s, i - 1, 1) ~ /[[:alnum:]]/ && substr(s, i + 1, 1) ~ /[[:alnum:]]/) continue
           if (ch == "\047" && !quote_escaped(s, i)) {
             if (substr(s, i + 1, 1) == "\047") i++
             else quote = ""

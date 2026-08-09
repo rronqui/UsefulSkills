@@ -188,15 +188,22 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
    Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
    legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline
    antes de continuar.
-   Se um objeto de tarefa legado tiver `gates.*` em `PASS`, `FAIL` ou `NA` mas
-   `gate_evidence` ausente ou incompleto, preserve o diagnóstico apenas como
-   histórico, redefina os dez `gates` para `pending`, limpe `gate_origins` e
-   `gate_evidence`, preserve a fase ativa e reabra a onda (`status: in_progress`,
-   `integration.status: pending`, `integration.evidence: ""`); se a fase anterior
-   era `VALIDATE`, `TOOLING_FIX` ou `DONE`, retome em `VALIDATE`. Nunca retome
-   `DONE` sem evidência por gate.
-   e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando
-   somente após a validação; se qualquer linha for inválida ou algum AC referenciado
+   Para `schema_version: "2.2"` também revalide `baseline.status` antes de retomar:
+   derive-o com as mesmas regras de `NOT_RUN`/`FAIL`/`PASS`, sem confiar em um
+   `PASS` persistido quando `tests` ou `build` estiverem `NOT_RUN` ou `NA` sem
+   `known_failures` com `reason` e `evidence` não vazios.
+   Se um objeto de tarefa legado tiver `phase: DONE` com algum gate diferente de
+   `PASS`/`NA` ou evidência inválida, ou tiver `gates.*` em `PASS`, `FAIL` ou `NA`
+   mas `gate_evidence` ausente, não-string, vazio ou incompleto, preserve o diagnóstico
+   apenas como histórico, redefina os dez `gates` para `pending`, limpe
+   `gate_origins` e `gate_evidence`, preserve a fase ativa e reabra a onda
+   (`status: in_progress`, `integration.status: pending`, `integration.evidence: ""`);
+   se a fase anterior era `VALIDATE`, `TOOLING_FIX` ou `DONE`, retome em `VALIDATE`.
+   Nunca retome `DONE` sem evidência por gate.
+   Ao migrar `red.criteria_to_tests` legado em formato texto, valide cada linha
+   no formato `arquivo::teste`, remova entradas vazias e converta-a para o objeto
+   `{ "AC-NNN": ["arquivo::teste", ...] }`, acumulando somente após a validação;
+   se qualquer linha for inválida ou algum AC referenciado
    não tiver entrada, a entrada inválida exige nova execução RED: marque a tarefa como
    `phase: RED` e `red.status: PENDING`, limpe `red.failing_tests`,
    `red.failure_reason_expected`, e redefina `red.criteria_to_tests` como `{}`;
@@ -277,7 +284,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem justificativa, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e `override_approved`. Se vermelha, **pare e reporte**; só avance com autorização explícita para este resultado, registrada em `override_approved`, e apenas se `known_failures` identificar os gates/erros aprovados.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
@@ -611,7 +618,7 @@ stateDiagram-v2
 |---|---|---|---|
 | `PRECHECK` | Orquestrador | Início / retomada | Ciclo com `(baseline.status: PASS ou FAIL com override_approved e known_failures correspondentes aos gates)` e `spec_kit WRITTEN` e OK; `NOT_RUN`/FAIL sem override/known_failures correspondentes, Spec Kit pendente ou sem OK exige nova execução ou decisão |
 | `RED` | `test-author` | Início da tarefa; bloqueio TESTE; retorno de `GREEN_CHECK`, `DOC` (contrato aprovado) ou `VALIDATE` (FAIL de origem TESTE) | `GREEN` só com falha por **asserção** e matriz AC→teste válida; `REVIEW` se testes passam de imediato, comportamento já implementado e matriz válida; reexecute RED se faltar teste ou matriz |
-| `RED_REVISION` | `test-author` | Bloqueio de REVIEW ou FAIL de VALIDATE por origem CÓDIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
+| `RED_REVISION` | `test-author` | Bloqueio de REVIEW ou FAIL de VALIDATE por origem CODIGO | `GREEN_FIX` só com teste de regressão falhando por **asserção** |
 | `GREEN` | `backend`/`frontend-developer` | RED válido | `REFACTOR`; volta a `RED` se faltar teste |
 | `GREEN_FIX` | `backend`/`frontend-developer` | `RED_REVISION` com `revision_delta` validado | `REFACTOR` após teste de regressão verde e requisito corrigido; volta a `RED_REVISION` se faltar evidência |
 | `TOOLING_FIX` | `backend`/`frontend-developer` | FAIL de VALIDATE com `origin: TOOLING`, evidência do gate, `allowed_write_globs` cobrindo o alvo e escopo de configuração/ferramenta (sem arquivos de comportamento) | `REFACTOR` após corrigir o gate e registrar a suíte completa PASSOU; se o diff tocar produção/comportamento ou faltar suíte, `RED_REVISION`/`BLOCKED` |

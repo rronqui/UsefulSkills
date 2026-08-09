@@ -373,6 +373,23 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("trailing-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("keeps flow redaction across contraction apostrophes", () => {
+    const result = runCapture([
+      "password: {",
+      "  value: 'it's }",
+      "  still-secret'",
+      "  normal: leaked",
+      "}",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("leaked");
+  });
+  it("preserves escaped ERROR_MSG wire framing", () => {
+    const result = runCapture(["password: first-secret", String.raw`path: C:\temp\secret`]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(String.raw`ERROR_MSG=<REDACTED>\npath: C:\\temp\\secret`);
+    expect(result.stdout.match(/^ERROR_MSG=.*$/m)?.[0]).not.toContain("\n");
+  });
   it("keeps outer redaction for an inline PEM block", () => {
     const result = runCapture([
       "password: { private_key: -----BEGIN PRIVATE KEY-----",
