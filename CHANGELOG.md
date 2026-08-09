@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/rronqui/UsefulSkills/compare/v0.2.5...v0.2.6) (2026-08-09)
+
+
+### Bug Fixes
+
+* corrigir achados P2 do fluxo Ship ([#23](https://github.com/rronqui/UsefulSkills/issues/23)) ([e0e7f40](https://github.com/rronqui/UsefulSkills/commit/e0e7f408e5b3ff53bcc53afa4e13b9921492765c))
+
 ## [0.2.5](https://github.com/rronqui/UsefulSkills/compare/v0.2.4...v0.2.5) (2026-08-09)
 
 
