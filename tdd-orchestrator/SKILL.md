@@ -88,7 +88,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 | `refactorer` | BLOQUEADO | `phase: BLOCKED` | Escale ao usuário |
 | `peer-reviewer` | APROVADO | (avance para DOC) | Registre veredicto |
 | `peer-reviewer` | BLOQUEADO | (ROUTE_BLOCK) | Roteie por origem + incremente `attempt` |
-| `validator` | PASSOU | `gates.*: PASS|NA` com `gate_evidence.<gate>` e, para `NA`, justificativa persistidas | Avance para DONE somente quando cada gate tiver status e evidência/justificativa válidos |
+| `validator` | PASSOU | `gates.*: PASS ou NA` com `gate_evidence.<gate>` e, para `NA`, justificativa persistidas | Avance para DONE somente quando cada gate tiver status e evidência/justificativa válidos |
 | `validator` | FALHOU | `gates.*: FAIL` com `origin` por gate e `gate_evidence.<gate>` persistidos | Roteie por `origin` do FAIL (`TOOLING` vai a `TOOLING_FIX`); ausência de `origin` ou evidência torna o output inválido e exige reexecução |
 | `integrator` | CONCLUÍDO | `wave.integration: PASS` | Commit de onda |
 | `integrator` | BLOQUEADO | `wave.integration: FAIL` | Devolva à tarefa/agente responsável |
@@ -168,11 +168,12 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON. **Verifique se a branch atual é `repo.branch_work`** — se não for, faça `git checkout <branch_work>` antes de continuar. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
    Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
-   preencha `baseline.status` ausente como `NOT_RUN` se qualquer gate estiver `NOT_RUN`
+   derive/recalcule `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN`
    ou for `NA` sem uma entrada correspondente em `known_failures` com `reason` e
-   `evidence` não vazios; caso contrário, como `FAIL` se algum gate for `FAIL`,
+   `evidence` não vazios; caso contrário, `FAIL` se algum gate for `FAIL`,
    `PASS` se cada gate for `PASS` ou `NA` com justificativa correspondente e não vazia,
-   ou `NOT_RUN` nos demais casos.
+   ou `NOT_RUN` nos demais casos. Não preserve um `baseline.status` anterior sem
+   validar novamente os gates, justificativas e evidências.
    Inicialize campos novos ausentes (`baseline.override_approved: false`,
    `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
    `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`;
@@ -435,6 +436,10 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 > `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected`; a nova
 > execução deve registrar uma falha de asserção, adicionar um `arquivo::teste` ausente
 > do mapa-base e produzir evidência própria antes de `GREEN_FIX`.
+> Se a tentativa `RED_REVISION` for inválida ou não demonstrar a falha exigida,
+> descarte o mapa candidato, restaure `red.criteria_to_tests` a partir de
+> `red.revision_baseline_tests`, limpe `red.revision_delta` e não substitua o
+> mapa-base até uma nova tentativa válida.
 > Ao iniciar `TOOLING_FIX`, incremente `attempt` e limpe `green.tooling_evidence` e
 > `green.tooling_suite_evidence`. Só aceite os campos preenchidos pelo resultado dessa
 > execução; evidência de uma tentativa anterior não autoriza a transição.
