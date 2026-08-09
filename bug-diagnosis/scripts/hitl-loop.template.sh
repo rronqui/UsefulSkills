@@ -236,24 +236,58 @@ redact() {
       }
       return 0
     }
-    function single_unclosed_text(s, i, count) {
+    function single_unclosed_text(s, i, ch, quote, count, prev, nxt) {
+      quote = ""
       count = 0
       for (i = 1; i <= length(s); i++) {
-        if (substr(s, i, 1) != "\047" || quote_escaped(s, i)) continue
-        if ((i > 1 && substr(s, i - 1, 1) ~ /[[:alnum:]]/) && (i < length(s) && substr(s, i + 1, 1) ~ /[[:alnum:]]/) ) continue
-        if (substr(s, i + 1, 1) == "\047") { i++; continue }
+        ch = substr(s, i, 1)
+        if (quote == "\"") {
+          if (ch == "\"" && !quote_escaped(s, i)) quote = ""
+          continue
+        }
+        if (quote == "\047") {
+          if (ch == "\047" && !quote_escaped(s, i)) {
+            prev = (i > 1) ? substr(s, i - 1, 1) : ""
+            nxt = (i < length(s)) ? substr(s, i + 1, 1) : ""
+            if (prev ~ /[[:alnum:]]/ && nxt ~ /[[:alnum:]]/) continue
+            if (substr(s, i + 1, 1) == "\047") i++
+            else { quote = ""; count++ }
+          }
+          continue
+        }
+        if (ch == "#") break
+        if (ch == "\"") { quote = "\""; continue }
+        if (ch != "\047" || quote_escaped(s, i)) continue
+        prev = (i > 1) ? substr(s, i - 1, 1) : ""
+        nxt = (i < length(s)) ? substr(s, i + 1, 1) : ""
+        if (prev ~ /[[:alnum:]]/ && nxt ~ /[[:alnum:]]/) continue
+        if (nxt == "\047") { i++; continue }
+        quote = "\047"
         count++
       }
       return (count % 2) == 1
     }
-    function double_unclosed_text(s, rest, pos, count) {
-      rest = s
-      count = 0
-      while ((pos = unescaped_double(rest))) {
-        count++
-        rest = substr(rest, pos + 1)
+    function double_unclosed_text(s, i, ch, quote) {
+      quote = ""
+      for (i = 1; i <= length(s); i++) {
+        ch = substr(s, i, 1)
+        if (quote == "\047") {
+          if (ch == "\047" && !quote_escaped(s, i)) quote = ""
+          continue
+        }
+        if (quote == "\"") {
+          if (ch == "\"" && !quote_escaped(s, i)) quote = ""
+          continue
+        }
+        if (ch == "#") break
+        if (ch == "\047" && !quote_escaped(s, i)) {
+          if (i > 1 && i < length(s) && substr(s, i - 1, 1) ~ /[[:alnum:]]/ && substr(s, i + 1, 1) ~ /[[:alnum:]]/) continue
+          quote = "\047"
+          continue
+        }
+        if (ch == "\"" && !quote_escaped(s, i)) quote = "\""
       }
-      return (count % 2) == 1
+      return quote == "\""
     }
     function single_closed(s, i, start, count) {
       start = assignment_start(s)
