@@ -292,13 +292,6 @@ redact() {
       lower = tolower($0)
       if (pending == 2) {
         print "<REDACTED>"
-        if (flow_depth > 0 && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
-          here_quote = (lower ~ /@"/) ? "\"" : "\047"
-          here_parent_depth = flow_depth
-          quote_open = ""
-          pending = 4
-          next
-        }
         scan = $0
         if (quote_open == "\"") {
           quote_pos = unescaped_double(scan)
@@ -322,6 +315,13 @@ redact() {
         if (flow_parens) {
           flow_depth += gsub(/\(/, "", scan)
           flow_depth -= gsub(/\)/, "", scan)
+        }
+        if (flow_depth > 0 && (lower ~ key || lower ~ bare_key || lower ~ bracket_key || lower ~ quoted_key) && lower ~ /[=:][[:space:]]*@["\047][[:space:]]*$/) {
+          here_quote = (lower ~ /@"/) ? "\"" : "\047"
+          here_parent_depth = flow_depth
+          quote_open = ""
+          pending = 4
+          next
         }
         if (flow_depth <= 0) {
           pending = (quote_open == "") ? 0 : 6
