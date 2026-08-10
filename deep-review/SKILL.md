@@ -196,9 +196,12 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
      usa somente o contexto local declarado para branch/base, não commitadas, commit ou
      custom.
 3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
-4. Registro de achados e veredito via seções incrementais de `yield`
-   (`type: ["findings"]`, `type: ["overall_correctness"]`, `type: ["explanation"]`,
-   `type: ["confidence"]`); jamais uma ferramenta separada de finding.
+4. Registro de achados, identidade e veredito via seções incrementais de `yield`
+   (`type: ["findings"]` quando houver achados; `type: ["agent"]`,
+   `type: ["status"]`, `type: ["reviewed_revision"]`,
+   `type: ["overall_correctness"]`, `type: ["explanation"]` e
+   `type: ["confidence"]`); cada seção escalar recebe somente seu próprio
+   `result.data`, jamais uma ferramenta separada de finding.
 
 Dispare todos em paralelo na mesma chamada; não serialize.
 
@@ -217,9 +220,12 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
    patch fornecido ou o comando indicado no assignment. Em Custom sem diff, leia as
    instruções e o workspace sem exigir patch.
 2. Ler os arquivos modificados ou atribuídos para contexto completo;
-3. Registrar cada achado com `yield` incremental `type: ["findings"]`;
-4. Registrar o veredito (`overall_correctness`, `explanation`, `confidence`) com
-   seções incrementais e parar — a finalização em idle monta o resultado.
+3. Registrar cada achado com `yield` incremental `type: ["findings"]` quando houver
+   achados;
+4. Registrar cada campo de identidade e veredito (`agent`, `status`,
+   `reviewed_revision`, `overall_correctness`, `explanation`, `confidence`) em uma
+   seção incremental escalar separada e parar — a finalização em idle monta o
+   resultado.
 
 **Critérios — um achado só é reportado se TODOS valerem**:
 - **Impacto provável**: apontar caminhos de código concretamente afetados (sem especulação);
@@ -290,11 +296,14 @@ Todos os revisores atribuídos devem retornar um resultado estruturado completo.
 esperado ausente ou faltante, timeout, resultado sem veredito, schema inválido, status
 ausente/diferente de `VALID`, `reviewed_revision` ausente/divergente ou finding
 incompleto produz `BLOCKED`; o agregador preserva o diagnóstico de cada falha e nunca
-infere `correct` ou aprovação por falta de dados. Em particular, revisor esperado
-ausente => `BLOCKED`, resultado sem veredito => `BLOCKED`, schema inválido => `BLOCKED`
-e finding incompleto => `BLOCKED`.
-Revisor esperado ausente => BLOCKED; essa decisão preserva o diagnóstico sem inferir aprovação.
-Resultado sem veredito => BLOCKED; schema inválido => BLOCKED; finding incompleto => BLOCKED.
+infere `correct` ou aprovação por falta de dados.
+O schema nativo do OMP trata `findings` como uma coleção incremental opcional:
+quando não há achados, a seção pode estar ausente. O dispatcher deve normalizar
+essa ausência para `findings: []` antes da validação do resultado normalizado; uma
+seção presente, mas incompleta ou inválida, continua produzindo `BLOCKED`.
+Em particular, revisor esperado ausente => `BLOCKED`, resultado sem veredito =>
+`BLOCKED`, schema inválido => `BLOCKED` e finding incompleto => `BLOCKED`.
+Resultado sem veredito => `BLOCKED`; schema inválido => `BLOCKED`; finding incompleto => `BLOCKED`.
 Nunca inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 Não inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 

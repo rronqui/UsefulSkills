@@ -264,6 +264,43 @@ function expectSkillRule(label, expression) {
 }
 
 describe("deep-review — protocolo normativo T-002", () => {
+  it("AC-005: agente deep-reviewer possui frontmatter fechado e corpo separado", () => {
+    const lines = reviewer.split(/\r?\n/);
+    const closingDelimiter = lines.indexOf("---", 1);
+
+    expect(lines[0]).toBe("---");
+    expect(closingDelimiter).toBeGreaterThan(1);
+    expect(lines.slice(closingDelimiter + 1).join("\n")).toMatch(/<procedure>/);
+  });
+  it("AC-011: findings usa schema opcional incremental nos dois agentes normalizados", () => {
+    for (const content of [reviewer, fallbackReviewer]) {
+      const lines = content.split(/\r?\n/);
+      const optionalProperties = lines.findIndex((line) => line === "  optionalProperties:");
+      const findings = lines.findIndex((line) => line === "    findings:");
+
+      expect(optionalProperties).toBeGreaterThan(-1);
+      expect(findings).toBeGreaterThan(optionalProperties);
+    }
+    expectSkillRule(
+      "ausência nativa de findings é normalizada",
+      /schema nativo[\s\S]{0,300}normalizar[\s\S]{0,120}findings:\s*\[\]/i,
+    );
+
+  });
+  it("AC-012: yield de identidade e veredito usa seções escalares separadas", () => {
+    expect(reviewer).toMatch(/one scalar value per call/i);
+    expect(reviewer).toMatch(/Never combine section names in one `type` array/i);
+    expect(reviewer).toMatch(/result\.data[\s\S]{0,100}complete result object/i);
+    for (const field of ["agent", "status", "reviewed_revision", "overall_correctness", "explanation", "confidence"]) {
+      expect(reviewer).toMatch(new RegExp(`type: \\["${field}"\\]`));
+    }
+    expect(fallbackReviewer).toMatch(/protocol_mode[\s\S]{0,120}DEEP_REVIEW_FALLBACK/i);
+    expect(fallbackReviewer).toMatch(/cada campo de identidade\/veredito[\s\S]{0,180}yield/i);
+    expect(skill).toMatch(/type: \["agent"\][\s\S]{0,180}type: \["status"\]/i);
+  });
+
+
+
   it("AC-006: bloqueia apenas findings válidos P0/P1 e retém P2/P3 com localização e contagem", () => {
     expect(reviewerResultIsComplete(validRound)).toBe(true);
     expect(validRound.findings.map(({ priority }) => priority)).toEqual([0, 1, 2, 3]);

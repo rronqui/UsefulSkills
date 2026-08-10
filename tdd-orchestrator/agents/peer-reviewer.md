@@ -38,9 +38,10 @@ output:
       metadata:
         description: Verdict confidence (0.0-1.0); required
       type: number
+  optionalProperties:
     findings:
       metadata:
-        description: Required array; use [] when no findings
+        description: Optional incremental findings; the dispatcher normalizes absence to [] when no findings exist
       elements:
         properties:
           title:
@@ -116,9 +117,15 @@ APROVADO/BLOQUEADO. A saída válida deve declarar explicitamente:
 - `overall_correctness`: `correct` ou `incorrect`, apenas como diagnóstico;
 - `explanation`: resumo em texto simples de 1–3 frases, obrigatório;
 - `confidence`: número entre 0.0 e 1.0, obrigatório;
-- `findings`: array obrigatório (use `[]` se não houver achados), em que cada item
-  exige `title`, `body`, `priority` inteira 0–3, `confidence` entre 0 e 1,
-  `file_path` não vazio e `line_start`/`line_end` válidos em no máximo 10 linhas.
+- `findings`: coleção incremental opcional; quando não houver achados, o adaptador
+  materializa `[]`; cada item emitido exige `title`, `body`, `priority` inteira 0–3,
+  `confidence` entre 0 e 1, `file_path` não vazio e `line_start`/`line_end` válidos
+  em no máximo 10 linhas.
+No fallback `DEEP_REVIEW_FALLBACK`, emita cada campo de identidade/veredito em
+uma seção `yield` separada, com `result.data` contendo somente o valor escalar;
+emita também `protocol_mode` com valor `"DEEP_REVIEW_FALLBACK"`; não combine nomes
+em `type` nem envie o objeto completo em uma seção escalar.
+
 
 O resultado malformado, incompleto, ausente, com revisão divergente ou sem
 `status: VALID` é inválido e o orquestrador deve retornar `BLOCKED`, preservando
