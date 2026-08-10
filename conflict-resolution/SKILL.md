@@ -138,18 +138,23 @@ e nunca a uma operação apenas planejada.
 Para `rebase`, aplique `git rebase --continue` e repita os checks após cada commit
 até não haver commits pendentes; somente depois faça a re-review final
 (`deep-review`) do estado terminal. O campo `resultingGitOperation` registra essa
-última continuação bem-sucedida; quando o rebase já terminou, não execute
-`git rebase --continue` novamente. Nunca faça a re-review antes de aplicar todos
-os commits pendentes. Para `merge`, depois desses checks obtenha a re-review final
-(`deep-review`) do snapshot resolvido e só prossiga com `git commit` se ela estiver
-`APPROVED`, `review.reviewed_revision` for igual a `resolved_revision`, sem
-blockers e com P0/P1 iguais a zero.
+última continuação bem-sucedida; quando o rebase já terminou, não execute `git rebase --continue`
+novamente. Nunca faça a re-review antes de aplicar todos os commits pendentes. Para
+`merge`, depois desses checks obtenha a re-review final (`deep-review`) do snapshot
+resolvido e só prossiga com `git commit` se ela estiver `APPROVED`,
+`review.reviewed_revision` for igual a `resolved_revision`, sem blockers e com P0/P1
+iguais a zero.
 No merge, `resolved_revision` identifica o snapshot resolvido e revisado antes do
 commit; `resultingGitOperation` é somente a evidência do comando `git commit`
 observado depois que o gate passou. Se a implementação persistir o SHA criado pelo
 commit, use um campo separado (`resulting_revision`); nunca sobrescreva
 `reviewed_revision`/`resolved_revision` com a revisão pós-commit nem trate essa
 mudança de metadado como motivo para executar a re-review novamente.
+Para que esse gate seja executável antes do commit, o dispatcher deve usar o modo
+`UNCOMMITTED` de `deep-review`, com `local_revision_context.revision` igual ao
+identificador/digest calculado do snapshot resolvido e com `staged`, `unstaged` e
+`untracked` capturados no mesmo instante. Não use `BRANCH_BASE` nesse ponto: ele
+revisaria a árvore anterior ao conflito e não o snapshot que será commitado.
 
 P2/P3 podem permanecer como achados documentados, mas **não bloqueiam** quando
 não houver P0/P1, hunk, check pendente ou divergência de snapshot. Qualquer P0/P1,

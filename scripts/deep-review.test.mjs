@@ -248,6 +248,37 @@ describe("deep-review — costura executável T-002", () => {
     expect(conflicting.status).toBe("BLOCKED");
     expect(conflicting.errors.join(" ")).toMatch(/sha|revision/i);
   });
+  it("AC-005: SHA herdado não pode substituir alias próprio ao fixar a revisão", () => {
+    const { validateRequest } = protocolApi();
+    const patchSource = Object.assign(Object.create({ sha: "stale-inherited-sha" }), {
+      kind: "gh-pr-diff",
+      head_sha: REVISION,
+      content: "diff --git a/src/inherited.mjs b/src/inherited.mjs\n+return safe;",
+    });
+    const checked = validateRequest(prRequest({
+      patch_source: patchSource,
+      consumer_context: { revision: "stale-inherited-sha", files: ["src/inherited.mjs"] },
+    }));
+    expect(checked.ok).toBe(false);
+    expect(checked.status).toBe("BLOCKED");
+    expect(checked.errors.join(" ")).toMatch(/revision|sha/i);
+  });
+  it("AC-006 regression: findings herdados não podem ser tratados como ausência de findings", () => {
+    const { validateReviewerResult } = protocolApi();
+    const inheritedFindings = reviewerResult("deep-reviewer");
+    delete inheritedFindings.findings;
+    Object.setPrototypeOf(inheritedFindings, { findings: [finding(0)] });
+
+    const checked = validateReviewerResult(inheritedFindings, {
+      agent: "deep-reviewer",
+      reviewed_revision: REVISION,
+      protocol_mode: "DEEP_REVIEW",
+    });
+
+    expect(checked.status).toBe("BLOCKED");
+    expect(checked.errors.join(" ")).toMatch(/findings.*own enumerable/i);
+  });
+
 
   it("AC-006: findings são objetos localizados, P0/P1 bloqueiam e P2/P3 permanecem retidos", () => {
     const { validateReviewerResult, aggregateReview } = protocolApi();

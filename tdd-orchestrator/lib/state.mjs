@@ -503,6 +503,7 @@ function validateProgressObject(progress, errors, options = {}) {
       }
     }
   }
+  let canonicalSpecRoot = "";
   if (checkKeys(progress.spec_kit, SPEC_KIT_KEYS, "progress.spec_kit", errors)) {
     validateStringFields(progress.spec_kit, ["spec", "plan", "tasks", "written_at", "mode"], "progress.spec_kit", errors);
     if (!SPEC_KIT_STATUSES.has(progress.spec_kit.status)) errors.push("progress.spec_kit.status: invalid enum");
@@ -512,15 +513,20 @@ function validateProgressObject(progress, errors, options = {}) {
       const planPath = String(progress.spec_kit.plan).replaceAll("\\", "/");
       const tasksPath = String(progress.spec_kit.tasks).replaceAll("\\", "/");
       if (!/\/spec\.md$/i.test(specPath)) errors.push("progress.spec_kit.spec: canonical spec.md path required");
-      if (!/\/plan\.md$/i.test(planPath)) errors.push("progress.spec_kit.plan: canonical plan.md path required");
-      if (!/\/tasks\.md$/i.test(tasksPath)) errors.push("progress.spec_kit.tasks: canonical tasks.md path required");
+      else canonicalSpecRoot = specPath.replace(/\/spec\.md$/i, "");
+      if (!/\/plan\.md$/i.test(planPath) || (canonicalSpecRoot && planPath !== `${canonicalSpecRoot}/plan.md`)) errors.push("progress.spec_kit.plan: canonical sibling plan.md path required");
+      if (!/\/tasks\.md$/i.test(tasksPath) || (canonicalSpecRoot && tasksPath !== `${canonicalSpecRoot}/tasks.md`)) errors.push("progress.spec_kit.tasks: canonical sibling tasks.md path required");
       if (!Number.isFinite(Date.parse(progress.spec_kit.written_at))) errors.push("progress.spec_kit.written_at: valid timestamp required");
     }
   }
   if (checkKeys(progress.contract, CONTRACT_KEYS, "progress.contract", errors)) {
     validateStringFields(progress.contract, ["file", "version", "status", "na_reason"], "progress.contract", errors);
-    if (!nonEmptyString(progress.contract.file) || !/\/contracts\/interface-contract\.md$/i.test(String(progress.contract.file).replaceAll("\\", "/"))) {
+    if (!CONTRACT_STATUSES.has(progress.contract.status)) errors.push("progress.contract.status: invalid enum");
+    const contractPath = String(progress.contract.file).replaceAll("\\", "/");
+    if (!nonEmptyString(progress.contract.file) || !/\/contracts\/interface-contract\.md$/i.test(contractPath)) {
       errors.push("progress.contract.file: canonical contracts/interface-contract.md path required");
+    } else if (canonicalSpecRoot && contractPath !== `${canonicalSpecRoot}/contracts/interface-contract.md`) {
+      errors.push("progress.contract.file: must be the Spec Kit contract for the same feature");
     }
     if (progress.contract.status === "NA" && !nonEmptyString(progress.contract.na_reason)) errors.push("progress.contract.na_reason: required when contract is NA");
   }
@@ -531,15 +537,12 @@ function validateProgressObject(progress, errors, options = {}) {
       ids.add(ac?.id);
     }
   }
-  if (!Array.isArray(progress.acceptance_criteria) || progress.acceptance_criteria.length === 0) errors.push("progress.acceptance_criteria: non-empty array required");
-  else progress.acceptance_criteria.forEach((ac, index) => {
-    if (!checkKeys(ac, AC_KEYS, `progress.acceptance_criteria[${index}]`, errors)) return;
-    if (!/^AC-\d{3}$/.test(ac.id) || !nonEmptyString(ac.desc) || !nonEmptyString(ac.source) || !Array.isArray(ac.tasks) || ac.tasks.length === 0 || ac.tasks.some((task) => !nonEmptyString(task)) || !ACCEPTANCE_STATUSES.has(ac.status)) errors.push(`progress.acceptance_criteria[${index}]: invalid acceptance criterion`);
-  });
   if (!Array.isArray(progress.waves) || progress.waves.length === 0) errors.push("progress.waves: non-empty array required");
   else progress.waves.forEach((wave, wi) => {
     const path = `progress.waves[${wi}]`;
     if (!checkKeys(wave, WAVE_KEYS, path, errors)) return;
+    if (!Number.isInteger(wave.wave) || wave.wave < 1) errors.push(`${path}.wave: positive integer required`);
+    if (!WAVE_STATUSES.has(wave.status)) errors.push(`${path}.status: invalid enum`);
     if (checkKeys(wave.integration, INTEGRATION_KEYS, `${path}.integration`, errors)) {
       if (!INTEGRATION_STATUSES.has(wave.integration.status)) errors.push(`${path}.integration.status: invalid enum`);
       if (!Number.isInteger(wave.integration.attempt) || wave.integration.attempt < 0 || wave.integration.attempt > 3) errors.push(`${path}.integration.attempt: non-negative integer capped at 3 required`);

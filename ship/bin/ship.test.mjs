@@ -479,7 +479,7 @@ describe("RED: deploy fail-closed e rollback observável", () => {
             callKind === "exec" && command === "git" && args[0] === "reset" && args[1] === "--hard" && args[2] === "old-head",
         ),
       ).toBe(true);
-      expect(calls.filter(({ kind: callKind, command }) => callKind === "spawn" && command === "stop-server")).toHaveLength(2);
+      expect(calls.filter(({ kind: callKind, command }) => callKind === "spawn" && command === "stop-server")).toHaveLength(1);
       expect(calls.filter(({ kind: callKind, command }) => callKind === "spawn" && command === "old-build")).toHaveLength(1);
       expect(calls.filter(({ kind: callKind, command }) => callKind === "spawn" && command === "old-start")).toHaveLength(1);
       expect(calls.filter(({ kind: callKind, command }) => callKind === "spawn" && command === "new-start")).toHaveLength(kind === "start" ? 1 : 0);
@@ -1004,7 +1004,7 @@ describe("T-001 guards e invariantes de release/deploy", () => {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });
-  it("AC-002: stopCommand não-zero sem dbPath restaura revisão e serviço antigos sem avançar o deploy", async () => {
+  it("AC-002: stopCommand não-zero sem dbPath bloqueia reset/start sem quiescência comprovada", async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "ship-stop-without-db-"));
     writeFileSync(join(tempRoot, "package.json"), JSON.stringify({ name: "fixture", version: "1.0.0" }));
     writeFileSync(
@@ -1057,14 +1057,14 @@ describe("T-001 guards e invariantes de release/deploy", () => {
       ).toBe(false);
       expect(calls.some(({ kind, command }) => kind === "spawn" && command === "new-build")).toBe(false);
       expect(calls.some(({ kind, command }) => kind === "spawn" && command === "start-server")).toBe(false);
-      expect(calls.some(({ kind, command }) => kind === "spawn" && command === "old-build")).toBe(true);
-      expect(calls.some(({ kind, command }) => kind === "spawn" && command === "old-start")).toBe(true);
+      expect(calls.some(({ kind, command }) => kind === "spawn" && command === "old-build")).toBe(false);
+      expect(calls.some(({ kind, command }) => kind === "spawn" && command === "old-start")).toBe(false);
       expect(
         calls.some(
           ({ kind, command, args }) => kind === "exec" && command === "git" && args[0] === "reset" && args[1] === "--hard" && args[2] === "head",
         ),
-      ).toBe(true);
-      expect(output).toMatch(/rollback/i);
+      ).toBe(false);
+      expect(output).toMatch(/quiescência|rollback/i);
     } finally {
       errorSpy.mockRestore();
       exitSpy.mockRestore();
@@ -1384,7 +1384,7 @@ describe("RED_REVISION: regressões de preflight e readiness", () => {
     }
   });
 
-  it("AC-002: stop interrompido após possível parada executa rollback e start antigo", async () => {
+  it("AC-002: stop interrompido sem quiescência comprovada bloqueia rollback e start antigo", async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "ship-stop-partial-"));
     const dataDir = join(tempRoot, "data");
     const dbPath = join(dataDir, "app.db");
@@ -1437,11 +1437,8 @@ describe("RED_REVISION: regressões de preflight e readiness", () => {
       await expect(runShip(["deploy"])).rejects.toThrow("__SHIP_EXIT_1__");
 
       expect(readFileSync(stoppedMarker, "utf8")).toBe("stopped");
-      expect(
-        calls.filter(({ kind, command }) => kind === "spawn" && command === "old-start").length,
-        "stop não determinístico deve deixar o serviço antigo iniciado",
-      ).toBeGreaterThanOrEqual(1);
-      expect(errorSpy.mock.calls.flat().join("\n")).toMatch(/rollback/i);
+      expect(calls.filter(({ kind, command }) => kind === "spawn" && command === "old-start")).toHaveLength(0);
+      expect(errorSpy.mock.calls.flat().join("\n")).toMatch(/quiescência|rollback/i);
     } finally {
       errorSpy.mockRestore();
       exitSpy.mockRestore();
@@ -1960,7 +1957,7 @@ describe("RED_REVISION: gaps adicionais de retry, deploy e readiness", () => {
   it.each([
     ["stop interrompido", { status: null, signal: "SIGTERM" }],
     ["stop não zero", { status: 1, signal: null }],
-  ])("AC-002: %s sem dbPath ainda restaura a revisão e reinicia o serviço antigo", async (_label, stopResult) => {
+  ])("AC-002: %s sem dbPath bloqueia reset/start sem quiescência comprovada", async (_label, stopResult) => {
     await mockShipConfig({
       dbPath: null,
       buildCommand: "old-build",
@@ -1980,9 +1977,9 @@ describe("RED_REVISION: gaps adicionais de retry, deploy e readiness", () => {
         ({ kind, command, args }) =>
           kind === "exec" && command === "git" && args[0] === "reset" && args[1] === "--hard" && args[2] === "old-head",
       );
-      expect(resetIndex).toBeGreaterThanOrEqual(0);
-      expect(calls.findIndex(({ kind, command }) => kind === "spawn" && command === "old-build")).toBeGreaterThan(resetIndex);
-      expect(calls.findIndex(({ kind, command }) => kind === "spawn" && command === "old-start")).toBeGreaterThan(resetIndex);
+      expect(resetIndex).toBe(-1);
+      expect(calls.findIndex(({ kind, command }) => kind === "spawn" && command === "old-build")).toBe(-1);
+      expect(calls.findIndex(({ kind, command }) => kind === "spawn" && command === "old-start")).toBe(-1);
     } finally {
       errorSpy.mockRestore();
       exitSpy.mockRestore();

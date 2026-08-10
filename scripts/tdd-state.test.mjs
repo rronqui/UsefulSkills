@@ -1370,6 +1370,24 @@ describe("T-003 — state migration and validation seams", () => {
       );
     }
   });
+  it("AC-008 regression — valida enums de contract/wave e paths Spec Kit do mesmo recurso", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const invalidContract = makeProgress();
+    invalidContract.contract.status = "UNKNOWN";
+    expectRejected(api.validateProgress(invalidContract), /contract\.status|enum/i);
+
+    const invalidWave = makeProgress();
+    invalidWave.waves[0].wave = 0;
+    invalidWave.waves[0].status = "UNKNOWN";
+    expectRejected(api.validateProgress(invalidWave), /waves\[0\].(?:wave|status)|enum|positive/i);
+
+    const mismatchedSpecKit = makeProgress();
+    mismatchedSpecKit.spec_kit.plan = "./specs/other-feature/plan.md";
+    expectRejected(api.validateProgress(mismatchedSpecKit), /Spec Kit|sibling|plan|canonical/i);
+  });
 
   it.each([
     ["known_failures nulo", null],

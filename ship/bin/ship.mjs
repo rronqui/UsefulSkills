@@ -536,6 +536,7 @@ function cmdNew(argv) {
   try {
     git(["switch", def]);
     git(["pull", "--ff-only"]);
+    requireVersionSources();
   } catch {
     restoreBranch();
     console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
@@ -717,20 +718,21 @@ function runRollbackCommand(failures, command, failureMessage) {
   }
 }
 
-function restoreStoppedDeployment(oldHead, oldCfg, activeCfg = oldCfg) {
+function restoreStoppedDeployment(oldHead, oldCfg, activeCfg = oldCfg, quiescenceConfirmed = false) {
   if (rollbackAlreadyAttempted) return;
   rollbackAlreadyAttempted = true;
   const failures = [];
-  const stopCommands = [...new Set([activeCfg?.stopCommand, oldCfg?.stopCommand].filter((command) => typeof command === "string" && command.trim()))];
-  let quiescenceConfirmed = stopCommands.length === 0;
-  for (const [index, command] of stopCommands.entries()) {
-    const stopLabel = index === 0 ? "stopCommand ativo" : "stopCommand da revisão anterior";
-    if (runRollbackCommand(failures, command, `não consegui parar o processo parcialmente iniciado (${stopLabel})`)) {
-      quiescenceConfirmed = true;
-      break;
+  if (!quiescenceConfirmed) {
+    const stopCommands = [...new Set([activeCfg?.stopCommand, oldCfg?.stopCommand].filter((command) => typeof command === "string" && command.trim()))];
+    for (const [index, command] of stopCommands.entries()) {
+      const stopLabel = index === 0 ? "stopCommand ativo" : "stopCommand da revisão anterior";
+      if (runRollbackCommand(failures, command, `não consegui parar o processo parcialmente iniciado (${stopLabel})`)) {
+        quiescenceConfirmed = true;
+        break;
+      }
     }
   }
-  if (activeCfg !== oldCfg && !quiescenceConfirmed) {
+  if (!quiescenceConfirmed) {
     failures.push("não consegui comprovar quiescência; reset/start da revisão anterior foram bloqueados");
     console.error(`rollback do deploy incompleto: ${failures.join("; ")}.`);
     return;
@@ -762,9 +764,10 @@ function restoreStoppedDeployment(oldHead, oldCfg, activeCfg = oldCfg) {
   }
 }
 
-function failAfterStoppedDeploy(stopped, _oldHead, _oldCfg, message) {
+function failAfterStoppedDeploy(stopped, oldHead, oldCfg, message, activeCfg = oldCfg, quiescenceConfirmed = false) {
   const error = new Error(message);
   error.rollbackRequired = Boolean(stopped);
+  error.rollbackArgs = [oldHead, oldCfg, activeCfg, quiescenceConfirmed];
   throw error;
 }
 
@@ -849,6 +852,7 @@ async function deploy() {
     process.exit(1);
   }
   let stopped = false;
+  let quiescenceConfirmed = false;
   if (cfg.stopCommand) {
     // A stop can partially terminate the service before returning non-zero or
     // throwing. Mark the boundary before invoking it so every failure is
@@ -861,6 +865,7 @@ async function deploy() {
         console.error(`Deploy cancelado: stopCommand falhou; operação fail-closed para não continuar em estado inseguro${cfg.dbPath ? " antes do snapshot" : ""}.`);
         process.exit(1);
       }
+      quiescenceConfirmed = true;
     } catch (err) {
       restoreStoppedDeployment(oldHead, oldCfg, cfg);
       console.error(`Deploy cancelado: stopCommand lançou exceção; operação fail-closed (${err?.message ?? err}).`);
@@ -874,10 +879,10 @@ async function deploy() {
     try {
       backupDest = performBackup(cfg, root);
     } catch (err) {
-      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup falhou: ${err instanceof Error ? err.message : String(err)}`);
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup falhou: ${err instanceof Error ? err.message : String(err)}`, cfg, quiescenceConfirmed);
     }
     if (backupDest === false) {
-      failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup não produziu um snapshot verificável.");
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup não produziu um snapshot verificável.", cfg, quiescenceConfirmed);
     }
     if (backupDest) console.log(`Backup: ${backupDest}`);
     else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
@@ -890,12 +895,14 @@ async function deploy() {
         oldHead,
         oldCfg,
         `git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`,
+        cfg,
+        quiescenceConfirmed,
       );
     }
     try {
       cfg = validateDeployConfig(readConfig());
     } catch (err) {
-      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `ship.config.json ficou inválido após o pull: ${err?.message ?? err}`);
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `ship.config.json ficou inválido após o pull: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
     }
     try {
       const versionsAfterPull = validateVersionSources();
@@ -906,6 +913,8 @@ async function deploy() {
         oldHead,
         oldCfg,
         `E_VERSION_SOURCE: ${err instanceof Error ? err.message : String(err)}`,
+        cfg,
+        quiescenceConfirmed,
       );
     }
     const postPullConfigChanged =
@@ -923,31 +932,35 @@ async function deploy() {
         oldHead,
         oldCfg,
         "Deploy cancelado: o serviço foi parado, mas a configuração pós-pull não tem startCommand.",
+        cfg,
+        quiescenceConfirmed,
       );
     }
     if (postPullConfigChanged && postPullQuiescenceChanged) {
       // A changed stop or snapshot boundary must be re-established with the
       // post-pull command. Mark stopped first: a partial stop is unsafe.
-      if (cfg.stopCommand) {
+      if (cfg.stopCommand && cfg.stopCommand !== oldCfg.stopCommand) {
+        quiescenceConfirmed = false;
         stopped = true;
         let postPullStop;
         try {
           postPullStop = spawnSync(cfg.stopCommand, { shell: true, cwd: root, stdio: "inherit" });
         } catch (err) {
-          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `stopCommand pós-pull lançou exceção: ${err?.message ?? err}`);
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `stopCommand pós-pull lançou exceção: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
         }
         if (postPullStop?.status !== 0) {
-          failAfterStoppedDeploy(stopped, oldHead, oldCfg, "stopCommand pós-pull falhou ao comprovar quiescência.");
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, "stopCommand pós-pull falhou ao comprovar quiescência.", cfg, quiescenceConfirmed);
         }
+        quiescenceConfirmed = true;
       }
       if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
         let postPullBackup;
         try {
           postPullBackup = performBackup(cfg, root);
         } catch (err) {
-          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup pós-pull falhou: ${err instanceof Error ? err.message : String(err)}`);
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup pós-pull falhou: ${err instanceof Error ? err.message : String(err)}`, cfg, quiescenceConfirmed);
         }
-        if (postPullBackup === false) failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup pós-pull não produziu um snapshot verificável.");
+        if (postPullBackup === false) failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup pós-pull não produziu um snapshot verificável.", cfg, quiescenceConfirmed);
         if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
         else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
       }
@@ -961,7 +974,7 @@ async function deploy() {
         .map((file) => file.replace(/\r$/, "").replaceAll("\\", "/"))
         .filter(Boolean);
     } catch (err) {
-      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Leitura do diff falhou: ${err?.message ?? err}`);
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Leitura do diff falhou: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
     }
     const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
     const hits = watch.filter((watched) => {
@@ -988,7 +1001,7 @@ async function deploy() {
       await checkServedVersion(cfg, expectedVersion);
     }
   } catch (err) {
-    if (stopped) restoreStoppedDeployment(oldHead, oldCfg, cfg);
+    if (stopped) restoreStoppedDeployment(...(err?.rollbackArgs ?? [oldHead, oldCfg, cfg, quiescenceConfirmed]));
     console.error(`Deploy falhou: ${err?.message ?? err}`);
     process.exit(1);
   }

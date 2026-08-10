@@ -168,7 +168,7 @@ function validateStringArray(value, name, errors, { allowEmpty = false } = {}) {
 }
 function patchSha(patch) {
   for (const key of ["sha", "head_sha", "head-sha"]) {
-    if (nonEmptyString(patch[key])) return patch[key];
+    if (hasOwn(patch, key) && Object.prototype.propertyIsEnumerable.call(patch, key) && nonEmptyString(patch[key])) return patch[key];
   }
   return undefined;
 }
@@ -209,7 +209,10 @@ function validatePatchSource(patch, repository, pullRequest, errors) {
 
   const suppliedShas = [];
   for (const key of ["sha", "head_sha", "head-sha"]) {
-    if (!hasOwn(patch, key)) continue;
+    if (!hasOwn(patch, key) || !Object.prototype.propertyIsEnumerable.call(patch, key)) {
+      if (hasOwn(patch, key)) errors.push(`patch_source.${key} must be an own enumerable property`);
+      continue;
+    }
     if (!nonEmptyString(patch[key])) {
       errors.push(`patch_source.${key} must be a non-empty string`);
     } else {
@@ -400,6 +403,8 @@ function validateReviewerResult(result, expected) {
   if (!["correct", "incorrect"].includes(result.overall_correctness)) {
     errors.push("overall_correctness must be correct or incorrect");
   }
+  const findingsInherited = !hasOwn(result, "findings") && "findings" in result;
+  if (findingsInherited) errors.push("reviewer result.findings must be an own enumerable property");
   const findings = hasOwn(result, "findings") ? result.findings : [];
   if (!Array.isArray(findings)) {
     errors.push("findings must be an array");

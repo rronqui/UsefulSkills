@@ -58,7 +58,7 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
 | Comando | Efeito |
 |---|---|
-| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default atualizada |
+| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos antes dos efeitos e novamente após atualizar a default; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default validada |
 | `bin/ship.mjs ship "descrição"` | Valida fontes de versão e pré-requisitos; depois faz commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR com exatamente um `Closes #N` canônico, auto-merge squash; `--body-file <arquivo>` valida todos os marcadores `Closes #N` contra a issue da branch antes de qualquer commit/push/PR e, em PR existente, faz retry body-only sem exigir commit |
 | `bin/ship.mjs deploy` | Valida configuração/comandos, `versionCheckUnit` e fontes SemVer antes de qualquer efeito; também revalida as fontes e a unidade após o pull antes do build novo, preservando `build: NA` com reason/evidence quando aplicável. Falha após `stopCommand` aciona o rollback idempotente descrito a seguir. |
 
@@ -215,13 +215,16 @@ O deploy separa validação de efeitos em duas fronteiras:
 
    Se o PR entrar em conflito com a base antes do merge: na branch do PR rode
    `git fetch origin` e depois `git merge origin/<default>`, resolva cada hunk
-   seguindo `skill://conflict-resolution`; rode os checks aplicáveis;
-   obtenha um veredito válido e revisão final (re-review) aprovada sobre o
-   snapshot resolvido; somente então execute
-   `git commit` e dê push. Sem veredito válido, a publicação do PR fica bloqueada;
-   um finding P0/P1, revisão ausente ou snapshot divergente mantém o merge
-   bloqueado e retorna o fluxo à triagem; o auto-merge só retoma
-   após CI verde.
+   seguindo `skill://conflict-resolution`; rode os checks aplicáveis e calcule o
+   identificador/digest do snapshot resolvido. Para a re-review anterior ao commit,
+   use `deep-review` em modo `UNCOMMITTED`, capturando no mesmo instante `staged`,
+   `unstaged` e `untracked` em `local_revision_context` e fixando sua `revision`
+   ao identificador do snapshot; não use `BRANCH_BASE`, que revisaria a árvore
+   anterior ao conflito. Só então obtenha veredito válido e revisão final aprovada
+   sobre o snapshot resolvido, e execute `git commit` e push.
+   Sem veredito válido, a publicação do PR fica bloqueada; um finding P0/P1,
+   revisão ausente ou snapshot divergente mantém o merge bloqueado e retorna o
+   fluxo à triagem; o auto-merge só retoma após CI verde.
 6. **Release**: NÃO mergue automaticamente o PR de release do release-please. Quando
    o usuário quiser lançar: `gh pr merge <nº do PR de release> --squash` e aguarde a
    tag.
