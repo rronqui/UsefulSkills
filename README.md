@@ -32,11 +32,12 @@ arquivo fora do inventário (7 skills + 9 agentes).
 - `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos.
 - `tdd-orchestrator`: nenhum binário externo obrigatório além de git/build do projeto; requer os 8 agentes de `tdd-orchestrator/agents/` disponíveis ao runtime em projeto (`./.omp/agents/`) ou usuário (`~/.omp/agent/agents/`) — projeto vence usuário (o orquestrador verifica e para se faltar algum).
 - `alignment`, `bug-diagnosis` e `conflict-resolution` são adaptações (traduzidas e sem as dependências do ecossistema original) das skills `grilling`, `diagnosing-bugs` e `resolving-merge-conflicts` de github.com/mattpocock/skills (MIT).
-- Os 7 agentes com modelo fixado (test-author, backend-developer, frontend-developer,
-  refactorer, validator, integrator, deep-reviewer) usam `model: openai-codex/gpt-5.6-luna, @slow` —
-  primário com fallback para o role `@slow` (remapeável sem editar arquivos). peer-reviewer e
-  spec-kit-author não declaram modelo e herdam o da sessão pai. Override global sem tocar nos
-  agentes: `task.agentModelOverrides` no config do omp.
+- Os 9 agentes com modelo fixado (test-author, backend-developer, frontend-developer,
+  refactorer, validator, integrator, peer-reviewer, spec-kit-author, deep-reviewer)
+  usam `model: openai-codex/gpt-5.6-luna, @slow` — primário com fallback para o
+  role `@slow` (remapável sem editar arquivos). Override global sem tocar nos
+  agentes:
+  `task.agentModelOverrides` no config do omp.
 
 ## Política de releases
 
