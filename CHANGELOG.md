@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.7](https://github.com/rronqui/UsefulSkills/compare/v0.2.6...v0.2.7) (2026-08-10)
+
+
+### Bug Fixes
+
+* habilitar scouts no validator ([#25](https://github.com/rronqui/UsefulSkills/issues/25)) ([33dd66b](https://github.com/rronqui/UsefulSkills/commit/33dd66b6529757157f282a4f70692f3973707a55))
+
 ## [0.2.6](https://github.com/rronqui/UsefulSkills/compare/v0.2.5...v0.2.6) (2026-08-09)
 
 
