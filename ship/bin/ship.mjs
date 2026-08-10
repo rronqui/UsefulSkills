@@ -536,7 +536,7 @@ function cmdNew(argv) {
   try {
     git(["switch", def]);
     git(["pull", "--ff-only"]);
-    requireVersionSources();
+    validateVersionSources();
   } catch {
     restoreBranch();
     console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);

@@ -153,6 +153,18 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason}; ${awkGateReason})`, () => 
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts camel-case sensitive assignments before reporting the trace", () => {
+    const result = runCapture([
+      "dbPassword=fixture-secret",
+      "clientSecret=client-secret",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("fixture-secret");
+    expect(result.stdout).not.toContain("client-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
   it("redacts indented continuation after a plain sensitive scalar", () => {
     const result = runCapture([
       "password: first-secret",

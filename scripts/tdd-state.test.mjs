@@ -958,6 +958,56 @@ describe("T-003 — state migration and validation seams", () => {
     ));
     expectRejected(api.validateProgress(progress), /AC-009|status|final|VALIDATED/i);
   });
+  it("AC-009 regression — acceptance criteria raiz exige schema completo e não aceita null", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const missingCriteria = makeProgress();
+    missingCriteria.acceptance_criteria = null;
+    expectRejected(api.validateProgress(missingCriteria), /acceptance_criteria.*non-empty/i);
+    expectRejected(api.validateProgress(makeProgress({
+      acceptance_criteria: [{ id: "AC-008" }],
+    })), /acceptance_criteria.*(missing|required|desc|source|tasks|status)/i);
+  });
+
+  it("AC-008 regression — onda completed exige integração PASS comprovada", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "completed",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [makeTask()],
+      }],
+    })), /completed.*integration|integration.*PASS/i);
+  });
+
+  it("AC-010 regression — fase RED com PASS exige falha de asserção", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [makeTask({
+          phase: "RED",
+          red: {
+            status: "PASS",
+            failing_tests: [],
+            failure_reason_expected: false,
+          },
+        })],
+      }],
+    })), /failure_reason_expected|assertion|RED/i);
+  });
+
 
   it("AC-009 regression — review APPROVED da tarefa precisa ser independente", async () => {
     const loaded = await loadStateApi();

@@ -387,7 +387,8 @@ function validateRed(task, path, errors, { allowLegacyPendingReview = false } = 
     && task.refactor?.status === "PENDING"
     && task.review?.status === "PENDING";
   const postRedProofRequired = !legacyPendingReview && RED_COMPLETE_PHASES.has(task.phase);
-  if (postRedProofRequired && task.implemented_by !== "existing-code" && !isNormativeTask(task)) {
+  const redProofRequired = postRedProofRequired || (task.phase === "RED" && task.red.status === "PASS");
+  if (redProofRequired && task.implemented_by !== "existing-code" && !isNormativeTask(task)) {
     if (task.red.status !== "PASS") errors.push(`${path}.red: expected PASS before ${task.phase}`);
     if (task.red.failure_reason_expected !== true) errors.push(`${path}.red.failure_reason_expected: expected assertion failure required for RED`);
     if (!Array.isArray(task.red.failing_tests) || task.red.failing_tests.length === 0) errors.push(`${path}.red.failing_tests: expected assertion test required`);
@@ -461,6 +462,43 @@ function validateTask(task, path, errors, options = {}) {
   if (task.phase === "BLOCKED" && Array.isArray(task.blockers) && task.blockers.length === 0) errors.push(`${path}: BLOCKED task requires blocker diagnosis`);
   if (task.attempt >= 3 && task.phase !== "BLOCKED") errors.push(`${path}: attempt cap requires BLOCKED phase`);
 }
+function validateAcceptanceCriteria(criteria, canonicalSpecRoot, errors) {
+  if (!Array.isArray(criteria) || criteria.length === 0) {
+    errors.push("progress.acceptance_criteria: non-empty array required");
+    return;
+  }
+  const ids = new Set();
+  criteria.forEach((ac, index) => {
+    const path = `progress.acceptance_criteria[${index}]`;
+    if (!checkKeys(ac, AC_KEYS, path, errors)) return;
+    if (!/^AC-\d{3}$/.test(ac.id)) errors.push(`${path}.id: invalid AC id`);
+    if (ids.has(ac.id)) errors.push(`progress.acceptance_criteria: duplicate ${ac.id}`);
+    ids.add(ac.id);
+    if (!nonEmptyString(ac.desc)) errors.push(`${path}.desc: non-empty string required`);
+    const source = typeof ac.source === "string" ? ac.source.replaceAll("\\", "/") : "";
+    if (!/^\.\/specs\/[^/]+\/spec\.md#\S+$/i.test(source)) {
+      errors.push(`${path}.source: canonical Spec Kit spec reference required`);
+    } else if (canonicalSpecRoot && source.slice(0, source.indexOf("#")) !== `${canonicalSpecRoot}/spec.md`) {
+      errors.push(`${path}.source: must reference the same Spec Kit spec`);
+    }
+    if (!Array.isArray(ac.tasks) || ac.tasks.length === 0) {
+      errors.push(`${path}.tasks: non-empty task ID array required`);
+    } else {
+      const taskIds = new Set();
+      ac.tasks.forEach((taskId, taskIndex) => {
+        if (typeof taskId !== "string" || !/^T-\d{3}$/.test(taskId)) {
+          errors.push(`${path}.tasks[${taskIndex}]: invalid task ID`);
+        } else if (taskIds.has(taskId)) {
+          errors.push(`${path}.tasks: duplicate ${taskId}`);
+        } else {
+          taskIds.add(taskId);
+        }
+      });
+    }
+    if (!ACCEPTANCE_STATUSES.has(ac.status)) errors.push(`${path}.status: invalid enum`);
+  });
+}
+
 function validateProgressObject(progress, errors, options = {}) {
   if (!checkKeys(progress, ROOT_KEYS, "progress", errors)) return;
   if (progress.schema_version !== "2.2") errors.push("progress.schema_version: expected 2.2");
@@ -512,16 +550,17 @@ function validateProgressObject(progress, errors, options = {}) {
       const specPath = String(progress.spec_kit.spec).replaceAll("\\", "/");
       const planPath = String(progress.spec_kit.plan).replaceAll("\\", "/");
       const tasksPath = String(progress.spec_kit.tasks).replaceAll("\\", "/");
-      if (!/\/spec\.md$/i.test(specPath)) errors.push("progress.spec_kit.spec: canonical spec.md path required");
+      if (!/^\.\/specs\/[^/]+\/spec\.md$/i.test(specPath)) errors.push("progress.spec_kit.spec: canonical ./specs/<feature>/spec.md path required");
       else canonicalSpecRoot = specPath.replace(/\/spec\.md$/i, "");
-      if (!/\/plan\.md$/i.test(planPath) || (canonicalSpecRoot && planPath !== `${canonicalSpecRoot}/plan.md`)) errors.push("progress.spec_kit.plan: canonical sibling plan.md path required");
-      if (!/\/tasks\.md$/i.test(tasksPath) || (canonicalSpecRoot && tasksPath !== `${canonicalSpecRoot}/tasks.md`)) errors.push("progress.spec_kit.tasks: canonical sibling tasks.md path required");
+      if (!/^\.\/specs\/[^/]+\/plan\.md$/i.test(planPath) || (canonicalSpecRoot && planPath !== `${canonicalSpecRoot}/plan.md`)) errors.push("progress.spec_kit.plan: canonical sibling plan.md path required");
+      if (!/^\.\/specs\/[^/]+\/tasks\.md$/i.test(tasksPath) || (canonicalSpecRoot && tasksPath !== `${canonicalSpecRoot}/tasks.md`)) errors.push("progress.spec_kit.tasks: canonical sibling tasks.md path required");
       if (!Number.isFinite(Date.parse(progress.spec_kit.written_at))) errors.push("progress.spec_kit.written_at: valid timestamp required");
     }
   }
   if (checkKeys(progress.contract, CONTRACT_KEYS, "progress.contract", errors)) {
     validateStringFields(progress.contract, ["file", "version", "status", "na_reason"], "progress.contract", errors);
     if (!CONTRACT_STATUSES.has(progress.contract.status)) errors.push("progress.contract.status: invalid enum");
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(progress.contract.version)) errors.push("progress.contract.version: SemVer required");
     const contractPath = String(progress.contract.file).replaceAll("\\", "/");
     if (!nonEmptyString(progress.contract.file) || !/\/contracts\/interface-contract\.md$/i.test(contractPath)) {
       errors.push("progress.contract.file: canonical contracts/interface-contract.md path required");
@@ -530,13 +569,7 @@ function validateProgressObject(progress, errors, options = {}) {
     }
     if (progress.contract.status === "NA" && !nonEmptyString(progress.contract.na_reason)) errors.push("progress.contract.na_reason: required when contract is NA");
   }
-  if (Array.isArray(progress.acceptance_criteria)) {
-    const ids = new Set();
-    for (const ac of progress.acceptance_criteria) {
-      if (ids.has(ac?.id)) errors.push(`progress.acceptance_criteria: duplicate ${ac.id}`);
-      ids.add(ac?.id);
-    }
-  }
+  validateAcceptanceCriteria(progress.acceptance_criteria, canonicalSpecRoot, errors);
   if (!Array.isArray(progress.waves) || progress.waves.length === 0) errors.push("progress.waves: non-empty array required");
   else progress.waves.forEach((wave, wi) => {
     const path = `progress.waves[${wi}]`;
@@ -548,6 +581,7 @@ function validateProgressObject(progress, errors, options = {}) {
       if (!Number.isInteger(wave.integration.attempt) || wave.integration.attempt < 0 || wave.integration.attempt > 3) errors.push(`${path}.integration.attempt: non-negative integer capped at 3 required`);
       if (typeof wave.integration.evidence !== "string") errors.push(`${path}.integration.evidence: must be string`);
       if (["FAIL", "PASS"].includes(wave.integration.status) && !nonEmptyString(wave.integration.evidence)) errors.push(`${path}.integration.evidence: evidence required for ${wave.integration.status}`);
+      if (wave.status === "completed" && wave.integration.status !== "PASS") errors.push(`${path}: completed wave requires integration PASS`);
     }
     if (!Array.isArray(wave.tasks) || wave.tasks.length === 0) errors.push(`${path}.tasks: non-empty array required`);
     else {

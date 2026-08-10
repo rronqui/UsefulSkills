@@ -140,14 +140,21 @@ as rodadas e respostas a partir do registro.
 
 Ao aceitar uma nova resposta durante `resume`, crie
 `nextResponses = [...persisted.responses, newResponse]`; nunca substitua a lista
-pela resposta nova. Reconstrua `request_canonical` com o pedido completo e esse
-histórico, calcule novamente o SHA-256 dos bytes UTF-8 e atualize
-`request_digest` no mesmo snapshot, de forma atômica, antes de continuar. O
-canonical e o SHA antigos só podem ser substituídos pelo par correspondente ao
-histórico completo; falha de leitura, validação ou gravação mantém o histórico
-anterior e retorna `E_ALIGNMENT_BLOCKED`. Novas rodadas acrescentam respostas
-sem apagar as anteriores, e nenhuma resposta pode ser inferida, omitida ou
-descartada silenciosamente.
+pela resposta nova. Reavalie a árvore de decisões com o pedido completo e
+`nextResponses`: reconstrua `frontier`, determine novamente se há perguntas
+abertas e derive `closure`, `closureRecorded` e `status` a partir desse estado.
+Uma resposta que introduz ou deixa qualquer decisão sem resposta deve limpar o
+fechamento anterior, manter `status: "BLOCKED"` e impedir roteamento; nunca
+preserve `CLOSED`/`fully-specified-fast-close` por herança do snapshot anterior.
+Somente quando a fronteira estiver vazia e todas as decisões estiverem
+resolvidas o checkpoint pode voltar a `CLOSED`.
+Reconstrua `request_canonical` com o pedido completo e esse histórico, calcule
+novamente o SHA-256 dos bytes UTF-8 e atualize `request_digest` no mesmo snapshot,
+de forma atômica, antes de continuar. O canonical e o SHA antigos só podem ser
+substituídos pelo par correspondente ao histórico completo; falha de leitura,
+validação ou gravação mantém o histórico anterior e retorna `E_ALIGNMENT_BLOCKED`.
+Novas rodadas acrescentam respostas sem apagar as anteriores, e nenhuma resposta
+pode ser inferida, omitida ou descartada silenciosamente.
 
 Se o registro, a fronteira, a identidade/digest, o canonical ou qualquer
 resposta estiver ausente, inconsistente ou não puder ser lido, mantenha
