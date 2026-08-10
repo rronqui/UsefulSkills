@@ -291,7 +291,11 @@ describe("deep-review — protocolo normativo T-002", () => {
     expect(reviewer).toMatch(/one scalar value per call/i);
     expect(reviewer).toMatch(/Never combine section names in one `type` array/i);
     expect(reviewer).toMatch(/result\.data[\s\S]{0,100}complete result object/i);
+    for (const field of ["agent", "status", "reviewed_revision", "overall_correctness", "explanation", "confidence"]) {
+      expect(reviewer).toMatch(new RegExp(`type: \\["${field}"\\]`));
+    }
     expect(fallbackReviewer).toMatch(/protocol_mode[\s\S]{0,120}DEEP_REVIEW_FALLBACK/i);
+    expect(fallbackReviewer).toMatch(/cada campo de identidade\/veredito[\s\S]{0,180}yield/i);
     expect(skill).toMatch(/type: \["agent"\][\s\S]{0,180}type: \["status"\]/i);
   });
 

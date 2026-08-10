@@ -220,9 +220,12 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
    patch fornecido ou o comando indicado no assignment. Em Custom sem diff, leia as
    instruções e o workspace sem exigir patch.
 2. Ler os arquivos modificados ou atribuídos para contexto completo;
-3. Registrar cada achado com `yield` incremental `type: ["findings"]`;
-4. Registrar o veredito (`overall_correctness`, `explanation`, `confidence`) com
-   seções incrementais e parar — a finalização em idle monta o resultado.
+3. Registrar cada achado com `yield` incremental `type: ["findings"]` quando houver
+   achados;
+4. Registrar cada campo de identidade e veredito (`agent`, `status`,
+   `reviewed_revision`, `overall_correctness`, `explanation`, `confidence`) em uma
+   seção incremental escalar separada e parar — a finalização em idle monta o
+   resultado.
 
 **Critérios — um achado só é reportado se TODOS valerem**:
 - **Impacto provável**: apontar caminhos de código concretamente afetados (sem especulação);

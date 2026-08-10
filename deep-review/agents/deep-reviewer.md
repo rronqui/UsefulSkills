@@ -167,6 +167,7 @@ The complete normalized verdict must also contain:
 - `status`: exactly `VALID`
 - `reviewed_revision`: exact patch/revision read from the assignment (remote SHA only in PR mode)
 - `overall_correctness`: `correct` or `incorrect` as diagnosis only
+- `explanation`: plain-text 1-3 sentence verdict summary; required
 - `confidence`: number between 0.0 and 1.0; required
   
 Verdict and identity fields use separate incremental `yield` sections. Use exactly
