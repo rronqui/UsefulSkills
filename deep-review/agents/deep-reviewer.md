@@ -65,6 +65,8 @@ output:
               description: Last line (1-indexed, ≤10 lines); required
             type: number
 
+---
+
 <procedure>
 1. No modo PR, leia exclusivamente o `patch_source` remoto exato fornecido pelo
    assignment, coletado por `gh pr diff` ou `pr://.../diff/...`; nunca use patch local.

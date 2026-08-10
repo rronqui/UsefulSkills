@@ -264,6 +264,15 @@ function expectSkillRule(label, expression) {
 }
 
 describe("deep-review — protocolo normativo T-002", () => {
+  it("AC-005: agente deep-reviewer possui frontmatter fechado e corpo separado", () => {
+    const lines = reviewer.split(/\r?\n/);
+    const closingDelimiter = lines.indexOf("---", 1);
+
+    expect(lines[0]).toBe("---");
+    expect(closingDelimiter).toBeGreaterThan(1);
+    expect(lines.slice(closingDelimiter + 1).join("\n")).toMatch(/<procedure>/);
+  });
+
   it("AC-006: bloqueia apenas findings válidos P0/P1 e retém P2/P3 com localização e contagem", () => {
     expect(reviewerResultIsComplete(validRound)).toBe(true);
     expect(validRound.findings.map(({ priority }) => priority)).toEqual([0, 1, 2, 3]);
