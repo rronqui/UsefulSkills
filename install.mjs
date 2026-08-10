@@ -3,12 +3,24 @@
 // Uso:
 //   node install.mjs           instala em ~/.omp/agent/ (skills/ e agents/)
 //   node install.mjs --check   compara hashes; lista divergências; exit 1 se houver
-// Requer: Node >= 18. Não toca nenhum arquivo fora do inventário abaixo.
+// Requer: Node >= 20. Não toca nenhum arquivo fora do inventário abaixo.
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import {
+  cpSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const nodeMajor = Number(process.versions.node.split(".")[0]);
+if (!Number.isInteger(nodeMajor) || nodeMajor < 20) {
+  console.error(`E_UNSUPPORTED_NODE: Node >= 20 é necessário (runtime ${process.versions.node}).`);
+  process.exit(1); // E_UNSUPPORTED_NODE: Node >= 20
+}
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const home = os.homedir();
@@ -38,19 +50,78 @@ const AGENTS = [
   ["deep-review", "agents", "deep-reviewer.md"],
 ];
 const inventoryKey = (name) => process.platform === "win32" ? name.toLowerCase() : name;
+const compareNames = (a, b) => {
+  const ak = inventoryKey(a);
+  const bk = inventoryKey(b);
+  return ak < bk ? -1 : ak > bk ? 1 : 0;
+};
 
-function sha256(file) {
-  return createHash("sha256").update(readFileSync(file)).digest("hex");
+function safeLstat(file) {
+  try {
+    return { stat: lstatSync(file), error: null };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { stat: null, error: null };
+    return { stat: null, error };
+  }
+}
+function safeReaddir(dir) {
+  try {
+    return { names: readdirSync(dir).sort(compareNames), error: null };
+  } catch (error) {
+    return { names: [], error };
+  }
 }
 
-function walk(dir, includeSymlinks = false) {
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walk(full, includeSymlinks));
-    else if (entry.isFile() || (includeSymlinks && entry.isSymbolicLink())) out.push(full);
+function statType(stat) {
+  if (!stat) return "missing";
+  if (stat.isSymbolicLink()) return "symlink";
+  if (stat.isDirectory()) return "directory";
+  if (stat.isFile()) return "file";
+  if (typeof stat.isFIFO === "function" && stat.isFIFO()) return "special (FIFO)";
+  if (typeof stat.isSocket === "function" && stat.isSocket()) return "special (socket)";
+  if (typeof stat.isCharacterDevice === "function" && stat.isCharacterDevice()) return "special (character device)";
+  if (typeof stat.isBlockDevice === "function" && stat.isBlockDevice()) return "special (block device)";
+  return "special";
+}
+
+function isRegularFile(stat) {
+  return Boolean(stat && stat.isFile() && !stat.isSymbolicLink());
+}
+
+function inspectTree(dir) {
+  const nodes = [];
+  const issues = [];
+  const pending = [""];
+  while (pending.length > 0) {
+    const relative = pending.pop();
+    const current = path.join(dir, relative);
+    let names;
+    try {
+      names = readdirSync(current).sort(compareNames);
+    } catch (error) {
+      issues.push(`não foi possível ler ${current}: ${error?.code || error?.message || "erro"}`);
+      continue;
+    }
+    for (let index = names.length - 1; index >= 0; index -= 1) {
+      const name = names[index];
+      const childRelative = relative ? path.join(relative, name) : name;
+      const child = path.join(dir, childRelative);
+      const { stat, error } = safeLstat(child);
+      if (error) {
+        issues.push(`não foi possível inspecionar ${child}: ${error?.code || error?.message || "erro"}`);
+        continue;
+      }
+      if (!stat) {
+        issues.push(`FALTA na origem: ${child}`);
+        continue;
+      }
+      const type = statType(stat);
+      nodes.push({ relative: childRelative, path: child, stat, type });
+      if (type === "directory") pending.push(childRelative);
+    }
   }
-  return out;
+  nodes.sort((a, b) => compareNames(a.relative, b.relative));
+  return { nodes, issues };
 }
 
 function destinationConflict(target) {
@@ -65,269 +136,322 @@ function destinationConflict(target) {
   const relative = path.relative(rootPath, resolvedTarget);
   for (const segment of relative ? relative.split(path.sep) : []) {
     current = path.join(current, segment);
-    let stat;
-    try {
-      stat = lstatSync(current);
-    } catch (err) {
-      if (err?.code === "ENOENT") continue;
-      return { kind: "inacessível", path: current };
-    }
-    if (stat.isSymbolicLink()) return { kind: "symlink", path: current };
-    if (!stat.isDirectory()) return { kind: "conflito de tipo", path: current };
+    const { stat, error } = safeLstat(current);
+    if (error) return { kind: "inacessível", path: current };
+    if (!stat) continue;
+    if (stat.isSymbolicLink()) return { kind: "symlink/junction", path: current };
+    if (!stat.isDirectory()) return { kind: statType(stat), path: current };
   }
   return null;
 }
 
-// Compara um diretório-fonte com o destino: retorna { status, detail }.
-// status: "equal" | "updated" | "created" | "drift"; conflitos de tipo são drift
-// em qualquer modo, enquanto divergências de conteúdo são drift apenas no --check.
-function syncDir(src, dest) {
-  const ancestorConflict = destinationConflict(dest);
-  if (ancestorConflict) {
-    return { status: "drift", detail: `${ancestorConflict.kind} no ancestral ${ancestorConflict.path} — remova manualmente` };
+function sourceInventory(skill) {
+  const src = path.join(root, skill);
+  const rootResult = safeLstat(src);
+  if (rootResult.error) return { files: [], dirs: [], issues: [`FALTA na origem ${src}: ${rootResult.error.message}`] };
+  if (!rootResult.stat) return { files: [], dirs: [], issues: [`FALTA na origem ${src}`] };
+  if (!rootResult.stat.isDirectory() || rootResult.stat.isSymbolicLink()) {
+    return { files: [], dirs: [], issues: [`origem ${src} tem tipo inválido: ${statType(rootResult.stat)}`] };
   }
-  // Conflito de tipo na RAIZ do destino: arquivo comum onde deveria haver o
-  // diretório da skill. Reporta drift sem crashar (walk/readdirSync daria ENOTDIR).
-  let destStat = null;
-  try {
-    destStat = lstatSync(dest);
-  } catch {
-    // destino ausente
+
+  const inspected = inspectTree(src);
+  const issues = [...inspected.issues];
+  const files = [];
+  const dirs = [];
+  for (const node of inspected.nodes) {
+    if (node.type === "file") files.push(node);
+    else if (node.type === "directory") dirs.push(node);
+    else issues.push(`origem contém ${node.type}: ${node.path}`);
   }
-  if (destStat && !destStat.isDirectory()) {
-    return { status: "drift", detail: "conflito de tipo na raiz (arquivo onde deveria haver diretório) — remova manualmente" };
+  const expectedSkillFile = path.join("SKILL.md");
+  if (!files.some((node) => inventoryKey(node.relative) === inventoryKey(expectedSkillFile))) {
+    issues.push(`FALTA na origem: ${path.join(src, expectedSkillFile)}`);
   }
-  const srcFiles = walk(src).map((f) => path.relative(src, f)).sort();
+  return { files, dirs, issues };
+}
+
+function sha256(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+function destinationInventory(dir) {
+  const result = safeLstat(dir);
+  if (result.error || !result.stat || !result.stat.isDirectory() || result.stat.isSymbolicLink()) {
+    return { exists: Boolean(result.stat), nodes: [], issues: [] };
+  }
+  const inspected = inspectTree(dir);
+  return { exists: true, nodes: inspected.nodes, issues: inspected.issues };
+}
+
+function planSyncDir(skill, src, dest, source) {
+  const issues = [];
+  const operations = [];
+  const ancestor = destinationConflict(path.dirname(dest));
+  if (ancestor) issues.push(`${ancestor.kind} no ancestral ${ancestor.path} — remova manualmente`);
+  const destResult = safeLstat(dest);
+  const destStat = destResult.stat;
+  if (destResult.error) issues.push(`destino inacessível ${dest}: ${destResult.error.message}`);
+  if (destStat && (!destStat.isDirectory() || destStat.isSymbolicLink())) {
+    issues.push(`conflito de tipo na raiz ${dest}: ${statType(destStat)} onde deveria haver diretório`);
+  }
+
+  const destination = destStat?.isDirectory() ? destinationInventory(dest) : { exists: false, nodes: [], issues: [] };
+  issues.push(...destination.issues);
+  const sourceKeys = new Set(source.files.map((node) => inventoryKey(node.relative)));
+  const sourceDirs = new Set(source.dirs.map((node) => inventoryKey(node.relative)));
   let created = 0;
+  let createdDirs = 0;
   let updated = 0;
   let equal = 0;
-  let typeConflicts = 0;
-  const removed = [];
-  const srcFileKeys = new Set(srcFiles.map(inventoryKey));
-  for (const rel of srcFiles) {
-    const s = path.join(src, rel);
-    const d = path.join(dest, rel);
-    let parentConflict = false;
-    let parent = path.dirname(d);
-    const boundary = path.dirname(path.dirname(path.dirname(dest)));
-    while (true) {
-      try {
-        const parentStat = lstatSync(parent);
-        if (!parentStat.isDirectory()) {
-          parentConflict = true;
-          break;
-        }
-      } catch (err) {
-        if (err?.code !== "ENOENT") {
-          parentConflict = true;
-          break;
-        }
-      }
-      if (parent === boundary) break;
-      const next = path.dirname(parent);
-      if (next === parent) break;
-      parent = next;
-    }
+  let equalDirs = 0;
+  const conflicts = [];
+
+  for (const node of source.dirs) {
+    const target = path.join(dest, node.relative);
+    const parentConflict = destinationConflict(path.dirname(target));
     if (parentConflict) {
-      typeConflicts++;
+      conflicts.push(`${node.relative}: ${parentConflict.kind} no ancestral ${parentConflict.path}`);
       continue;
     }
-    let st = null;
-    try {
-      st = lstatSync(d);
-    } catch {
-      // destino ausente
-    }
-    if (st && (st.isDirectory() || st.isSymbolicLink())) {
-      // Conflito de tipo: diretório no destino onde deveria haver arquivo.
-      // --check reporta como drift; o modo normal NÃO destrói o diretório.
-      typeConflicts++;
-      continue;
-    }
-    if (!st) {
-      if (!check) {
-        mkdirSync(path.dirname(d), { recursive: true });
-        cpSync(s, d);
-      }
-      created++;
-    } else if (sha256(s) !== sha256(d)) {
-      if (!check) cpSync(s, d);
-      updated++;
+    const result = safeLstat(target);
+    if (result.error) {
+      conflicts.push(`${node.relative}: destino inacessível (${result.error.code || result.error.message})`);
+    } else if (!result.stat) {
+      operations.push({ directory: true, target });
+      createdDirs += 1;
+    } else if (!result.stat.isDirectory() || result.stat.isSymbolicLink()) {
+      conflicts.push(`${node.relative}: ${statType(result.stat)} no destino onde deveria haver diretório`);
     } else {
-      equal++;
+      equalDirs += 1;
     }
   }
-  const destRoot = (() => { try { return lstatSync(dest); } catch { return null; } })();
-  if (destRoot?.isDirectory()) {
-    for (const rel of walk(dest, true).map((f) => path.relative(dest, f))) {
-      if (!srcFileKeys.has(inventoryKey(rel))) removed.push(rel);
+
+  for (const node of source.files) {
+    const target = path.join(dest, node.relative);
+    const parentConflict = destinationConflict(path.dirname(target));
+    if (parentConflict) {
+      conflicts.push(`${node.relative}: ${parentConflict.kind} no ancestral ${parentConflict.path}`);
+      continue;
+    }
+    const result = safeLstat(target);
+    if (result.error) {
+      conflicts.push(`${node.relative}: destino inacessível (${result.error.code || result.error.message})`);
+      continue;
+    }
+    if (!result.stat) {
+      operations.push({ source: node.path, target });
+      created += 1;
+    } else if (!isRegularFile(result.stat)) {
+      conflicts.push(`${node.relative}: ${statType(result.stat)} no destino onde deveria haver arquivo`);
+    } else if (sha256(node.path) !== sha256(target)) {
+      operations.push({ source: node.path, target });
+      updated += 1;
+    } else {
+      equal += 1;
     }
   }
-  const srcTopLevel = new Set(readdirSync(src).map(inventoryKey));
-  const extraTopLevel = destRoot?.isDirectory()
-    ? readdirSync(dest).filter((entry) => !srcTopLevel.has(inventoryKey(entry)))
-    : [];
-  if (typeConflicts > 0) {
-    return { status: "drift", detail: `${typeConflicts} conflito(s) de tipo (arquivo-pai ou diretório onde deveria haver arquivo) — remova manualmente` };
+
+  const extras = [];
+  for (const node of destination.nodes) {
+    const key = inventoryKey(node.relative);
+    if (sourceKeys.has(key) || sourceDirs.has(key)) {
+      if (node.type.startsWith("special") || node.type === "symlink") {
+        conflicts.push(`${node.relative}: ${node.type} no destino`);
+      }
+      continue;
+    }
+    extras.push(`${node.relative} (${node.type})`);
   }
-  if (check && extraTopLevel.length > 0) {
-    return { status: "drift", detail: `${equal} iguais, ${updated} divergem, ${created} faltam, extras no topo: ${extraTopLevel.join(", ")}` };
+  if (issues.length > 0 || conflicts.length > 0) {
+    return {
+      status: "drift",
+      detail: `${issues.concat(conflicts).join("; ") || "conflito de inventário"} — E_INSTALL_DRIFT`,
+      operations,
+      unsafe: true,
+    };
   }
-  if (check && removed.length > 0) {
-    return { status: "drift", detail: `${equal} iguais, ${updated} divergem, ${created} faltam, extras locais: ${removed.join(", ")}` };
+  if (check && extras.length > 0) {
+    return {
+      status: "drift",
+      detail: `${equal} iguais, ${equalDirs} diretório(s) iguais, ${updated} divergem, ${created} faltam, ${createdDirs} diretório(s) faltam, extras locais: ${extras.join(", ")}`,
+      operations,
+      unsafe: false,
+    };
   }
-  if (updated > 0) return { status: check ? "drift" : "updated", detail: `${updated} arquivo(s) divergentes${check ? " (não alterados no --check)" : " atualizados"}` };
-  if (created > 0) return { status: check ? "drift" : "created", detail: `${created} arquivo(s) ${check ? "ausentes" : "instalados"}` };
-  return { status: "equal", detail: `${equal} arquivo(s) iguais` };
+  if (updated > 0) return { status: check ? "drift" : "updated", detail: `${updated} arquivo(s) divergentes${check ? " (não alterados no --check)" : " atualizados"}`, operations, unsafe: false };
+  if (created > 0 || createdDirs > 0) {
+    const details = [];
+    if (created > 0) details.push(`${created} arquivo(s) ${check ? "ausentes" : "instalados"}`);
+    if (createdDirs > 0) details.push(`${createdDirs} diretório(s) ${check ? "ausentes" : "criados"}`);
+    return { status: check ? "drift" : "created", detail: details.join(", "), operations, unsafe: false };
+  }
+  return { status: "equal", detail: `${equal} arquivo(s) iguais, ${equalDirs} diretório(s) iguais`, operations, unsafe: false };
 }
+
+function findProjectAgent(file) {
+  let current = path.resolve(process.cwd());
+  while (true) {
+    for (const relativeDir of [path.join(".omp", "agents")]) {
+      const candidate = path.join(current, relativeDir, file);
+      const result = safeLstat(candidate);
+      if (result.error) return { path: candidate, type: "inacessível" };
+      if (result.stat) return { path: candidate, type: statType(result.stat) };
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+function applyOperations(operations) {
+  for (const operation of operations) {
+    if (operation.directory) {
+      mkdirSync(operation.target, { recursive: true });
+      continue;
+    }
+    mkdirSync(path.dirname(operation.target), { recursive: true });
+    cpSync(operation.source, operation.target);
+  }
+}
+
 let drift = false;
+let unsafe = false;
+const plannedOperations = [];
+const skillSources = new Map();
 
 console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
-const destinationConflicts = [
-  ["skills", skillsDest, destinationConflict(skillsDest)],
-  ["agents", agentsDest, destinationConflict(agentsDest)],
-].filter(([, , conflict]) => conflict);
-let skillsDestStat = null;
-try {
-  skillsDestStat = lstatSync(skillsDest);
-} catch {
-  // destino ausente
+
+for (const name of SKILLS) {
+  const source = sourceInventory(name);
+  skillSources.set(name, source);
+  if (source.issues.length > 0) {
+    drift = true;
+    unsafe = true;
+    console.log(`skill ${name.padEnd(18)} drift    ${source.issues.join("; ")} — E_INSTALL_DRIFT`);
+    continue;
+  }
+  const result = planSyncDir(name, path.join(root, name), path.join(skillsDest, name), source);
+  plannedOperations.push(...result.operations);
+  if (result.status === "drift") drift = true;
+  if (result.unsafe) unsafe = true;
+  console.log(`skill ${name.padEnd(18)} ${result.status.padEnd(8)} ${result.detail}`);
 }
-const skillsDestinationConflicts = destinationConflicts.filter(([kind]) => kind === "skills");
-const agentsDestinationConflicts = destinationConflicts.filter(([kind]) => kind === "agents");
-if (skillsDestinationConflicts.length > 0) {
-  for (const [kind, target, conflict] of skillsDestinationConflicts) {
-    console.log(`${kind} (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino ${target} não será alterado`);
-  }
+
+const skillsRootConflict = destinationConflict(path.dirname(skillsDest));
+const skillsRootResult = safeLstat(skillsDest);
+if (skillsRootConflict || (skillsRootResult.stat && (!skillsRootResult.stat.isDirectory() || skillsRootResult.stat.isSymbolicLink()))) {
+  const conflict = skillsRootConflict || { kind: statType(skillsRootResult.stat), path: skillsDest };
+  console.log(`skill (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
   drift = true;
-} else if (skillsDestStat && !skillsDestStat.isDirectory()) {
-  console.log("skill (raiz)          drift    conflito de tipo (arquivo onde deveria haver diretório) — remova manualmente");
-  drift = true;
-} else {
-  for (const name of SKILLS) {
-    const src = path.join(root, name);
-    const dest = path.join(skillsDest, name);
-    const { status, detail } = syncDir(src, dest);
-    if (status === "drift") drift = true;
-    console.log(`skill ${name.padEnd(18)} ${status.padEnd(8)} ${detail}`);
-  }
-  if (check && skillsDestStat?.isDirectory()) {
-    const expected = new Set(SKILLS.map(inventoryKey));
-    for (const entry of readdirSync(skillsDest)) {
+  unsafe = true;
+}
+if (skillsRootResult.stat?.isDirectory()) {
+  const expected = new Set(SKILLS.map(inventoryKey));
+  const entriesResult = safeReaddir(skillsDest);
+  if (entriesResult.error) {
+    console.log(`skill (raiz)          drift    não foi possível ler ${skillsDest}: ${entriesResult.error.code || entriesResult.error.message} — E_INSTALL_DRIFT`);
+    drift = true;
+    unsafe = true;
+  } else {
+    for (const entry of entriesResult.names) {
       if (!expected.has(inventoryKey(entry))) {
         console.log(`skill (extra) ${entry.padEnd(32)} drift    diretório fora do inventário`);
-        drift = true;
+        drift = drift || check;
       }
     }
   }
 }
 
-// Conflito de tipo na raiz do destino dos agentes (arquivo onde deveria haver
-// diretório): reporta drift e pula sync/scan — readdirSync/mkdirSync dariam ENOTDIR.
-let agentsParentConflict = false;
-let agentsParent = path.dirname(agentsDest);
-const agentsBoundary = path.dirname(path.dirname(agentsDest));
-while (true) {
-  try {
-    if (!lstatSync(agentsParent).isDirectory()) {
-      agentsParentConflict = true;
-      break;
-    }
-  } catch (err) {
-    if (err?.code !== "ENOENT") {
-      agentsParentConflict = true;
-      break;
-    }
-  }
-  if (agentsParent === agentsBoundary) break;
-  const next = path.dirname(agentsParent);
-  if (next === agentsParent) break;
-  agentsParent = next;
-}
-let agentsDestStat = null;
-try {
-  agentsDestStat = lstatSync(agentsDest);
-} catch {
-  // destino ausente
-}
-if (agentsDestinationConflicts.length > 0) {
-  for (const [kind, target, conflict] of agentsDestinationConflicts) {
-    console.log(`${kind} (raiz)           drift    ${conflict.kind} em ${conflict.path}; destino ${target} não será alterado`);
-  }
+const agentsRootConflict = destinationConflict(path.dirname(agentsDest));
+const agentsRootResult = safeLstat(agentsDest);
+if (agentsRootConflict || (agentsRootResult.stat && (!agentsRootResult.stat.isDirectory() || agentsRootResult.stat.isSymbolicLink()))) {
+  const conflict = agentsRootConflict || { kind: statType(agentsRootResult.stat), path: agentsDest };
+  console.log(`agent (raiz)           drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
   drift = true;
-} else if (agentsParentConflict || (agentsDestStat && !agentsDestStat.isDirectory())) {
-  console.log("agent (raiz)           drift    conflito de tipo no caminho do diretório — remova manualmente");
-  drift = true;
+  unsafe = true;
 } else {
+  const agentSourceState = [];
   for (const [skill, subdir, file] of AGENTS) {
-    const src = path.join(root, skill, subdir, file);
-    const dest = path.join(agentsDest, file);
-    const base = `${skill}/${file}`;
-    if (!existsSync(src)) {
-      console.log(`agent ${base.padEnd(40)} FALTA na origem`);
+    const sourcePath = path.join(root, skill, subdir, file);
+    const sourceResult = safeLstat(sourcePath);
+    const destinationPath = path.join(agentsDest, file);
+    const destinationResult = safeLstat(destinationPath);
+    const project = findProjectAgent(file);
+    if (project) {
+      console.log(`agent ${file.padEnd(40)} drift    duplicata: projeto precede perfil (${project.path}); perfil não será alterado`);
       drift = true;
+      unsafe = true;
       continue;
     }
-    let srcStat = null;
-    try {
-      srcStat = lstatSync(src);
-    } catch {
-      // origem ausente
-    }
-    if (!srcStat || !srcStat.isFile() || srcStat.isSymbolicLink()) {
-      console.log(`agent ${base.padEnd(40)} FALTA na origem ou symlink não permitido`);
-      drift = true;
-      continue;
-    }
-    let st = null;
-    try {
-      st = lstatSync(dest);
-    } catch {
-      // destino ausente
-    }
-    if (st && (st.isDirectory() || st.isSymbolicLink())) {
-      console.log(`agent ${base.padEnd(40)} drift    conflito de tipo (diretório no destino)`);
-      drift = true;
-      continue;
-    }
-    if (!st) {
-      if (!check) {
-        mkdirSync(agentsDest, { recursive: true });
-        cpSync(src, dest);
+    if (sourceResult.error || !sourceResult.stat || !isRegularFile(sourceResult.stat)) {
+      const reason = sourceResult.error ? sourceResult.error.message : sourceResult.stat ? `tipo ${statType(sourceResult.stat)}` : "origem ausente";
+      if (destinationResult.stat) {
+        console.log(`agent ${skill}/${file.padEnd(32)} drift    stale/obsoleto: origem ausente ou inválida (${reason}); destino preservado`);
+      } else {
+        console.log(`agent ${skill}/${file.padEnd(32)} FALTA na origem (${reason})`);
       }
-      console.log(`agent ${base.padEnd(40)} ${check ? "drift    ausente" : "created  instalado"}`);
+      drift = true;
+      unsafe = true;
+      continue;
+    }
+    const parentConflict = destinationConflict(path.dirname(destinationPath));
+    if (parentConflict) {
+      console.log(`agent ${skill}/${file.padEnd(32)} drift    ${parentConflict.kind} no ancestral ${parentConflict.path} — destino preservado`);
+      drift = true;
+      unsafe = true;
+      continue;
+    }
+    if (!destinationResult.stat) {
+      if (!check) plannedOperations.push({ source: sourcePath, target: destinationPath });
+      console.log(`agent ${skill}/${file.padEnd(32)} ${check ? "drift    ausente" : "created  instalado"}`);
       drift = drift || check;
       continue;
     }
-    const same = sha256(src) === sha256(dest);
-    if (!same) {
-      if (!check) cpSync(src, dest);
-      console.log(`agent ${base.padEnd(40)} ${check ? "drift    divergente" : "updated  atualizado"}`);
+    if (!isRegularFile(destinationResult.stat)) {
+      console.log(`agent ${skill}/${file.padEnd(32)} drift    ${statType(destinationResult.stat)} no destino — preservado — E_INSTALL_DRIFT`);
+      drift = true;
+      unsafe = true;
+      continue;
+    }
+    if (sha256(sourcePath) !== sha256(destinationPath)) {
+      if (!check) plannedOperations.push({ source: sourcePath, target: destinationPath });
+      console.log(`agent ${skill}/${file.padEnd(32)} ${check ? "drift    divergente" : "updated  atualizado"}`);
       drift = drift || check;
     } else {
-      console.log(`agent ${base.padEnd(40)} equal`);
+      console.log(`agent ${skill}/${file.padEnd(32)} equal`);
     }
+    agentSourceState.push(file);
   }
 
-  // --check: arquivos extras no destino dos agentes também são drift (reportados,
-  // nunca removidos — o modo normal não destrói arquivos do usuário).
-  if (check && agentsDestStat?.isDirectory()) {
+  if (agentsRootResult.stat?.isDirectory()) {
     const expected = new Set(AGENTS.map(([, , file]) => inventoryKey(file)));
-    for (const entry of readdirSync(agentsDest)) {
-      if (!expected.has(inventoryKey(entry))) {
-        console.log(`agent (extra) ${entry.padEnd(32)} drift    arquivo fora do inventário`);
-        drift = true;
+    const entriesResult = safeReaddir(agentsDest);
+    if (entriesResult.error) {
+      console.log(`agent (raiz)           drift    não foi possível ler ${agentsDest}: ${entriesResult.error.code || entriesResult.error.message} — E_INSTALL_DRIFT`);
+      drift = true;
+      unsafe = true;
+    } else {
+      for (const entry of entriesResult.names) {
+        if (!expected.has(inventoryKey(entry))) {
+          console.log(`agent (extra) ${entry.padEnd(32)} ${check ? "drift    " : "preservado "}arquivo fora do inventário`);
+          drift = drift || check;
+        }
       }
     }
   }
 }
+
+// Never apply a write when the inventory has an unsafe source/destination shape.
+// This makes preflight genuinely fail-fast and keeps all conflict paths non-destructive.
+if (!check && !unsafe) applyOperations(plannedOperations);
 
 if (check) {
   console.log(drift ? "\nDRIFT detectado — rode `node install.mjs` para sincronizar." : "\nInstalação sincronizada.");
   process.exit(drift ? 1 : 0);
 }
 if (drift) {
-  console.error("\nDRIFT detectado — conflitos exigem correção manual.");
+  console.error("\nDRIFT detectado — conflitos exigem correção manual (E_INSTALL_DRIFT).");
   process.exit(1);
 }
 console.log("\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).");

@@ -23,31 +23,45 @@ As fases seguintes usam ESSE levantamento, não suposições.
 ## FASE 0 — Auditoria de segurança (antes de publicar)
 
 - Liste TODOS os arquivos rastreados (`git ls-files`) e varra o histórico inteiro por
-  segredos: JWT (`eyJ…`), `sk-`, `ghp_`/`gho_`/`ghs_`, `AKIA`, `AIza`, `xox[bp]-`, PEM
-  (`-----BEGIN`), base64 longo. Confirme que não há credencial hardcoded (mesmo como
-  default) nem PII (nomes, documentos, e-mails) em código ou fixtures de teste.
+  segredos: JWT (`eyJ…`), `sk-`, `ghp_`/`gho_`/`ghs_`/`ghr_`/`github_pat_`, `AKIA`,
+  `AIza`, `xox[bp]-`, PEM (`-----BEGIN`) e base64 longo. Confirme que não há
+  credencial hardcoded (mesmo como default) nem PII (nomes, documentos, e-mails) em
+  código ou fixtures de teste.
+- A auditoria não imprime valores encontrados: redija cada ocorrência como
+  `<REDACTED>` e registre somente o tipo/arquivo/commit. Token encontrado bloqueia a
+  publicação (histórico e arquivos rastreados); não prossiga para release.
 - Confirme que segredos reais (`.env`…), banco de dados local, logs e artefatos de build
   estão no `.gitignore` e nunca foram commitados. Artefato rastreado por engano → remover
   do tracking + ignorar.
 - Crie `.env.example` (ou equivalente do ecossistema) com apenas NOMES das variáveis.
 - Repo público exige ainda: `LICENSE` (MIT se o usuário não especificar), nota de
   privacidade se o app lida com dados sensíveis, e README com instruções reais de setup.
+- Para instalar o secret sem expor o valor, use stdin (`gh secret set RELEASE_PLEASE_TOKEN`),
+  limpe a variável mesmo em erro (`unset token` ou `$token = $null`) e nunca passe o token
+  em argumentos/logs.
 - Commit, push e só então publique (ou avise o usuário para publicar).
 
 ## FASE 1 — Proteção server-side (GitHub; repo PÚBLICO no plano free)
 
-- Ruleset via `gh api repos/{owner}/{repo}/rulesets` com regras `deletion`,
-  `non_fast_forward`, `pull_request` (`required_approving_review_count: 0`) e
-  `required_status_checks` exigindo o contexto que o CI produzirá (ex.: `quality`).
-- ARMADILHA: `strict_required_status_checks_policy` (boolean) é campo OBRIGATÓRIO do
-  schema de `required_status_checks`, senão HTTP 422 "data matches no possible input".
+- O ruleset deve declarar `target: branch`, `enforcement: active` e proteger somente a branch default descoberta.
+- Descubra a branch default antes de criar o ruleset (`default_branch=$(gh api repos/{owner}/{repo} -q .default_branch)`) e use `conditions.ref_name.include: ["refs/heads/${default_branch}"]`; esse refspec é o escopo da branch default, não tags nem outras branches. Se a ferramenta não puder resolver a branch, falhe fechado.
+- Inclua regras `deletion`, `non_fast_forward`, `pull_request`
+  (`required_approving_review_count: 0`) e `required_status_checks` exigindo o
+  contexto que o CI produzirá (`context: quality`).
+- `strict_required_status_checks_policy: true` (booleano estrito; `false` também é válido) é
+  campo obrigatório do schema de `required_status_checks`, senão HTTP 422
+  "data matches no possible input".
+- Depois de criar, faça GET de `repos/{owner}/{repo}/rulesets/{id}` e valide
+  `target`, `enforcement`, include/exclude de refs, regras e o status `quality`; sem
+  resposta compatível, falhe fechado. Não invente uma chamada live em testes.
 - ARMADILHA: habilite criação de PRs pelo Actions:
   `gh api repos/{owner}/{repo}/actions/permissions/workflow --method PUT
   --field default_workflow_permissions=write --field can_approve_pull_request_reviews=true`
   — o nome do campo é exatamente `can_approve_pull_request_reviews`; nomes errados são
   ignorados silenciosamente (confirme com um GET depois).
-- Se o repo não puder ser público: rulesets não existem no plano free — o enforcement
-  server-side fica indisponível; declare isso explicitamente e siga com hooks + CI.
+- Se o repo for privado ou o plano não oferecer rulesets, registre a limitação:
+  o enforcement server-side fica indisponível; declare isso explicitamente e siga com
+  hooks + CI. Não anuncie proteção que o servidor não aplica.
 - Auto-merge de PRs comuns: `gh api repos/{owner}/{repo} --method PATCH -F allow_auto_merge=true` (usar `-F`, que envia booleano real; `-f` enviaria a string `"true"`).
   A skill companheira `ship` usa `gh pr merge --auto --squash`; sem esta flag o comando
   falha e o PR fica aguardando merge manual. NÃO habilite auto-merge para o PR de
@@ -69,24 +83,21 @@ As fases seguintes usam ESSE levantamento, não suposições.
 
 - `.github/workflows/release-please.yml`: push na default branch + `workflow_dispatch`,
   `googleapis/release-please-action@v4`, com `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`.
-- `release-please-config.json` com `include-component-in-tag: false` e `release-type`
-  pela tabela:
-  | Stack | release-type |
-  |---|---|
-  | Node/JS/TS | `node` |
-  | Python | `python` |
-  | Rust | `rust` |
-  | Go | `go` |
-  | Maven | `maven` |
-  | Ruby | `ruby` |
-  | PHP | `php` |
-  | Dart/Flutter | `dart` |
-  | Terraform | `terraform-module` |
-  | Outro | `simple` (version.txt + CHANGELOG) |
-  Monorepo: um bloco em `packages` por pacote.
-- ARMADILHA (primeiro release): `release-as: "X.Y.0"` exige `.release-please-manifest.json`
-  `{".": "X.Y.0"}`, senão o run falha com "Missing required manifest versions". Após o
-  primeiro release, REMOVA o `release-as` (senão todo release futuro sai na mesma versão).
+- `release-please-config.json` com `include-component-in-tag: false` para a unidade
+  única atual e `release-type: node`; cada entrada em `packages` é uma unidade real,
+  com `initial-version` SemVer. Em monorepo, cada package deve manter identidade
+  qualificada no release/tag (não colapse componentes na raiz), ter seu próprio
+  manifesto e uma fonte de versão que o `ship` consiga resolver.
+- A configuração é fail-fast: se qualquer unidade de `packages` não for Node ou não
+  tiver `package.json`/fonte SemVer resolvível pelo `ship`, interrompa com
+  `E_VERSION_SOURCE`; não compare somente a versão da raiz. `versionCheckUrl` só é
+  habilitado quando há exatamente uma unidade `"."`, nunca para mascarar um monorepo.
+- Cada unidade/package tem uma fonte SemVer que o `ship` consegue resolver; unidade não-Node
+  ou monorepo sem fonte válida falha cedo com `E_VERSION_SOURCE`.
+- O manifesto `.release-please-manifest.json` deve conter exatamente as mesmas chaves
+  de `packages` e uma versão inicial SemVer igual à versão do `package.json` de cada
+  unidade. Não use `release-as` persistente: após inicializar o primeiro release,
+  remova-o para que releases futuros avancem normalmente.
 - ARMADILHA CRÍTICA: PRs criados com `GITHUB_TOKEN` não disparam outros workflows — o CI
   nunca rodaria no PR de release. Crie o secret com um PAT sem expô-lo nos argumentos.
   Em shell POSIX/Git Bash, valide a saída e remova o terminador antes de enviar por
@@ -94,6 +105,8 @@ As fases seguintes usam ESSE levantamento, não suposições.
   `status=1; token="$(gh auth token)" && [ -n "$token" ] && { if printf %s "$token" | gh secret set RELEASE_PLEASE_TOKEN; then status=0; else status=$?; fi; }; unset token; [ "$status" -eq 0 ]`.
   No PowerShell, adquira o token dentro do `try`, escreva-o sem newline no stdin do processo e remova-o no `finally`:
 `$token = $null; $p = $null; try { $token = gh auth token; if ($LASTEXITCODE -ne 0) { throw "gh auth token falhou" }; $token = $token.Trim(); if ([string]::IsNullOrWhiteSpace($token)) { throw "gh auth token vazio" }; $psi = [Diagnostics.ProcessStartInfo]::new("gh", "secret set RELEASE_PLEASE_TOKEN"); $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false; $p = [Diagnostics.Process]::Start($psi); $p.StandardInput.Write($token); $p.StandardInput.Close(); $p.WaitForExit(); if ($p.ExitCode -ne 0) { throw "gh secret set falhou" } } finally { $token = $null; try { if ($null -ne $p -and !$p.HasExited) { $p.Kill(); $p.WaitForExit() } } catch { } }`.
+- Em retry, preserve o corpo já publicado e mantenha exactly one `Closes #N`; não duplique
+  marker nem `Closes`; os markers `!` e `BREAKING CHANGE:` continuam indicando major.
 - Política: Conventional Commits dirigem o bump (`fix:` → patch, `feat:` → minor,
   `!`/`BREAKING CHANGE:` → major). Ninguém edita o campo de versão manualmente.
 

@@ -1,22 +1,56 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATE = "bug-diagnosis/scripts/hitl-loop.template.sh";
 
-function runCapture(lines) {
+function findBash() {
+  const candidates =
+    process.platform === "win32"
+      ? ["C:/Program Files/Git/bin/bash.exe", "C:/Program Files/Git/usr/bin/bash.exe", "bash"]
+      : ["bash"];
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ["-c", "exit 0"], { stdio: "ignore" });
+    if (probe.status === 0) return candidate;
+  }
+  return null;
+}
+
+const bash = findBash();
+const bashGateReason = bash
+  ? `Bash disponível (${bash})`
+  : "Bash indisponível; suíte HITL gated para evitar ENOENT";
+
+function runCapture(lines, extraEnv = {}) {
+  if (!bash) throw new Error(bashGateReason);
   const input = ["x", "y", ...lines, "__END__", ""].join("\n");
-  return spawnSync("bash", [TEMPLATE], {
+  return spawnSync(bash, [TEMPLATE], {
     cwd: repoRoot,
     input,
     encoding: "utf8",
-    env: { ...process.env, APP_INSTRUCTIONS: "x", ERROR_QUESTION: "q" },
+    env: {
+      ...process.env,
+      APP_INSTRUCTIONS: "x",
+      ERROR_QUESTION: "q",
+      ...extraEnv,
+    },
   });
 }
 
-describe("hitl-loop redaction", () => {
+describe("hitl-loop platform gate", () => {
+  it("detecta Bash e informa o motivo do gate quando indisponível", () => {
+    expect(bash === null || typeof bash === "string").toBe(true);
+    if (!bash) expect(bashGateReason).toMatch(/Bash indisponível/);
+  });
+});
+
+const hitlDescribe = bash ? describe : describe.skip;
+hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
+
   it("redacts a new sensitive key after ending scalar continuation", () => {
     const result = runCapture([
       "password:",
@@ -881,5 +915,110 @@ describe("hitl-loop redaction", () => {
     expect(result.stdout).not.toContain("first-secret");
     expect(result.stdout).not.toContain("still # literal");
     expect(result.stdout).toContain("normal: visible");
+  });
+  it("redacts a raw token before writing the captured artifact", () => {
+    const rawToken = ["github", "pat", "11TEST_ONLY_1234567890"].join("_");
+    const result = runCapture([rawToken, "normal: visible"]);
+    expect(result.status, result.stderr).toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).not.toContain(rawToken);
+    expect(output).toContain("<REDACTED>");
+    expect(output).toContain("normal: visible");
+  });
+  const rawCredentialFixtures = [
+    [
+      "JWT",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.s3cr3tSignature",
+    ],
+    ["GitLab", "glpat_11TEST_ONLY_1234567890abcdefghijkl"],
+    ["Stripe", "sk_live_51TEST_ONLY_12345678901234567890"],
+  ];
+
+  for (const [kind, credential] of rawCredentialFixtures) {
+    it(`redacts a raw ${kind} credential before it reaches output`, () => {
+      const result = runCapture([`payload: ${credential}`, "normal: visible"]);
+      expect(result.status, result.stderr).toBe(0);
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(output).not.toContain(credential);
+      expect(output).toContain("<REDACTED>");
+      expect(output).toContain("normal: visible");
+    });
+  }
+
+  it("redacts before atomic TRACE_FILE persistence and leaves no temporary artifact", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-trace-"));
+    const traceFile = join(traceDir, "captured.trace");
+    const jwt =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.persistedSignature";
+    try {
+      const result = runCapture(
+        [
+          `payload: ${jwt}`,
+          "[DEBUG-trace] should be removed before persistence",
+          "normal: visible",
+        ],
+        { TRACE_FILE: traceFile },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(existsSync(traceFile)).toBe(true);
+      const persisted = readFileSync(traceFile, "utf8");
+      expect(persisted).not.toContain(jwt);
+      expect(persisted).toContain("<REDACTED>");
+      expect(persisted).not.toMatch(/\[DEBUG-[^]]*\]/);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when the clean scan rejects a trace and publishes no TRACE_FILE", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-scan-"));
+    const traceFile = join(traceDir, "rejected.trace");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    expect(persistence).toMatch(
+      /if ! scan_clean_trace < "\$tmp"; then[\s\S]*?rm -f -- "\$tmp"[\s\S]*?return 1[\s\S]*?fi[\s\S]*?if ! mv -f -- "\$tmp" "\$path"; then/,
+    );
+    const scanner = template.match(/scan_clean_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(scanner).toBeDefined();
+    for (const signature of ["eyJ", "glpat_", "sk_live_"]) {
+      expect(scanner).toContain(signature);
+    }
+
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      "scan_clean_trace() { return 1; }",
+      "printf '%s\\n' 'redacted fixture' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+      'if [[ -e "$1" ]]; then printf "artifact-present\\n"; fi',
+    ].join("\n");
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", traceFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(result.stdout).not.toContain("artifact-present");
+      expect(existsSync(traceFile)).toBe(false);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("removes debug probes from the final captured trace", () => {
+    const result = runCapture([
+      "[DEBUG-a4f2] probe=timing value=17ms",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).not.toContain("[DEBUG-a4f2]");
+    expect(output).not.toContain("probe=timing");
+    expect(output).toContain("normal: visible");
   });
 });

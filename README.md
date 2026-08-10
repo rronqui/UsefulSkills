@@ -20,6 +20,7 @@ Instalador determinístico na raiz do projeto:
 node install.mjs           # instala skills em ~/.omp/agent/skills/ e agentes em ~/.omp/agent/agents/
 node install.mjs --check   # compara hashes; lista divergências; exit 1 se houver drift
 ```
+O `install.mjs` faz preflight fail-fast e exige Node >=20 antes de copiar qualquer arquivo.
 
 e reinicie a sessão do omp (descoberta ocorre no startup). O instalador nunca toca
 arquivo fora do inventário (7 skills + 9 agentes).
@@ -28,7 +29,7 @@ arquivo fora do inventário (7 skills + 9 agentes).
 
 - `release-bootstrap`: gh CLI autenticado; repo no GitHub (público para rulesets no plano free).
 - `deep-review`: git (e `gh` autenticado para revisão de PRs). Usa o agente `deep-reviewer` desta skill em `<repo>/.omp/agents/` ou `~/.omp/agent/agents/` (projeto vence usuário em colisão de nome).
-- `ship`: repo já bootstrapped pela release-bootstrap; git; gh autenticado; Node >= 18. Requer também a skill `deep-review` + agente `deep-reviewer` instalados (gate) e as skills `alignment`, `bug-diagnosis`, `conflict-resolution` (alinhamento obrigatório, diagnóstico para correções de bug, resolução de conflitos no merge/PR). Integração TDD via `skill://tdd-orchestrator` (opcional mas recomendada para mudanças comportamentais).
+- `ship`: repo já bootstrapped pela release-bootstrap; git; gh autenticado; Node >= 20. Requer também a skill `deep-review` + agente `deep-reviewer` instalados (gate) e as skills `alignment`, `bug-diagnosis`, `conflict-resolution` (alinhamento obrigatório, diagnóstico para correções de bug, resolução de conflitos no merge/PR). Integração TDD via `skill://tdd-orchestrator` (opcional mas recomendada para mudanças comportamentais).
 - `alignment`, `bug-diagnosis`, `conflict-resolution`: sem requisitos externos.
 - `tdd-orchestrator`: nenhum binário externo obrigatório além de git/build do projeto; requer os 8 agentes de `tdd-orchestrator/agents/` disponíveis ao runtime em projeto (`./.omp/agents/`) ou usuário (`~/.omp/agent/agents/`) — projeto vence usuário (o orquestrador verifica e para se faltar algum).
 - `alignment`, `bug-diagnosis` e `conflict-resolution` são adaptações (traduzidas e sem as dependências do ecossistema original) das skills `grilling`, `diagnosing-bugs` e `resolving-merge-conflicts` de github.com/mattpocock/skills (MIT).
@@ -44,6 +45,7 @@ arquivo fora do inventário (7 skills + 9 agentes).
 - Mudanças entram somente via issue → branch (`fix/N-slug` / `feat/N-slug`) → implementação → gate de revisão (skill `deep-review`) → PR (`Closes #N`) → merge. Branch `main` protegida por ruleset (sem push direto).
 - Commits seguem Conventional Commits (validados pelo hook `commit-msg`); o bump SemVer é automático pelo release-please: `fix:` → patch, `feat:` → minor, `!`/`BREAKING CHANGE:` → major. Ninguém edita versão manualmente.
 - O release-please roda via `.github/workflows/release-please.yml` usando o secret `RELEASE_PLEASE_TOKEN` (PAT): PRs criados com o `GITHUB_TOKEN` padrão não disparam o CI no PR de release.
+- Retry do corpo do PR preserva texto já publicado, mantém exactly one `Closes #N` e não duplica marker; `!` e `BREAKING CHANGE:` não são removidos.
 - O hook `pre-push` bloqueia push direto na `main` (bypass documentado: `git push --no-verify`).
 
 ### Desenvolvimento local

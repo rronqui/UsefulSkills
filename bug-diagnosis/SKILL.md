@@ -57,6 +57,57 @@ gatilho 100×, paralelize, adicione estresse, estreite janelas de timing, injete
 sleeps. Bug de 50% de flake é debugável; 1% não é — continue subindo a taxa até
 ficar debugável.
 
+### Critério determinístico para falhas intermitentes
+
+Para cada execução, persista um único registro de reprodução com `attempts`
+(tentativas), `successes` (sucessos), `failures` (falhas) e `rate` (taxa
+observada). A invariável é `attempts = successes + failures` e, quando há
+amostra, `rate = successes / attempts`. Persista também `minimum_sample`,
+`rate_threshold` e `reproducible_environment` (booleano, indicando que o
+ambiente observado é capaz de reproduzir o cenário) antes de iniciar o loop;
+esses valores não podem ser ajustados depois de observar o resultado.
+
+O predicado de avanço é fechado e exatamente:
+`reproducible_environment === true && rate > 0 && attempts >= minimum_sample && rate >= rate_threshold`.
+**Only advance** quando o ambiente for reprodutível, a amostra atingir o
+`threshold` e a `rate` observada for estritamente maior que zero e atingir o
+limiar acordado; a regra acima é a única decisão permitida.
+`rate = 0`, `rate = unknown` e `rate = null` são explicitamente **BLOCKED**;
+um ambiente não reprodutível também é **BLOCKED**, mesmo que a amostra pareça
+suficiente. Não trate taxa ausente como zero silencioso nem invente uma
+conclusão.
+
+Toda decisão deve persistir `decision` (o predicado avaliado e o resultado
+`advance` ou `blocked`) e todo handoff **BLOCKED** deve persistir estes campos:
+`status`: blocked, `reason`, `evidence`, `environment`, `last_command`,
+`next_action`. A `evidence` deve conter `attempts`, `successes`, `failures`,
+`rate`, `minimum_sample`, `rate_threshold` e `reproducible_environment`,
+inclusive quando a taxa for zero ou desconhecida. O registro de `resume`: {
+`attempts`, `successes`, `failures`, `rate`, `minimum_sample`,
+`rate_threshold`, `reproducible_environment` } deve preservar e continuar esses
+valores e a decisão anterior; nunca zere a amostra ao retomar.
+
+Se não houver taxa, se a taxa não for estritamente maior que zero ou não houver
+um `reproducible environment` (ambiente capaz de reproduzir), o diagnóstico fica
+**BLOCKED** com essa evidência. Ao fazer `resume`, leia a prova persistida e
+continue do mesmo registro; se o ambiente continuar incapaz de reproduzir,
+permaneça **BLOCKED**.
+
+### Persistência, limpeza e execução portátil
+
+Qualquer trace, log ou captura que vá para arquivo deve passar por
+**redact-before-write**: redija primeiro, faça a limpeza final e só então
+persista. O scan final deve rejeitar credenciais brutas e remover toda linha
+com marcador `[DEBUG-*]`; um scan que falhar não publica o artefato. O
+template HITL oferece `TRACE_FILE` opcional e aplica redaction, limpeza e
+scan antes do `mv` atômico, preservando `<REDACTED>` no lugar do segredo.
+
+O harness Bash é explicitamente gated: detecte Bash antes de executar o
+cenário e, quando indisponível, marque o teste como skip com o motivo
+(`Bash indisponível`) em vez de trocar por uma rota que enfraqueça a
+redaction.
+
+
 ### Quando realmente não for possível construir um loop
 
 Pare e diga explicitamente. Liste o que tentou. Peça ao usuário: (a) acesso ao
