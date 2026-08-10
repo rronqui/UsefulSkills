@@ -196,9 +196,12 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
      usa somente o contexto local declarado para branch/base, não commitadas, commit ou
      custom.
 3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
-4. Registro de achados e veredito via seções incrementais de `yield`
-   (`type: ["findings"]`, `type: ["overall_correctness"]`, `type: ["explanation"]`,
-   `type: ["confidence"]`); jamais uma ferramenta separada de finding.
+4. Registro de achados, identidade e veredito via seções incrementais de `yield`
+   (`type: ["findings"]` quando houver achados; `type: ["agent"]`,
+   `type: ["status"]`, `type: ["reviewed_revision"]`,
+   `type: ["overall_correctness"]`, `type: ["explanation"]` e
+   `type: ["confidence"]`); cada seção escalar recebe somente seu próprio
+   `result.data`, jamais uma ferramenta separada de finding.
 
 Dispare todos em paralelo na mesma chamada; não serialize.
 
