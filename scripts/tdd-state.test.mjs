@@ -1,25 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const scriptsDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(scriptsDir, "..");
-const skillPath = join(repoRoot, "tdd-orchestrator", "SKILL.md");
-const contractPath = join(
-  repoRoot,
-  "specs",
-  "specs002-integracao-robusta-skills",
-  "contracts",
-  "interface-contract.md",
-);
-const specPath = join(repoRoot, "specs", "specs002-integracao-robusta-skills", "spec.md");
-
-const skill = readFileSync(skillPath, "utf8");
-const contract = readFileSync(contractPath, "utf8");
-const spec = readFileSync(specPath, "utf8");
-
-const T003_AC = ["AC-011", "AC-012", "AC-013", "AC-014", "AC-015", "AC-016", "AC-023"];
+const STATE_MODULE = "../tdd-orchestrator/lib/state.mjs";
 const GATES = [
   "tests",
   "traceability",
@@ -32,766 +13,1595 @@ const GATES = [
   "contract",
   "git_sanity",
 ];
-const FINAL_AC_STATUS = new Set(["COVERED", "IMPLEMENTED", "VALIDATED"]);
+const ACCEPTANCE_CRITERIA = ["AC-008", "AC-009", "AC-010"];
+const VALID_GATE_ORIGINS = ["", "TESTE", "CODIGO", "TOOLING", "REFACTOR", "SPEC-CONTRATO"];
 
-function sectionBetween(source, start, end) {
-  const startAt = source.indexOf(start);
-  const endAt = end ? source.indexOf(end, startAt + start.length) : -1;
-  return source.slice(startAt, endAt === -1 ? undefined : endAt);
+async function loadStateApi() {
+  try {
+    return { api: await import(STATE_MODULE), error: null };
+  } catch (error) {
+    return { api: null, error };
+  }
 }
 
-function expectDocumented(ac, source, requiredPatterns) {
-  const missing = requiredPatterns.filter((pattern) => !pattern.test(source));
-  expect(
-    missing,
-    `${ac}: a regra contratual não está documentada no SKILL.md: ${missing.join(", ")}`,
-  ).toEqual([]);
+function assertStateApiLoaded(loaded) {
+  const requiredExports = [
+    "migrateProgress",
+    "validateProgress",
+    "validateCriteriaMatrix",
+    "validateGateReport",
+    "canPromoteWave",
+  ];
+  const missingExports = requiredExports.filter((exportName) => typeof loaded.api?.[exportName] !== "function");
+  if (!loaded.error && missingExports.length === 0) return loaded.api;
+
+  const reason = loaded.error?.message ?? `missing exports: ${missingExports.join(", ")}`;
+  return Object.fromEntries(
+    requiredExports.map((exportName) => [
+      exportName,
+      () => ({ ok: false, errors: [`state API behavior unavailable: ${reason}`] }),
+    ]),
+  );
 }
 
-function baseTask() {
+function gateValues(status = "pending") {
+  return Object.fromEntries(GATES.map((gate) => [gate, status]));
+}
+
+function gateOrigins(value = "") {
+  return Object.fromEntries(GATES.map((gate) => [gate, value]));
+}
+
+function gateEvidence(value = "") {
+  return Object.fromEntries(GATES.map((gate) => [
+    gate,
+    gate === "spec_kit" && value
+      ? `${value}; spec.md; plan.md; tasks.md; contracts/interface-contract.md`
+      : value,
+  ]));
+}
+
+function criteriaMatrix() {
+  return Object.fromEntries(
+    ACCEPTANCE_CRITERIA.map((ac) => [ac, [`scripts/tdd-state.test.mjs::${ac} behavior`]]),
+  );
+}
+
+function pendingReview() {
   return {
-    id: "T-003",
-    title: "estado TDD",
-    phase: "VALIDATE",
-    attempt: 1,
-    allowed_write_globs: ["scripts/tdd-state.test.mjs"],
-    acceptance_criteria: [...T003_AC],
-    implemented_by: "backend-developer",
-    reviewed_by: "peer-reviewer",
-    red: {
-      status: "PASS",
-      failing_tests: ["scripts/tdd-state.test.mjs::fixture documental"],
-      failure_reason_expected: true,
-      criteria_to_tests: Object.fromEntries(T003_AC.map((ac) => [ac, [`scripts/tdd-state.test.mjs::${ac}`]])),
-      revision_delta: { ac: "", test: "", evidence: "" },
-      revision_baseline_tests: {},
-    },
-    green: { status: "PASS", reason_if_skipped: "", changed_files: ["tdd-orchestrator/SKILL.md"] },
-    refactor: { status: "SKIPPED", reason_if_skipped: "sem alteração" },
-    doc_impact: "applied",
-    gates: Object.fromEntries(GATES.map((gate) => [gate, "PASS"])),
-    gate_origins: Object.fromEntries(GATES.map((gate) => [gate, ""])),
-    gate_evidence: Object.fromEntries(GATES.map((gate) => [gate, `comando ${gate}; trecho PASS`])),
-    blockers: [],
-    evidence: "estado validado",
+    status: "PENDING",
+    agent: "",
+    independent: false,
+    revision: "",
+    evidence: "",
   };
 }
 
-function baseProgress() {
+function approvedTaskReview() {
   return {
+    status: "APPROVED",
+    agent: "peer-reviewer",
+    independent: true,
+    revision: "task-review-sha",
+    evidence: "peer-reviewer output: APPROVED",
+  };
+}
+
+function makeTask(overrides = {}) {
+  const task = {
+    id: "T-003",
+    title: "validar estado TDD",
+    phase: "VALIDATE",
+    attempt: 0,
+    allowed_write_globs: ["scripts/tdd-state.test.mjs", "scripts/integration-validation.test.mjs"],
+    acceptance_criteria: [...ACCEPTANCE_CRITERIA],
+    implemented_by: "backend-developer",
+    reviewed_by: "peer-reviewer",
+    review: pendingReview(),
+    red: {
+      status: "PENDING",
+      failing_tests: [],
+      failure_reason_expected: false,
+      criteria_to_tests: criteriaMatrix(),
+      revision_delta: { ac: "", test: "", evidence: "" },
+      revision_baseline_tests: {},
+    },
+    green: {
+      status: "PENDING",
+      reason_if_skipped: "",
+      changed_files: [],
+      tooling_evidence: "",
+      tooling_suite_evidence: "",
+    },
+    refactor: { status: "PENDING", reason_if_skipped: "" },
+    doc_impact: "none",
+    gates: gateValues(),
+    gate_origins: gateOrigins(),
+    gate_evidence: gateEvidence(),
+    blockers: [],
+    evidence: "",
+  };
+  return {
+    ...task,
+    ...overrides,
+    review: { ...task.review, ...(overrides.review ?? {}) },
+    red: { ...task.red, ...(overrides.red ?? {}) },
+    green: { ...task.green, ...(overrides.green ?? {}) },
+    refactor: { ...task.refactor, ...(overrides.refactor ?? {}) },
+    gates: { ...task.gates, ...(overrides.gates ?? {}) },
+    gate_origins: { ...task.gate_origins, ...(overrides.gate_origins ?? {}) },
+    gate_evidence: { ...task.gate_evidence, ...(overrides.gate_evidence ?? {}) },
+  };
+}
+
+function makeProgress(overrides = {}) {
+  const task = makeTask();
+  const progress = {
     schema_version: "2.2",
     run_id: "2026-08-10T00:00:00.000Z",
     task_source: "TASKS.md",
     updated_at: "2026-08-10T00:00:00.000Z",
     repo: {
       branch_start: "main",
-      branch_work: "feat/tdd-state",
+      branch_work: "fix/36-corrigir-integracao-robusta-das-skills",
       merge_target: "main",
       delivery: "internal",
       merge_status: "",
       pr_url: "",
-      head_start: "abc",
-      head_current: "def",
+      head_start: "abc123",
+      head_current: "def456",
       dirty_at_start: false,
     },
     baseline: {
       status: "PASS",
       tests: "PASS",
-      tests_evidence: "npm test — 117 passed",
+      tests_evidence: "npm test -- --runInBand; 194 passed",
       build: "NA",
-      build_evidence: "ship.config.json: buildCommand=null",
+      build_evidence: "buildCommand=null; NA justificado",
       override_approved: false,
-      known_failures: [{ gate: "build", reason: "buildCommand null", evidence: "ship.config.json" }],
+      known_failures: [{ gate: "build", reason: "buildCommand=null", evidence: "ship.config.json" }],
     },
     spec_kit: {
-      spec: "./specs/specs002-integracao-robusta-skills/spec.md",
-      plan: "./specs/specs002-integracao-robusta-skills/plan.md",
-      tasks: "./specs/specs002-integracao-robusta-skills/tasks.md",
+      spec: "./specs/specs003-convivencia-robusta-skills/spec.md",
+      plan: "./specs/specs003-convivencia-robusta-skills/plan.md",
+      tasks: "./specs/specs003-convivencia-robusta-skills/tasks.md",
       status: "WRITTEN",
       written_at: "2026-08-10T00:00:00.000Z",
       mode: "updated_in_place",
     },
     contract: {
-      file: "./specs/specs002-integracao-robusta-skills/contracts/interface-contract.md",
+      file: "./specs/specs003-convivencia-robusta-skills/contracts/interface-contract.md",
       version: "0.1.0",
       status: "DRAFT",
       na_reason: "",
     },
-    acceptance_criteria: T003_AC.map((id) => ({
+    acceptance_criteria: ACCEPTANCE_CRITERIA.map((id) => ({
       id,
-      desc: `${id} — fixture documental`,
-      source: "./specs/specs002-integracao-robusta-skills/spec.md#criterios-de-aceite",
+      desc: `${id} behavior`,
+      source: "./specs/specs003-convivencia-robusta-skills/spec.md#criterios-de-aceite",
       tasks: ["T-003"],
       status: "VALIDATED",
     })),
     waves: [
       {
         wave: 1,
-        status: "completed",
-        integration: { status: "PASS", evidence: "onda 1 integrada; suíte PASS" },
-        tasks: [baseTask()],
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [task],
       },
     ],
   };
-}
 
-function doneViolations(progress) {
-  const task = progress.waves[0].tasks[0];
-  const violations = [];
-  if (task.blockers.length > 0) violations.push("blockers");
-  if (progress.acceptance_criteria.some((criterion) => !FINAL_AC_STATUS.has(criterion.status))) {
-    violations.push("acceptance criteria");
-  }
-  if (GATES.some((gate) => !["PASS", "NA"].includes(task.gates[gate]))) violations.push("gate status");
-  if (GATES.some((gate) => typeof task.gate_evidence[gate] !== "string" || task.gate_evidence[gate].trim() === "")) {
-    violations.push("gate evidence");
-  }
-  if (progress.waves[0].integration.status !== "PASS") violations.push("integration");
-  if (task.phase !== "DONE") violations.push("phase");
-  return violations;
-}
-
-function matrixErrors(matrix) {
-  const errors = [];
-  if (!matrix || Array.isArray(matrix) || typeof matrix !== "object") return ["matrix must be object"];
-  const keys = Object.keys(matrix);
-  if (keys.length !== T003_AC.length || T003_AC.some((ac) => !keys.includes(ac))) errors.push("missing or extra AC");
-  for (const [ac, references] of Object.entries(matrix)) {
-    if (!T003_AC.includes(ac)) continue;
-    if (!Array.isArray(references) || references.length === 0) {
-      errors.push(`${ac} empty`);
-      continue;
-    }
-    if (references.some((reference) => typeof reference !== "string" || !reference.includes("::"))) {
-      errors.push(`${ac} invalid reference`);
-    }
-  }
-  return errors;
-}
-
-function consolidatedReportErrors(report) {
-  return GATES.flatMap((gate) => {
-    const record = report[gate];
-    if (!record || typeof record.command !== "string" || record.command.trim() === "") return [`${gate}: command`];
-    if (typeof record.output !== "string" || record.output.trim() === "") return [`${gate}: output`];
-    if (record.status === "NA" && (typeof record.reason !== "string" || record.reason.trim() === "")) {
-      return [`${gate}: NA reason`];
-    }
-    return [];
-  });
-}
-const RETRY_PHASES = [
-  "RED",
-  "RED_REVISION",
-  "GREEN",
-  "GREEN_FIX",
-  "REFACTOR",
-  "REFACTOR_FIX",
-  "REVIEW",
-  "DOC",
-  "VALIDATE",
-  "TOOLING_FIX",
-];
-const RETRY_SOURCES = [...RETRY_PHASES, "INTEGRATION"];
-const TOOLING_EVIDENCE_FIELDS = ["tooling_evidence", "tooling_suite_evidence"];
-const NA_AC = "AC-016";
-
-function doneResumeFixture(invalidGate = "coverage") {
-  const fixture = baseProgress();
-  const task = fixture.waves[0].tasks[0];
-  task.phase = "DONE";
-  task.attempt = 2;
-  task.review = {
-    status: "APPROVED",
-    agent: "peer-reviewer",
-    independent: true,
-    evidence: "review SHA def",
-  };
-  task.red.status = "PASS";
-  task.red.failure_reason_expected = true;
-  task.red.failing_tests = ["scripts/tdd-state.test.mjs::DONE resume fixture"];
-  task.gates[invalidGate] = "pending";
-  task.gate_origins[invalidGate] = "CODIGO";
-  task.gate_evidence[invalidGate] = "";
-  fixture.waves[0].integration = {
-    status: "PASS",
-    evidence: "onda 1 integrada; suíte PASS; SHA def",
-  };
-  return fixture;
-}
-
-function doneResumeViolations(progress) {
-  const task = progress.waves[0].tasks[0];
-  const violations = [];
-  if (task.blockers.length > 0) violations.push("blockers");
-  if (progress.acceptance_criteria.some((criterion) => !FINAL_AC_STATUS.has(criterion.status))) {
-    violations.push("acceptance criteria");
-  }
-  if (task.red.status !== "PASS" || task.red.failure_reason_expected !== true) {
-    violations.push("red");
-  }
-  if (
-    task.reviewed_by.trim() === "" ||
-    task.reviewed_by === task.implemented_by ||
-    task.review?.status !== "APPROVED" ||
-    task.review?.independent !== true
-  ) {
-    violations.push("review");
-  }
-  if (progress.waves[0].integration.status !== "PASS") violations.push("integration");
-  return violations;
-}
-
-function invalidMatrixResumeFixture() {
-  const fixture = baseProgress();
-  const task = fixture.waves[0].tasks[0];
-  task.phase = "VALIDATE";
-  task.attempt = 2;
-  task.blockers = ["historical blocker retained"];
-  task.evidence = "historical diagnosis retained";
-  task.red.criteria_to_tests = Object.fromEntries(
-    T003_AC.map((ac) => [ac, [`scripts/tdd-state.test.mjs::${ac}`]]),
-  );
-  task.red.revision_baseline_tests = structuredClone(task.red.criteria_to_tests);
-  delete task.red.criteria_to_tests[NA_AC];
-  return fixture;
-}
-
-function retryCapFixture() {
   return {
-    phases: Object.fromEntries(
-      RETRY_PHASES.map((phase) => [phase, { phase, attempt: 3, expected: "BLOCKED" }]),
-    ),
-    integration: { status: "FAIL", attempt: 3, expected: "BLOCKED" },
+    ...progress,
+    ...overrides,
+    repo: { ...progress.repo, ...(overrides.repo ?? {}) },
+    baseline: { ...progress.baseline, ...(overrides.baseline ?? {}) },
+    contract: { ...progress.contract, ...(overrides.contract ?? {}) },
+    waves: overrides.waves ?? progress.waves,
+    acceptance_criteria: overrides.acceptance_criteria ?? progress.acceptance_criteria,
   };
 }
 
-function toolingFixFixture() {
-  const fixture = baseProgress();
-  const task = fixture.waves[0].tasks[0];
-  task.phase = "TOOLING_FIX";
-  task.gates.lint = "FAIL";
-  task.gate_origins.lint = "TOOLING";
-  task.gate_evidence.lint = "npm run lint — FAIL";
-  task.green.status = "PASS";
-  task.green.tooling_evidence = "npm run lint — PASS";
-  task.green.tooling_suite_evidence = "";
-  return fixture;
+function makeLegacy21Progress() {
+  const progress = makeProgress();
+  const task = progress.waves[0].tasks[0];
+  progress.schema_version = "2.1";
+  progress.repo.branch = progress.repo.branch_work;
+  delete progress.repo.branch_work;
+  task.reviewer = task.reviewed_by;
+  delete task.reviewed_by;
+  delete task.review;
+  task.gates.rastreabilidade = task.gates.traceability;
+  delete task.gates.traceability;
+  delete progress.waves[0].integration.attempt;
+  return progress;
 }
 
-function toolingEvidenceReady(task) {
-  const toolingGate = GATES.find((gate) => task.gate_origins[gate] === "TOOLING");
-  return (
-    task.phase === "TOOLING_FIX" &&
-    toolingGate !== undefined &&
-    TOOLING_EVIDENCE_FIELDS.every(
-      (field) => typeof task.green[field] === "string" && task.green[field].trim() !== "",
-    )
-  );
+function expectAccepted(result) {
+  expect(result).toMatchObject({ ok: true, errors: [] });
+  expect(result.value).toBeDefined();
+  return result.value;
 }
 
-function strictMatrixErrors(matrix) {
-  const errors = [];
-  if (!matrix || Array.isArray(matrix) || typeof matrix !== "object") return ["matrix must be object"];
-  const keys = Object.keys(matrix);
-  if (keys.length !== T003_AC.length || T003_AC.some((ac) => !keys.includes(ac))) {
-    errors.push("missing or extra AC");
-  }
-  for (const ac of T003_AC) {
-    const entry = matrix[ac];
-    if (entry && !Array.isArray(entry) && entry.status === "NA") {
-      if (typeof entry.reason !== "string" || entry.reason.trim() === "") errors.push(`${ac} NA reason`);
-      if (entry.validator !== "validator") errors.push(`${ac} NA validator`);
-      if (
-        typeof entry.evidence !== "string" ||
-        !/(?:contract|interface-contract|spec\.md)/i.test(entry.evidence) ||
-        entry.evidence.trim() === ""
-      ) {
-        errors.push(`${ac} NA evidence`);
-      }
-      if (typeof entry.reference !== "string" || !entry.reference.includes(ac)) {
-        errors.push(`${ac} NA reference`);
-      }
-      continue;
-    }
-    if (!Array.isArray(entry) || entry.length === 0) {
-      errors.push(`${ac} empty`);
-      continue;
-    }
-    for (const reference of entry) {
-      if (typeof reference !== "string") {
-        errors.push(`${ac} invalid reference`);
-        continue;
-      }
-      const separator = reference.indexOf("::");
-      if (
-        separator <= 0 ||
-        separator === reference.length - 2 ||
-        reference.slice(0, separator).trim() === "" ||
-        reference.slice(separator + 2).trim() === ""
-      ) {
-        errors.push(`${ac} invalid reference`);
-      }
-    }
-  }
-  return errors;
+function expectRejected(result, errorPattern) {
+  expect(result.ok).toBe(false);
+  expect(result).not.toHaveProperty("value");
+  expect(Array.isArray(result.errors)).toBe(true);
+  expect(result.errors.join(" ")).toMatch(errorPattern);
 }
 
-function waveOrderingErrors(wave) {
-  const errors = [];
-  const allTasksDone = wave.tasks.every((task) => task.phase === "DONE");
-  if (wave.integration.status === "PASS" && !allTasksDone) {
-    errors.push("integration before all tasks DONE");
-  }
-  if (wave.status === "completed" && wave.integration.status !== "PASS") {
-    errors.push("completed wave without integration PASS");
-  }
-  return errors;
-}
-
-function resolveAgent(projectAgents, userAgents, basename) {
-  const project = projectAgents.filter((entry) => entry.basename === basename);
-  const user = userAgents.filter((entry) => entry.basename === basename);
-  const duplicate = project.length > 0 && user.length > 0;
-  return {
-    selected: project[0]?.path ?? user[0]?.path ?? null,
-    duplicate,
-    reports: {
-      stale: [],
-      extras: [],
-      typeConflicts: [],
+function fullyValidTask(overrides = {}) {
+  return makeTask({
+    phase: "DONE",
+    review: approvedTaskReview(),
+    red: {
+      status: "PASS",
+      failing_tests: ["scripts/tdd-state.test.mjs::red assertion"],
+      failure_reason_expected: true,
+      criteria_to_tests: criteriaMatrix(),
+      revision_delta: { ac: "", test: "", evidence: "" },
+      revision_baseline_tests: {},
     },
-  };
+    green: {
+      status: "PASS",
+      reason_if_skipped: "",
+      changed_files: ["tdd-orchestrator/lib/state.mjs"],
+      tooling_evidence: "",
+      tooling_suite_evidence: "",
+    },
+    refactor: { status: "PASS", reason_if_skipped: "" },
+    gates: gateValues("PASS"),
+    gate_origins: gateOrigins(),
+    gate_evidence: gateEvidence("npm test -- target; output: PASS"),
+    ...overrides,
+  });
 }
 
-describe("T-003 — estado TDD 2.2, retomada e integração (RED documental)", () => {
-  it("AC-011 — rejeita campos desconhecidos e enums inválidos antes de tratar o JSON como progresso", () => {
-    const fixture = baseProgress();
-    fixture.unexpected_field = "não permitido";
-    fixture.contract.status = "INVALID_CONTRACT_STATUS";
-    fixture.waves[0].tasks[0].phase = "UNKNOWN_PHASE";
-    fixture.waves[0].tasks[0].gates.tests = "UNKNOWN_GATE";
-    fixture.waves[0].tasks[0].gate_origins.tests = "UNKNOWN_ORIGIN";
-    fixture.repo.delivery = "UNKNOWN_DELIVERY";
-    fixture.spec_kit.status = "UNKNOWN_SPEC_STATUS";
-    fixture.waves[0].status = "UNKNOWN_WAVE_STATUS";
-    fixture.waves[0].integration.status = "UNKNOWN_INTEGRATION_STATUS";
-    fixture.waves[0].tasks[0].red.status = "UNKNOWN_RED_STATUS";
-    fixture.waves[0].tasks[0].green.status = "UNKNOWN_GREEN_STATUS";
-    fixture.waves[0].tasks[0].refactor.status = "UNKNOWN_REFACTOR_STATUS";
-    fixture.waves[0].tasks[0].doc_impact = "UNKNOWN_DOC_IMPACT";
+function normativeEntry(ac = "AC-019") {
+  return {
+    status: "NA",
+    reason: "critério exclusivamente normativo",
+    validator: "spec-kit-validator",
+    evidence: "interface-contract.md#invariantes",
+    reference: `spec.md#${ac}`,
+  };
+}
+function legacyBaseline({ status = "FAIL", tests = "NA", build = "NA", overrideApproved = true } = {}) {
+  const progress = makeLegacy21Progress();
+  progress.baseline.status = status;
+  progress.baseline.tests = tests;
+  progress.baseline.tests_evidence = `npx vitest run; tests=${tests}`;
+  progress.baseline.build = build;
+  progress.baseline.build_evidence = `ship.config.json: buildCommand=${build === "NA" ? "null" : "configured"}`;
+  progress.baseline.override_approved = overrideApproved;
+  progress.baseline.known_failures = [
+    { gate: "tests", reason: "baseline tests result retained", evidence: `tests=${tests}` },
+    { gate: "build", reason: "baseline build result retained", evidence: `build=${build}` },
+  ];
+  return progress;
+}
 
-    expect(fixture.repo.delivery).toBe("UNKNOWN_DELIVERY");
-    expect(fixture.spec_kit.status).toBe("UNKNOWN_SPEC_STATUS");
-    expect(fixture.waves[0].status).toBe("UNKNOWN_WAVE_STATUS");
-    expect(fixture.waves[0].integration.status).toBe("UNKNOWN_INTEGRATION_STATUS");
-    expect(fixture.waves[0].tasks[0].red.status).toBe("UNKNOWN_RED_STATUS");
-    expect(fixture.waves[0].tasks[0].green.status).toBe("UNKNOWN_GREEN_STATUS");
-    expect(fixture.waves[0].tasks[0].refactor.status).toBe("UNKNOWN_REFACTOR_STATUS");
-    expect(fixture.waves[0].tasks[0].doc_impact).toBe("UNKNOWN_DOC_IMPACT");
+describe("T-003 — state migration and validation seams", () => {
+  it("AC-008 — migrates only the documented 2.1 aliases and initializes compatibility metadata", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    expect(fixture.schema_version).toBe("2.2");
-    expect(fixture.unexpected_field).toBe("não permitido");
-    expect(fixture.waves[0].tasks[0].phase).toBe("UNKNOWN_PHASE");
-    expect(fixture.waves[0].tasks[0].gates.tests).toBe("UNKNOWN_GATE");
-    expect(fixture.waves[0].tasks[0].gate_origins.tests).toBe("UNKNOWN_ORIGIN");
+    const legacy = makeLegacy21Progress();
+    const original = structuredClone(legacy);
+    const migrated = expectAccepted(api.migrateProgress(legacy));
 
-    const resumeRules = sectionBetween(skill, "### Passo 0 — Retomada", "### Esquema do `progress.json`");
-    expectDocumented("AC-011", resumeRules, [
-      /campos?\s+(?:desconhecidos|extras)|chaves?\s+(?:desconhecidas|extras)/i,
-      /gate_origins[^\n]{0,140}(?:enum|valores aceitos|origens aceitas)/i,
-      /contract\.status[^\n]{0,140}NA[^\n]{0,140}(?:na_reason|justificativa)/i,
-    ]);
+    expect(migrated.schema_version).toBe("2.2");
+    expect(migrated.repo.branch_work).toBe("fix/36-corrigir-integracao-robusta-das-skills");
+    expect(migrated.repo.branch).toBeUndefined();
+    expect(migrated.waves[0].tasks[0].reviewed_by).toBe("peer-reviewer");
+    expect(migrated.waves[0].tasks[0].reviewer).toBeUndefined();
+    expect(migrated.waves[0].tasks[0].gates.traceability).toBe("pending");
+    expect(migrated.waves[0].tasks[0].gates.rastreabilidade).toBeUndefined();
+    expect(migrated.waves[0].integration.attempt).toBe(0);
+    expect(migrated.waves[0].tasks[0].review).toEqual(pendingReview());
+    expect(legacy).toEqual(original);
   });
 
-  it("AC-011 — conserva diagnóstico e reabre/escalona quando a tentativa inválida não pode ser normalizada", () => {
-    const fixture = baseProgress();
-    fixture.waves[0].tasks[0].phase = "VALIDATE";
-    fixture.waves[0].tasks[0].attempt = 3;
-    fixture.waves[0].tasks[0].blockers = ["enum inválido no resume"];
-    fixture.waves[0].tasks[0].evidence = "diagnóstico original";
+  it("AC-008 — rejects alias collisions, unknown aliases and unknown canonical keys without discarding diagnostics", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    expect(fixture.waves[0].tasks[0].attempt).toBe(3);
-    expect(fixture.waves[0].tasks[0].blockers).toHaveLength(1);
-    expect(fixture.waves[0].tasks[0].evidence).toBe("diagnóstico original");
+    const collision = makeLegacy21Progress();
+    collision.repo.branch_work = "another-branch";
+    collision.waves[0].tasks[0].blockers = ["collision diagnosis"];
+    collision.waves[0].tasks[0].evidence = "collision evidence";
+    const collisionResult = api.migrateProgress(collision);
+    expectRejected(collisionResult, /collision|colis[aã]o/i);
+    expect(collisionResult.errors.join(" ")).toContain("collision diagnosis");
 
-    const resumeRules = sectionBetween(skill, "### Passo 0 — Retomada", "### Esquema do `progress.json`");
-    expectDocumented("AC-011", resumeRules, [
-      /tentativa[^\n]{0,120}(?:inválid|desconhecid)[^\n]{0,160}(?:diagnóstico|histórico)[^\n]{0,160}(?:BLOCKED|bloque)/i,
-      /attempt\s*>=\s*3[^\n]{0,160}(?:preserv|mant)[^\n]{0,160}(?:escal|BLOCKED)/i,
-    ]);
+    const unknownAlias = makeLegacy21Progress();
+    unknownAlias.repo.branch_legacy = "silently-forbidden";
+    unknownAlias.waves[0].tasks[0].blockers = ["unknown alias diagnosis"];
+    const unknownAliasResult = api.migrateProgress(unknownAlias);
+    expectRejected(unknownAliasResult, /unknown|desconhecid|allowlist/i);
+    expect(unknownAliasResult.errors.join(" ")).toContain("unknown alias diagnosis");
+
+    const unknownCanonical = makeProgress({ unexpected_field: true });
+    const validationResult = api.validateProgress(unknownCanonical);
+    expectRejected(validationResult, /unknown|desconhecid|extra|chave/i);
   });
 
-  it("AC-012 — impede DONE/commit para cada violação independente de gate, AC, blocker ou integração", () => {
-    const variants = [
-      ["blocker", (progress) => { progress.waves[0].tasks[0].blockers = ["review pendente"]; }],
-      ["AC não final", (progress) => { progress.acceptance_criteria[0].status = "PENDING"; }],
-      ["gate pendente", (progress) => { progress.waves[0].tasks[0].gates.tests = "pending"; }],
-      ["evidência vazia", (progress) => { progress.waves[0].tasks[0].gate_evidence.tests = ""; }],
-      ["integração pendente", (progress) => { progress.waves[0].integration.status = "pending"; }],
+  it("AC-008 — converts legacy wave BLOCKED and caps integration attempts while preserving history", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacyBlocked = makeLegacy21Progress();
+    const blockedTask = legacyBlocked.waves[0].tasks[0];
+    legacyBlocked.waves[0].status = "BLOCKED";
+    legacyBlocked.waves[0].integration = {
+      status: "FAIL",
+      attempt: 2,
+      evidence: "integration attempt 2 failed; output retained",
+    };
+    blockedTask.phase = "BLOCKED";
+    blockedTask.blockers = ["merge conflict diagnosis"];
+    blockedTask.evidence = "original integration evidence";
+
+    const migratedBlocked = expectAccepted(api.migrateProgress(legacyBlocked));
+    expect(migratedBlocked.waves[0].status).toBe("in_progress");
+    expect(migratedBlocked.waves[0].integration.status).toBe("FAIL");
+    expect(migratedBlocked.waves[0].integration.attempt).toBe(2);
+    expect(migratedBlocked.waves[0].tasks[0].phase).toBe("BLOCKED");
+    expect(migratedBlocked.waves[0].tasks[0].blockers).toEqual(["merge conflict diagnosis"]);
+    expect(migratedBlocked.waves[0].tasks[0].evidence).toBe("original integration evidence");
+
+    const incremented = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "FAIL", attempt: 2, evidence: "attempt 2 output" },
+        tasks: [makeTask({ phase: "BLOCKED", blockers: ["retry history"], evidence: "attempt 2 evidence" })],
+      }],
+    });
+    const incrementedValidation = api.validateProgress(incremented);
+    expect(incrementedValidation.ok).toBe(true);
+    expect(incremented.waves[0].integration.attempt).toBe(2);
+
+    const capped = structuredClone(incremented);
+    capped.waves[0].integration.attempt = 3;
+    const cappedMigration = expectAccepted(api.migrateProgress(capped));
+    expect(cappedMigration.waves[0].integration.attempt).toBe(3);
+    expect(cappedMigration.waves[0].tasks[0].phase).toBe("BLOCKED");
+    expect(cappedMigration.waves[0].tasks[0].blockers).toEqual(["retry history"]);
+    expect(cappedMigration.waves[0].tasks[0].evidence).toBe("attempt 2 evidence");
+
+    const invalidAttempt = structuredClone(incremented);
+    invalidAttempt.waves[0].integration.attempt = -1;
+    expectRejected(api.validateProgress(invalidAttempt), /attempt|inteiro|negativ/i);
+    invalidAttempt.waves[0].integration.attempt = 1.5;
+    expectRejected(api.validateProgress(invalidAttempt), /attempt|inteiro|integer/i);
+  });
+  it("AC-008 regression — migração de wave BLOCKED legada força integration FAIL", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacyBlocked = makeLegacy21Progress();
+    const blockedTask = legacyBlocked.waves[0].tasks[0];
+    legacyBlocked.waves[0].status = "BLOCKED";
+    legacyBlocked.waves[0].integration = {
+      status: "PASS",
+      attempt: 1,
+      evidence: "stale integration PASS from legacy state",
+    };
+    blockedTask.phase = "BLOCKED";
+    blockedTask.blockers = ["legacy integration blocked"];
+    blockedTask.evidence = "legacy blocker evidence";
+
+    const migrated = expectAccepted(api.migrateProgress(legacyBlocked));
+    expect(migrated.waves[0].status).toBe("in_progress");
+    expect(migrated.waves[0].integration.status).toBe("FAIL");
+    expect(migrated.waves[0].integration.evidence).not.toBe("");
+    expect(migrated.waves[0].tasks[0].phase).toBe("BLOCKED");
+  });
+
+  it("AC-008 — validates gate origins/enums and non-empty command-plus-output evidence", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const valid = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [makeTask({
+          phase: "RED",
+          gates: gateValues("PASS"),
+          gate_origins: gateOrigins(),
+          gate_evidence: gateEvidence("npm run gate; output: PASS"),
+        })],
+      }],
+    });
+    expect(api.validateProgress(valid).ok).toBe(true);
+
+    const invalidOrigin = structuredClone(valid);
+    invalidOrigin.waves[0].tasks[0].gates.tests = "FAIL";
+    invalidOrigin.waves[0].tasks[0].gate_origins.tests = "UNTRUSTED";
+    invalidOrigin.waves[0].tasks[0].gate_evidence.tests = "npm test; output: FAIL";
+    expectRejected(api.validateProgress(invalidOrigin), /origin|origem|enum|UNTRUSTED/i);
+
+    const originOnPass = structuredClone(valid);
+    originOnPass.waves[0].tasks[0].gate_origins.tests = "TESTE";
+    expectRejected(api.validateProgress(originOnPass), /origin|origem|PASS|FAIL/i);
+
+    const missingEvidence = structuredClone(valid);
+    missingEvidence.waves[0].tasks[0].gate_evidence.coverage = "";
+    expectRejected(api.validateProgress(missingEvidence), /evidence|evid[eê]ncia|coverage/i);
+
+    const invalidEnum = structuredClone(valid);
+    invalidEnum.waves[0].tasks[0].gates.tests = "UNKNOWN";
+    expectRejected(api.validateProgress(invalidEnum), /enum|status|UNKNOWN/i);
+  });
+
+  it("AC-009 — accepts DONE only as a pre-integration readiness marker and keeps validation inputs immutable", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const preIntegration = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [fullyValidTask()],
+      }],
+    });
+    const before = structuredClone(preIntegration);
+    const result = api.validateProgress(preIntegration);
+    expect(result).toMatchObject({ ok: true, errors: [] });
+    expect(preIntegration).toEqual(before);
+    expect(preIntegration.waves[0].tasks[0].phase).toBe("DONE");
+    expect(preIntegration.waves[0].integration.status).toBe("pending");
+
+    const invalidDone = structuredClone(preIntegration);
+    invalidDone.waves[0].tasks[0].blockers = ["still blocked"];
+    expectRejected(api.validateProgress(invalidDone), /DONE|blocker|bloque/i);
+
+    const pendingPromotion = api.canPromoteWave(preIntegration.waves[0]);
+    expect(pendingPromotion.ok).toBe(false);
+    expect(pendingPromotion.errors.join(" ")).toMatch(/integration|pending|promo/i);
+  });
+  it("AC-009 regression — DONE exige GREEN PASS e REFACTOR PASS ou SKIPPED", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const pendingGreen = fullyValidTask({
+      green: {
+        status: "PENDING",
+        reason_if_skipped: "",
+        changed_files: [],
+        tooling_evidence: "",
+        tooling_suite_evidence: "",
+      },
+      refactor: { status: "PASS", reason_if_skipped: "" },
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [pendingGreen],
+      }],
+    })), /DONE|green|PASS|SKIPPED/i);
+
+    const skippedGreen = fullyValidTask({
+      green: {
+        status: "SKIPPED",
+        reason_if_skipped: "comportamento já implementado",
+        changed_files: [],
+        tooling_evidence: "",
+        tooling_suite_evidence: "",
+      },
+      refactor: { status: "SKIPPED", reason_if_skipped: "sem alteração a refatorar" },
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [skippedGreen],
+      }],
+    })), /DONE|green|PASS|SKIPPED/i);
+    const pendingRefactor = fullyValidTask({
+      green: {
+        status: "PASS",
+        reason_if_skipped: "",
+        changed_files: ["tdd-orchestrator/lib/state.mjs"],
+        tooling_evidence: "",
+        tooling_suite_evidence: "",
+      },
+      refactor: { status: "PENDING", reason_if_skipped: "" },
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [pendingRefactor],
+      }],
+    })), /DONE|refactor|PASS|SKIPPED/i);
+
+    const skippedRefactor = fullyValidTask({
+      refactor: { status: "SKIPPED", reason_if_skipped: "sem alteração a refatorar" },
+    });
+    expect(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [skippedRefactor],
+      }],
+    })).ok).toBe(true);
+  });
+
+  it("AC-010 — enforces executable AC→test matrix, exact normative NA, and RED/RED_REVISION evidence", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const validTask = fullyValidTask({ phase: "GREEN" });
+    const matrixResult = api.validateCriteriaMatrix(validTask);
+    expect(matrixResult).toMatchObject({ ok: true, errors: [] });
+
+    const missing = structuredClone(validTask);
+    delete missing.red.criteria_to_tests["AC-009"];
+    expectRejected(api.validateCriteriaMatrix(missing), /missing|ausent|AC-009/i);
+
+    const extra = structuredClone(validTask);
+    extra.red.criteria_to_tests["AC-999"] = ["scripts/tdd-state.test.mjs::unknown AC"];
+    expectRejected(api.validateCriteriaMatrix(extra), /extra|unknown|desconhecid|AC-999/i);
+
+    const malformed = structuredClone(validTask);
+    malformed.red.criteria_to_tests["AC-008"] = ["not-a-seam"];
+    expectRejected(api.validateCriteriaMatrix(malformed), /::|seam|refer[eê]ncia/i);
+
+    const nonNormativeNa = structuredClone(validTask);
+    nonNormativeNa.red.criteria_to_tests["AC-008"] = {
+      status: "NA",
+      reason: "not executable",
+      validator: "spec-kit-validator",
+      evidence: "interface-contract.md#invariantes",
+      reference: "spec.md#AC-008",
+    };
+    expectRejected(api.validateCriteriaMatrix(nonNormativeNa), /NA|normativ|execut/i);
+
+    const normative = makeTask({
+      acceptance_criteria: ["AC-019"],
+      red: {
+        criteria_to_tests: {
+          "AC-019": {
+            status: "NA",
+            reason: "critério exclusivamente normativo",
+            validator: "spec-kit-validator",
+            evidence: "interface-contract.md#invariantes",
+            reference: "spec.md#AC-019",
+          },
+        },
+      },
+    });
+    expect(api.validateCriteriaMatrix(normative)).toMatchObject({ ok: true, errors: [] });
+
+    const extraNaField = structuredClone(normative);
+    extraNaField.red.criteria_to_tests["AC-019"].extra = "forbidden";
+    expectRejected(api.validateCriteriaMatrix(extraNaField), /exact|extra|chave/i);
+
+    const redReady = fullyValidTask({
+      phase: "GREEN",
+      red: {
+        status: "PASS",
+        failing_tests: ["scripts/tdd-state.test.mjs::assertion failure"],
+        failure_reason_expected: true,
+        criteria_to_tests: criteriaMatrix(),
+        revision_delta: { ac: "", test: "", evidence: "" },
+        revision_baseline_tests: {},
+      },
+    });
+    expect(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [redReady] }] }))).toMatchObject({ ok: true, errors: [] });
+
+    const existingBehavior = fullyValidTask({
+      phase: "REVIEW",
+      implemented_by: "existing-code",
+      red: {
+        status: "PASS",
+        failing_tests: [],
+        failure_reason_expected: false,
+        criteria_to_tests: criteriaMatrix(),
+        revision_delta: { ac: "", test: "", evidence: "" },
+        revision_baseline_tests: {},
+      },
+      green: { status: "SKIPPED", reason_if_skipped: "comportamento já implementado", changed_files: [], tooling_evidence: "", tooling_suite_evidence: "" },
+      refactor: { status: "SKIPPED", reason_if_skipped: "sem alteração a refatorar" },
+    });
+    expect(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [existingBehavior] }] }))).toMatchObject({ ok: true, errors: [] });
+
+    const falseRed = structuredClone(redReady);
+    falseRed.red.failure_reason_expected = false;
+    expectRejected(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [falseRed] }] })), /failure_reason_expected|assert|RED/i);
+
+    const revision = fullyValidTask({
+      phase: "RED_REVISION",
+      red: {
+        status: "PASS",
+        failing_tests: ["scripts/tdd-state.test.mjs::new regression assertion"],
+        failure_reason_expected: true,
+        criteria_to_tests: {
+          ...criteriaMatrix(),
+          "AC-008": [
+            "scripts/tdd-state.test.mjs::old baseline seam",
+            "scripts/tdd-state.test.mjs::new regression assertion",
+          ],
+        },
+        revision_delta: {
+          ac: "AC-008",
+          test: "scripts/tdd-state.test.mjs::new regression assertion",
+          evidence: "vitest assertion failed: expected blocked state",
+        },
+        revision_baseline_tests: {
+          "AC-008": ["scripts/tdd-state.test.mjs::old baseline seam"],
+          "AC-009": criteriaMatrix()["AC-009"],
+          "AC-010": criteriaMatrix()["AC-010"],
+        },
+      },
+    });
+    expect(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [revision] }] }))).toMatchObject({ ok: true, errors: [] });
+
+    const invalidRevision = structuredClone(revision);
+    invalidRevision.red.revision_delta.test = "scripts/tdd-state.test.mjs::old baseline seam";
+    expectRejected(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [invalidRevision] }] })), /revision|delta|baseline|new/i);
+  });
+  it("AC-010 regression — retomada 2.2 em RED_REVISION limpa toda prova stale e preserva a baseline", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const baselineRef = "scripts/tdd-state.test.mjs::previous revision assertion";
+    const staleRef = "scripts/tdd-state.test.mjs::stale revision assertion";
+    const progress = makeProgress();
+    const task = progress.waves[0].tasks[0];
+    task.phase = "RED_REVISION";
+    task.review = approvedTaskReview();
+    task.red.status = "PASS";
+    task.red.failing_tests = [staleRef];
+    task.red.failure_reason_expected = true;
+    task.red.criteria_to_tests = {
+      "AC-008": [baselineRef, staleRef],
+      "AC-009": criteriaMatrix()["AC-009"],
+      "AC-010": criteriaMatrix()["AC-010"],
+    };
+    task.red.revision_delta = {
+      ac: "AC-008",
+      test: staleRef,
+      evidence: "vitest assertion failed: stale revision proof",
+    };
+    task.red.revision_baseline_tests = {
+      "AC-008": [baselineRef],
+      "AC-009": criteriaMatrix()["AC-009"],
+      "AC-010": criteriaMatrix()["AC-010"],
+    };
+
+    const resumed = expectAccepted(api.migrateProgress(progress));
+    const resumedTask = resumed.waves[0].tasks[0];
+    expect(resumedTask.phase).toBe("RED_REVISION");
+    expect(resumedTask.red.revision_baseline_tests).toEqual(task.red.revision_baseline_tests);
+    expect(resumedTask.red.revision_delta).toEqual({ ac: "", test: "", evidence: "" });
+    expect(resumedTask.red.failing_tests).toEqual([]);
+    expect(resumedTask.red.failure_reason_expected).toBe(false);
+  });
+  it("AC-010 regression — accepts only canonical spec-kit-validator for normative NA", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const canonical = makeTask({
+      acceptance_criteria: ["AC-019"],
+      red: {
+        criteria_to_tests: {
+          "AC-019": {
+            status: "NA",
+            reason: "critério exclusivamente normativo",
+            validator: "spec-kit-validator",
+            evidence: "interface-contract.md#invariantes",
+            reference: "spec.md#AC-019",
+          },
+        },
+      },
+    });
+    const legacy = structuredClone(canonical);
+    legacy.red.criteria_to_tests["AC-019"].validator = "validator";
+    expectRejected(api.validateCriteriaMatrix(legacy), /validator|literal|canonical/i);
+    expect(api.validateCriteriaMatrix(canonical)).toMatchObject({ ok: true, errors: [] });
+  });
+  it("AC-008 regression — completa a ponte 2.1→2.2, converte READY/textual matrix e inicializa campos novos", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacy = makeLegacy21Progress();
+    const task = legacy.waves[0].tasks[0];
+    task.phase = "READY";
+    task.red.criteria_to_tests = [
+      "AC-008 -> scripts/tdd-state.test.mjs::legacy migration matrix",
+      "AC-009: scripts/tdd-state.test.mjs::legacy DONE readiness",
+      "AC-010 -> scripts/tdd-state.test.mjs::legacy evidence matrix",
+      "",
+    ].join("\n");
+    delete legacy.baseline.override_approved;
+    delete task.red.revision_delta;
+    delete task.red.revision_baseline_tests;
+    delete task.green.reason_if_skipped;
+    delete task.green.tooling_evidence;
+    delete task.green.tooling_suite_evidence;
+    delete task.refactor.reason_if_skipped;
+    delete task.gate_origins;
+    delete task.gate_evidence;
+
+    const migrated = expectAccepted(api.migrateProgress(legacy));
+    const migratedTask = migrated.waves[0].tasks[0];
+    expect(migrated.schema_version).toBe("2.2");
+    expect(migratedTask.phase).toBe("REVIEW");
+    expect(migratedTask.review).toEqual(pendingReview());
+    expect(migratedTask.red.criteria_to_tests).toEqual({
+      "AC-008": ["scripts/tdd-state.test.mjs::legacy migration matrix"],
+      "AC-009": ["scripts/tdd-state.test.mjs::legacy DONE readiness"],
+      "AC-010": ["scripts/tdd-state.test.mjs::legacy evidence matrix"],
+    });
+    expect(migratedTask.red.revision_delta).toEqual({ ac: "", test: "", evidence: "" });
+    expect(migratedTask.red.revision_baseline_tests).toEqual({});
+    expect(migratedTask.green.reason_if_skipped).toBe("");
+    expect(migratedTask.green.tooling_evidence).toBe("");
+    expect(migratedTask.green.tooling_suite_evidence).toBe("");
+    expect(migratedTask.refactor.reason_if_skipped).toBe("");
+    expect(migratedTask.gate_origins).toEqual(gateOrigins(""));
+    expect(migratedTask.gate_evidence).toEqual(gateEvidence(""));
+    expect(migrated.baseline.override_approved).toBe(false);
+
+    const malformedMatrix = makeLegacy21Progress();
+    malformedMatrix.waves[0].tasks[0].red.criteria_to_tests = [
+      "AC-008 -> scripts/tdd-state.test.mjs::valid row",
+      "not an AC mapping",
+    ].join("\n");
+    malformedMatrix.waves[0].tasks[0].blockers = ["legacy matrix diagnosis"];
+    malformedMatrix.waves[0].tasks[0].evidence = "legacy matrix evidence";
+    const malformedResult = api.migrateProgress(malformedMatrix);
+    expectRejected(malformedResult, /matrix|invalid|AC-009/i);
+    expect(malformedResult.errors.join(" ")).toContain("legacy matrix diagnosis");
+  });
+
+  it("AC-008 regression — baseline NA só normaliza PASS com known_failure/evidence específicos", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const justifiedNa = legacyBaseline({ status: "FAIL", tests: "NA", build: "NA" });
+    const normalizedNa = expectAccepted(api.migrateProgress(justifiedNa));
+    expect(normalizedNa.baseline.status).toBe("PASS");
+    expect(normalizedNa.baseline.known_failures).toEqual(justifiedNa.baseline.known_failures);
+  });
+
+  it("AC-008 regression — baseline FAIL é recalculada e preserva override aprovado", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const failed = legacyBaseline({ status: "PASS", tests: "FAIL", build: "NA" });
+    const normalizedFail = expectAccepted(api.migrateProgress(failed));
+    expect(normalizedFail.baseline.status).toBe("FAIL");
+    expect(normalizedFail.baseline.override_approved).toBe(true);
+    expect(normalizedFail.baseline.tests_evidence).toContain("FAIL");
+  });
+
+  it("AC-008 regression — baseline FAIL sem override explícito permanece bloqueada", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const withoutOverride = legacyBaseline({
+      status: "FAIL",
+      tests: "FAIL",
+      build: "NA",
+      overrideApproved: false,
+    });
+    expectRejected(api.migrateProgress(withoutOverride), /override|aprova|baseline|FAIL/i);
+  });
+  it("AC-008 regression — baseline FAIL com override ainda exige evidência de cada gate PASS", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const missingTestsEvidence = makeProgress({
+      baseline: {
+        status: "FAIL",
+        tests: "PASS",
+        tests_evidence: "",
+        build: "FAIL",
+        build_evidence: "baseline build command; output: FAIL",
+        override_approved: true,
+        known_failures: [{
+          gate: "build",
+          reason: "baseline build failure retained",
+          evidence: "baseline build command; output: FAIL",
+        }],
+      },
+    });
+    expectRejected(api.validateProgress(missingTestsEvidence), /baseline|tests|evidence|evid[eê]ncia/i);
+
+    const missingBuildEvidence = makeProgress({
+      baseline: {
+        status: "FAIL",
+        tests: "FAIL",
+        tests_evidence: "baseline tests command; output: FAIL",
+        build: "PASS",
+        build_evidence: "",
+        override_approved: true,
+        known_failures: [{
+          gate: "tests",
+          reason: "baseline test failure retained",
+          evidence: "baseline tests command; output: FAIL",
+        }],
+      },
+    });
+    expectRejected(api.validateProgress(missingBuildEvidence), /baseline|build|evidence|evid[eê]ncia/i);
+  });
+
+  it("AC-008 regression — malformed waves falham fechadas sem throw", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const malformed = makeLegacy21Progress();
+    malformed.waves = [null];
+    let outcome;
+    let thrown;
+    try {
+      outcome = api.migrateProgress(malformed);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown, "malformed wave must be rejected as data, not throw").toBeUndefined();
+    expect(outcome?.ok).toBe(false);
+    expect(outcome?.errors?.join(" ")).toMatch(/wave|object|malform/i);
+  });
+
+  it("AC-008 regression — task attempt 3 bloqueia nova delegação e preserva diagnóstico", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const capped = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [makeTask({
+          phase: "VALIDATE",
+          attempt: 3,
+          blockers: ["task retry history"],
+          evidence: "attempt 3 evidence retained",
+        })],
+      }],
+    });
+    const cappedMigration = expectAccepted(api.migrateProgress(capped));
+    expect(cappedMigration.waves[0].tasks[0].phase).toBe("BLOCKED");
+    expect(cappedMigration.waves[0].tasks[0].attempt).toBe(3);
+    expect(cappedMigration.waves[0].tasks[0].blockers).toEqual(["task retry history"]);
+    expect(cappedMigration.waves[0].tasks[0].evidence).toBe("attempt 3 evidence retained");
+  });
+  it("AC-008 regression — schema 2.2 integration FAIL no attempt cap bloqueia tarefa não resolvida", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const exhaustedIntegration = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: {
+          status: "FAIL",
+          attempt: 3,
+          evidence: "integration attempt 3 failed; output retained",
+        },
+        tasks: [makeTask({
+          phase: "VALIDATE",
+          blockers: [],
+          evidence: "task remains unblocked despite exhausted integration",
+        })],
+      }],
+    });
+    expectRejected(api.validateProgress(exhaustedIntegration), /integration|attempt|cap|BLOCKED|bloque/i);
+  });
+
+  it("AC-008 regression — review PENDING nunca carrega agente ou prova stale", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacy = makeLegacy21Progress();
+    legacy.waves[0].tasks[0].review = {
+      status: "PENDING",
+      agent: "peer-reviewer",
+      independent: false,
+      revision: "",
+      evidence: "",
+    };
+    legacy.waves[0].tasks[0].phase = "VALIDATE";
+    const migrated = expectAccepted(api.migrateProgress(legacy));
+    expect(migrated.waves[0].tasks[0].phase).toBe("REVIEW");
+    expect(migrated.waves[0].tasks[0].review).toEqual(pendingReview());
+  });
+
+  it("AC-009 regression — DONE exige status final dos ACs vinculados", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [fullyValidTask()],
+      }],
+    });
+    progress.acceptance_criteria = progress.acceptance_criteria.map((ac) => (
+      ac.id === "AC-009" ? { ...ac, status: "PENDING" } : ac
+    ));
+    expectRejected(api.validateProgress(progress), /AC-009|status|final|VALIDATED/i);
+  });
+
+  it("AC-009 regression — review APPROVED da tarefa precisa ser independente", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const task = fullyValidTask({
+      review: { agent: "peer-reviewer", independent: false },
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [task],
+      }],
+    })), /independent|review/i);
+  });
+  it("AC-009 regression — review canônico rejeita implementador e agente incorreto", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const implementerReview = fullyValidTask({
+      implemented_by: "peer-reviewer",
+      reviewed_by: "peer-reviewer",
+      review: approvedTaskReview(),
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [implementerReview],
+      }],
+    })), /implement|independent|review/i);
+
+    const wrongAgentReview = fullyValidTask({
+      review: { ...approvedTaskReview(), agent: "validator" },
+      reviewed_by: "peer-reviewer",
+    });
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [wrongAgentReview],
+      }],
+    })), /peer-reviewer|agent|review/i);
+  });
+
+  it("AC-009 regression — integração PASS exige evidência não vazia", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "PASS", attempt: 1, evidence: "" },
+        tasks: [makeTask({ phase: "VALIDATE" })],
+      }],
+    });
+    expectRejected(api.validateProgress(progress), /integration|evidence|evid[eê]ncia/i);
+  });
+
+  it("AC-009 regression — READY legado converte para REVIEW e nunca persiste", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacyReady = makeLegacy21Progress();
+    legacyReady.waves[0].tasks[0].phase = "READY";
+    const migrated = expectAccepted(api.migrateProgress(legacyReady));
+    expect(migrated.waves[0].tasks[0].phase).toBe("REVIEW");
+    expect(migrated.waves[0].tasks[0].phase).not.toBe("READY");
+  });
+
+  it("AC-009 regression — DONE malformado retorna ok:false sem lançar exceção", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const malformedDone = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [fullyValidTask({ blockers: null })],
+      }],
+    });
+    let result;
+    let thrown;
+    try {
+      result = api.validateProgress(malformedDone);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown, "malformed DONE must fail closed without throwing").toBeUndefined();
+    expect(result?.ok).toBe(false);
+    expect(result?.errors?.join(" ")).toMatch(/DONE|blocker|object|array/i);
+  });
+  it("AC-009 regression — linkage AC↔task é bidirecional para DONE", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const task = fullyValidTask({
+      acceptance_criteria: ["AC-009", "AC-010"],
+      red: {
+        criteria_to_tests: {
+          "AC-009": criteriaMatrix()["AC-009"],
+          "AC-010": criteriaMatrix()["AC-010"],
+        },
+      },
+    });
+    const progress = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [task],
+      }],
+    });
+    expectRejected(api.validateProgress(progress), /link|AC-008|T-003|task|tarefa/i);
+  });
+
+  it("AC-009/AC-019 regression — tarefa normativa AC-019 pode concluir apenas com NA exato", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const normativeTask = makeTask({
+      id: "T-019",
+      title: "rastrear AC normativo",
+      phase: "DONE",
+      acceptance_criteria: ["AC-019"],
+      review: approvedTaskReview(),
+      red: {
+        status: "PASS",
+        failing_tests: [],
+        failure_reason_expected: false,
+        criteria_to_tests: { "AC-019": normativeEntry() },
+        revision_delta: { ac: "", test: "", evidence: "" },
+        revision_baseline_tests: {},
+      },
+      green: {
+        status: "SKIPPED",
+        reason_if_skipped: "critério exclusivamente normativo",
+        changed_files: [],
+        tooling_evidence: "",
+        tooling_suite_evidence: "",
+      },
+      refactor: { status: "SKIPPED", reason_if_skipped: "critério exclusivamente normativo" },
+      gates: gateValues("PASS"),
+      gate_origins: gateOrigins(),
+      gate_evidence: gateEvidence("normative evidence: PASS"),
+    });
+    const progress = makeProgress({
+      acceptance_criteria: [{
+        id: "AC-019",
+        desc: "artefatos Spec Kit coerentes",
+        source: "./specs/specs003-convivencia-robusta-skills/spec.md#AC-019",
+        tasks: ["T-019"],
+        status: "VALIDATED",
+      }],
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [normativeTask],
+      }],
+    });
+    expect(api.validateProgress(progress)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("AC-009/AC-019 regression — tarefa não avança enquanto Spec Kit está PENDING", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const pending = makeProgress({
+      spec_kit: {
+        spec: "./specs/specs003-convivencia-robusta-skills/spec.md",
+        plan: "./specs/specs003-convivencia-robusta-skills/plan.md",
+        tasks: "./specs/specs003-convivencia-robusta-skills/tasks.md",
+        status: "PENDING",
+        written_at: "",
+        mode: "created",
+      },
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [fullyValidTask()],
+      }],
+    });
+    expectRejected(api.validateProgress(pending), /spec_kit|WRITTEN|written|Spec Kit/i);
+  });
+
+  it("AC-009/AC-019 regression — Spec Kit WRITTEN exige paths e timestamp de prova não vazios", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const missingEvidence = makeProgress({
+      spec_kit: {
+        spec: "",
+        plan: "./specs/specs003-convivencia-robusta-skills/plan.md",
+        tasks: "./specs/specs003-convivencia-robusta-skills/tasks.md",
+        status: "WRITTEN",
+        written_at: "",
+        mode: "created",
+      },
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [fullyValidTask()],
+      }],
+    });
+    expectRejected(api.validateProgress(missingEvidence), /spec_kit|path|written|evidence/i);
+  });
+
+  it("AC-010 regression — existing-code não pode avançar sem GREEN/REFACTOR SKIPPED explícitos", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const invalidExisting = fullyValidTask({
+      phase: "REVIEW",
+      implemented_by: "existing-code",
+      red: {
+        status: "PASS",
+        failing_tests: [],
+        failure_reason_expected: false,
+        criteria_to_tests: criteriaMatrix(),
+        revision_delta: { ac: "", test: "", evidence: "" },
+        revision_baseline_tests: {},
+      },
+      green: {
+        status: "PENDING",
+        reason_if_skipped: "",
+        changed_files: [],
+        tooling_evidence: "",
+        tooling_suite_evidence: "",
+      },
+      refactor: { status: "PENDING", reason_if_skipped: "" },
+    });
+    expectRejected(
+      api.validateProgress(makeProgress({
+        waves: [{
+          wave: 1,
+          status: "in_progress",
+          integration: { status: "pending", attempt: 0, evidence: "" },
+          tasks: [invalidExisting],
+        }],
+      })),
+      /existing|SKIPPED|green|refactor/i,
+    );
+  });
+
+  it("AC-008 regression — integração PASS na tentativa inclusiva 3 não bloqueia tarefas", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "integrating",
+        integration: {
+          status: "PASS",
+          attempt: 3,
+          evidence: "integration attempt 3 PASS; output retained",
+        },
+        tasks: [fullyValidTask()],
+      }],
+    });
+    const migrated = expectAccepted(api.migrateProgress(progress));
+    expect(migrated.waves[0].integration).toMatchObject({
+      status: "PASS",
+      attempt: 3,
+      evidence: "integration attempt 3 PASS; output retained",
+    });
+    expect(migrated.waves[0].tasks[0].phase).toBe("DONE");
+    expect(migrated.waves[0].tasks[0].blockers).toEqual([]);
+  });
+
+  it("AC-010 regression — migração 2.1 de RED_REVISION limpa prova stale e preserva baseline", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const baselineRef = "scripts/tdd-state.test.mjs::2.1 baseline assertion";
+    const staleRef = "scripts/tdd-state.test.mjs::2.1 stale assertion";
+    const legacy = makeLegacy21Progress();
+    const task = legacy.waves[0].tasks[0];
+    task.phase = "RED_REVISION";
+    task.review = approvedTaskReview();
+    task.red.status = "PASS";
+    task.red.failing_tests = [staleRef];
+    task.red.failure_reason_expected = true;
+    task.red.criteria_to_tests = {
+      ...criteriaMatrix(),
+      "AC-008": [baselineRef, staleRef],
+    };
+    task.red.revision_baseline_tests = {
+      "AC-008": [baselineRef],
+      "AC-009": criteriaMatrix()["AC-009"],
+      "AC-010": criteriaMatrix()["AC-010"],
+    };
+    task.red.revision_delta = {
+      ac: "AC-008",
+      test: staleRef,
+      evidence: "vitest assertion failed: stale 2.1 proof",
+    };
+
+    const migrated = expectAccepted(api.migrateProgress(legacy));
+    const migratedTask = migrated.waves[0].tasks[0];
+    expect(migratedTask.phase).toBe("RED_REVISION");
+    expect(migratedTask.red.revision_baseline_tests).toEqual(task.red.revision_baseline_tests);
+    expect(migratedTask.red.status).toBe("PENDING");
+    expect(migratedTask.red.failing_tests).toEqual([]);
+    expect(migratedTask.red.failure_reason_expected).toBe(false);
+    expect(migratedTask.red.revision_delta).toEqual({ ac: "", test: "", evidence: "" });
+  });
+
+  it("AC-008 regression — review BLOCKED sem prova preserva bloqueio e diagnóstico na retomada 2.2", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress();
+    const task = progress.waves[0].tasks[0];
+    task.phase = "BLOCKED";
+    task.review = {
+      status: "BLOCKED",
+      agent: "",
+      independent: false,
+      revision: "",
+      evidence: "",
+    };
+    task.blockers = ["review blocked diagnosis"];
+    task.evidence = "review blocked evidence";
+
+    const resumed = expectAccepted(api.migrateProgress(progress));
+    const resumedTask = resumed.waves[0].tasks[0];
+    expect(resumedTask.review).toEqual(task.review);
+    expect(resumedTask.phase).toBe("BLOCKED");
+    expect(resumedTask.blockers).toEqual(["review blocked diagnosis"]);
+    expect(resumedTask.evidence).toBe("review blocked evidence");
+  });
+
+  it("AC-008 regression — allowed_write_globs exige strings não vazias e rejeita buracos", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const malformedGlobs = [
+      ["scripts/**", 42],
+      ["scripts/**", , "tdd-orchestrator/**"],
+      ["scripts/**", ""],
     ];
-
-    for (const [label, mutate] of variants) {
-      const fixture = baseProgress();
-      fixture.waves[0].tasks[0].phase = "DONE";
-      mutate(fixture);
-      expect(doneViolations(fixture), label).toContain(
-        label === "AC não final" ? "acceptance criteria" : label === "gate pendente" ? "gate status" : label === "evidência vazia" ? "gate evidence" : label === "integração pendente" ? "integration" : "blockers",
+    for (const allowed_write_globs of malformedGlobs) {
+      const progress = makeProgress();
+      progress.waves[0].tasks[0].allowed_write_globs = allowed_write_globs;
+      expectRejected(
+        api.validateProgress(progress),
+        /allowed_write_globs|glob|string|non-empty|required/i,
       );
     }
-
-    const taskRules = sectionBetween(skill, "## Máquina de estados por tarefa", "## Paralelismo");
-    expectDocumented("AC-012", taskRules, [
-      /DONE[^\n]{0,220}(?:blockers|bloqueio)[^\n]{0,100}(?:vazio|empty|zero)/i,
-      /DONE[^\n]{0,220}(?:AC|critério)[^\n]{0,120}(?:final|VALIDATED|IMPLEMENTED)/i,
-      /DONE[^\n]{0,220}integration\.status[^\n]{0,120}PASS/i,
-      /NA[^\n]{0,180}(?:não|nao) substitui[^\n]{0,100}PASS/i,
-    ]);
   });
 
-  it("AC-013 — resume preserva provas válidas e limpa somente campos invalidados pela transição", () => {
-    const fixture = baseProgress();
-    const task = fixture.waves[0].tasks[0];
-    task.gate_origins.tests = "TESTE";
-    task.gate_evidence.tests = "npm test — falha de asserção registrada";
-    fixture.baseline.tests_evidence = "npm test — 117 passed";
-    fixture.baseline.build_evidence = "ship.config.json: buildCommand=null";
-    task.blockers = ["decisão do usuário pendente"];
-    task.evidence = "review APROVADO; decisão pendente; integração PASS";
-    fixture.waves[0].integration.evidence = "onda integrada SHA abc; suíte PASS";
+  it("AC-008 regression — baseline FAIL inconsistente com gates resolvidos é inválida", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    const preserved = [
-      task.gate_evidence.tests,
-      task.gate_origins.tests,
-      fixture.baseline.tests_evidence,
-      fixture.baseline.build_evidence,
-      task.blockers[0],
-      task.evidence,
-      fixture.waves[0].integration.evidence,
-    ];
-    expect(preserved.every((value) => typeof value === "string" && value.length > 0)).toBe(true);
-    expect(task.gate_origins.tests).toBe("TESTE");
-    expect(fixture.waves[0].integration.evidence).toContain("SHA");
-
-    const resumeRules = sectionBetween(skill, "### Passo 0 — Retomada", "### Esquema do `progress.json`");
-    expectDocumented("AC-013", resumeRules, [
-      /retomad\w*[^\n]{0,80}(?:preserv|mant)[^\n]{0,100}(?:gate_evidence|evidência de gate)/i,
-      /retomad\w*[^\n]{0,120}(?:baseline\.tests_evidence|baseline\.build_evidence)/i,
-      /retomad\w*[^\n]{0,180}(?:blockers|decis(?:ão|ões) pendente|veredito de review|integration\.evidence)/i,
-      /somente|só[^\n]{0,160}(?:campos|fields)[^\n]{0,120}(?:invalidad|limp|reset)/i,
-    ]);
+    const invalidBaseline = makeProgress({
+      baseline: {
+        status: "FAIL",
+        tests: "PASS",
+        tests_evidence: "baseline tests command; output: PASS",
+        build: "NA",
+        build_evidence: "ship.config.json: buildCommand=null; output: NA",
+        override_approved: true,
+        known_failures: [{
+          gate: "build",
+          reason: "buildCommand is intentionally absent",
+          evidence: "ship.config.json: buildCommand=null",
+        }],
+      },
+    });
+    expectRejected(api.validateProgress(invalidBaseline), /baseline|status|FAIL|gate/i);
   });
 
-  it("AC-014 — exige objeto exato AC→teste, rejeita matriz texto/incompleta/extra e rastreia NA documental", () => {
-    const complete = Object.fromEntries(
-      T003_AC.map((ac) => [ac, [`scripts/tdd-state.test.mjs::${ac} fixture`]]),
-    );
-    const textMatrix = T003_AC.map((ac) => `${ac} -> scripts/tdd-state.test.mjs::${ac}`).join("\n");
-    const incomplete = { ...complete };
-    delete incomplete["AC-016"];
-    const extra = { ...complete, "AC-999": ["docs/spec.md::evidência"] };
-    const normativeNa = {
-      status: "NA",
-      reason: "critério exclusivamente normativo",
-      validator: "validator",
-      evidence: "interface-contract.md#invariantes",
-      reference: "spec.md#AC-016",
-    };
+  it("AC-008 regression — identidade de repo ausente falha fechada", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    expect(matrixErrors(complete)).toEqual([]);
-    expect(matrixErrors(textMatrix)).not.toEqual([]);
-    expect(matrixErrors(incomplete)).not.toEqual([]);
-    expect(matrixErrors(extra)).not.toEqual([]);
-    expect(normativeNa.status).toBe("NA");
-    expect(normativeNa.reason).not.toBe("");
-    expect(normativeNa.validator).toBe("validator");
-    expect(normativeNa.evidence).toContain("interface-contract.md");
-    expect(normativeNa.reference).toContain("spec.md");
-
-    const matrixRules = sectionBetween(skill, "## Máquina de estados por tarefa", "## Paralelismo");
-    expectDocumented("AC-014", matrixRules, [
-      /objeto[^\n]{0,100}AC(?:→|->)teste[^\n]{0,160}(?:exatamente|sem ausentes|sem extras)/i,
-      /AC[^\n]{0,100}(?:exclusivamente normativo|normativo)[^\n]{0,120}NA[^\n]{0,160}(?:razão|motivo)[^\n]{0,160}(?:validator|evidência documental)[^\n]{0,160}(?:contrato|spec)/i,
-    ]);
-  });
-
-  it("AC-015 — bloqueia entrega sem relatório consolidado por gate e registra buildCommand null como NA", () => {
-    const report = Object.fromEntries(
-      GATES.map((gate) => [
-        gate,
-        {
-          status: gate === "build" ? "NA" : "PASS",
-          command: gate === "build" ? "read ship.config.json" : `npm run ${gate}`,
-          output: gate === "build" ? "buildCommand=null" : `${gate}: PASS`,
-          ...(gate === "build" ? { reason: "build não configurado" } : {}),
-        },
-      ]),
-    );
-    const missingGate = { ...report };
-    delete missingGate.security;
-    const missingNaReason = { ...report, build: { ...report.build, reason: "" } };
-
-    expect(consolidatedReportErrors(report)).toEqual([]);
-    expect(consolidatedReportErrors(missingGate)).toContain("security: command");
-    expect(consolidatedReportErrors(missingNaReason)).toContain("build: NA reason");
-    expect(report.build.output).toContain("buildCommand=null");
-
-    const finalRules = sectionBetween(skill, "## Entrega final", "## Regras invioláveis");
-    expectDocumented("AC-015", finalRules, [
-      /validação consolidada[^\n]{0,180}(?:cada gate|por gate)[^\n]{0,180}(?:comando|command)[^\n]{0,180}(?:trecho|saída)[^\n]{0,180}(?:persiste|registra)/i,
-      /buildCommand\s*=\s*null[^\n]{0,160}(?:build:\s*NA|NA)[^\n]{0,160}(?:motivo|razão)/i,
-      /relatório[^\n]{0,180}(?:incompleto|ausente)[^\n]{0,120}(?:bloque|não entrega|não pode entregar)/i,
-    ]);
-  });
-
-  it("AC-016 — após cada integração exige peer-review independente e nova execução dos gates", () => {
-    const integratedWave = {
-      integration: { status: "PASS", evidence: "onda 1 integrada" },
-      review: { agent: "peer-reviewer", independent: true, revision: "abc" },
-      validation: { agent: "validator", suite: "npm test", gates: "reexecutados", evidence: "PASS" },
-    };
-    const behaviorChange = {
-      ...integratedWave,
-      integration: { status: "FAIL", evidence: "conflito resolvido com mudança comportamental" },
-      correction: { behaviorChanged: true, nextPhase: "RED_REVISION" },
-    };
-
-    expect(integratedWave.review.independent).toBe(true);
-    expect(integratedWave.validation.gates).toBe("reexecutados");
-    expect(behaviorChange.correction.nextPhase).toBe("RED_REVISION");
-    expect(behaviorChange.correction.nextPhase).not.toBe("DONE");
-
-    const integrationRules = sectionBetween(skill, "## Integração por onda", "## Quality Gates");
-    expectDocumented("AC-016", integrationRules, [
-      /ap[oó]s cada integra(?:ção|tion)[^\n]{0,200}(?:peer-reviewer|peer review)[^\n]{0,160}(?:independente|independent)/i,
-      /validator[^\n]{0,180}(?:repete|reexecuta|executa novamente)[^\n]{0,180}(?:su[ií]te|gates)/i,
-      /mudan(?:ça|c)\w* comportamental[^\n]{0,180}(?:RED|TDD|ciclo)/i,
-    ]);
-  });
-
-  it("AC-023 — reporta stale/extras/conflitos separadamente e nunca deixa o perfil sobrescrever projeto", () => {
-    const projectAgents = [
-      { basename: "validator", path: "./.omp/agents/validator.md", kind: "project" },
-      { basename: "peer-reviewer", path: "./.omp/agents/peer-reviewer.md", kind: "project" },
-    ];
-    const userAgents = [
-      { basename: "validator", path: "~/.omp/agent/agents/validator.md", kind: "user" },
-      { basename: "peer-reviewer", path: "~/.omp/agent/agents/peer-reviewer.md", kind: "user" },
-    ];
-    const resolved = resolveAgent(projectAgents, userAgents, "validator");
-    resolved.reports.stale.push("~/.omp/agent/agents/old-validator.md");
-    resolved.reports.extras.push("~/.omp/agent/agents/user-extra.md");
-    resolved.reports.typeConflicts.push("validator.md: arquivo vs diretório");
-    resolved.reports.duplicates = ["validator"];
-
-    expect(resolved.selected).toBe("./.omp/agents/validator.md");
-    expect(resolved.duplicate).toBe(true);
-    expect(resolved.reports.stale).toHaveLength(1);
-    expect(resolved.reports.extras).toHaveLength(1);
-    expect(resolved.reports.typeConflicts).toHaveLength(1);
-    expect(resolved.reports.duplicates).toEqual(["validator"]);
-
-    const agentRules = sectionBetween(skill, "> **Pré-requisito — subagentes", "## Tabela de papéis");
-    expectDocumented("AC-023", agentRules, [
-      /stale[^\n]{0,140}(?:report|relat|categor)/i,
-      /duplicat[^\n]{0,140}(?:report|relat|categor)/i,
-      /extras?[^\n]{0,140}(?:usu[aá]rio|user)[^\n]{0,140}(?:report|relat|categor)/i,
-      /conflitos? de tipo[^\n]{0,140}(?:report|relat|categor)/i,
-      /escopo de projeto[^\n]{0,180}(?:não|nao|never)[^\n]{0,180}(?:perfil|usu[aá]rio|instala)/i,
-    ]);
-  });
-  it("AC-012 — retomada de DONE revalida blockers, ACs, RED, review e integração antes de preservar o atalho", () => {
-    const invalidations = [
-      ["blockers", (fixture) => { fixture.waves[0].tasks[0].blockers = ["blocker reaberto"]; }],
-      ["acceptance criteria", (fixture) => { fixture.acceptance_criteria[0].status = "PENDING"; }],
-      ["red", (fixture) => { fixture.waves[0].tasks[0].red.status = "PENDING"; }],
-      ["review", (fixture) => { fixture.waves[0].tasks[0].reviewed_by = ""; }],
-      ["integration", (fixture) => { fixture.waves[0].integration.status = "pending"; }],
-    ];
-
-    for (const [label, mutate] of invalidations) {
-      const fixture = doneResumeFixture();
-      mutate(fixture);
-      expect(doneResumeViolations(fixture), label).toContain(label);
-    }
-
-    const resumeRules = sectionBetween(skill, "Se um objeto de tarefa legado tiver `phase: DONE`", "Ao migrar `red.criteria_to_tests`");
-    for (const field of ["blockers", "acceptance_criteria", "red.status", "reviewed_by", "integration.status"]) {
-      const escapedField = field.replace(".", "\\.");
-      expect(
-        resumeRules,
-        `DONE resume must revalidate ${field} in the concrete state fixture`,
-      ).toMatch(new RegExp(`phase: DONE[\\s\\S]{0,900}${escapedField}`));
+    for (const field of ["branch_start", "branch_work", "merge_target", "head_start", "head_current"]) {
+      const missingIdentity = makeProgress();
+      missingIdentity.repo[field] = "";
+      expectRejected(
+        api.validateProgress(missingIdentity),
+        /repo|identity|branch|head|non-empty|required/i,
+      );
     }
   });
 
-  it("AC-013 — ao invalidar um gate, preserva gates/evidências válidos e limpa somente o campo inválido", () => {
-    const invalidGate = "coverage";
-    const validGate = "tests";
-    const fixture = doneResumeFixture(invalidGate);
-    const task = fixture.waves[0].tasks[0];
-    const preserved = {
-      attempt: task.attempt,
-      gate: task.gates[validGate],
-      evidence: task.gate_evidence[validGate],
-      integrationEvidence: fixture.waves[0].integration.evidence,
-    };
+  it.each([
+    ["known_failures nulo", null],
+    ["entrada null em known_failures", [null]],
+  ])("AC-008 regression — migrateProgress rejeita %s sem lançar e preserva errors", async (label, knownFailures) => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    expect(task.gates[invalidGate]).toBe("pending");
-    expect(task.gate_origins[invalidGate]).toBe("CODIGO");
-    expect(task.gate_evidence[invalidGate]).toBe("");
-    expect(preserved).toEqual({
-      attempt: 2,
-      gate: "PASS",
-      evidence: "comando tests; trecho PASS",
-      integrationEvidence: "onda 1 integrada; suíte PASS; SHA def",
+    const progress = makeProgress();
+    progress.baseline.known_failures = knownFailures;
+    progress.waves[0].tasks[0].blockers = [`${label} diagnosis`];
+    progress.waves[0].tasks[0].evidence = `${label} evidence`;
+
+    let migrated;
+    let thrown;
+    try {
+      migrated = api.migrateProgress(progress);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeUndefined();
+    expectRejected(migrated, /known_failures|baseline|malformed|invalid/i);
+    expect(migrated.errors.join(" ")).toMatch(/diagnosis|evidence/i);
+  });
+
+  it("AC-008 regression — baseline PASS sem evidence normaliza para NOT_RUN", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress({
+      baseline: {
+        status: "PASS",
+        tests: "PASS",
+        tests_evidence: "",
+        build: "PASS",
+        build_evidence: "",
+        override_approved: false,
+        known_failures: [],
+      },
+    });
+    const task = progress.waves[0].tasks[0];
+    task.phase = "GREEN";
+    task.red.status = "PASS";
+    task.red.failure_reason_expected = true;
+    task.red.failing_tests = ["scripts/tdd-state.test.mjs::RED assertion"];
+
+    const migrated = expectAccepted(api.migrateProgress(progress));
+    expect(migrated.baseline.status).toBe("NOT_RUN");
+  });
+  it("AC-008 regression — known_failures de gate não suportado força nova baseline", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const progress = makeProgress();
+    progress.baseline.known_failures.push({
+      gate: "coverage",
+      reason: "legacy coverage diagnostic",
+      evidence: "coverage output",
+    });
+    const task = progress.waves[0].tasks[0];
+    task.phase = "GREEN";
+    task.red.status = "PASS";
+    task.red.failure_reason_expected = true;
+    task.red.failing_tests = ["scripts/tdd-state.test.mjs::RED assertion"];
+
+    const migrated = expectAccepted(api.migrateProgress(progress));
+    expect(migrated.baseline.status).toBe("NOT_RUN");
+    expect(migrated.baseline.tests).toBe("NOT_RUN");
+    expect(migrated.baseline.build).toBe("NOT_RUN");
+    expect(migrated.baseline.known_failures).toEqual([
+      { gate: "build", reason: "buildCommand=null", evidence: "ship.config.json" },
+    ]);
+  });
+
+  it("AC-008 regression — reabre onda concluída quando review rebaixa tarefa", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const task = makeTask({
+      phase: "DONE",
+      review: pendingReview(),
+      red: {
+        status: "PASS",
+        failing_tests: ["scripts/tdd-state.test.mjs::RED assertion"],
+        failure_reason_expected: true,
+      },
+      green: { status: "PASS", changed_files: ["tdd-orchestrator/lib/state.mjs"] },
+      refactor: { status: "PASS" },
+      gates: gateValues("PASS"),
+      gate_evidence: gateEvidence("gate output: PASS"),
+      evidence: "done task evidence",
+    });
+    const progress = makeProgress({
+      waves: [{
+        wave: 1,
+        status: "completed",
+        integration: { status: "PASS", attempt: 1, evidence: "integration PASS" },
+        tasks: [task],
+      }],
     });
 
-    const resumeRules = sectionBetween(skill, "Se um objeto de tarefa legado tiver `phase: DONE`", "Ao migrar `red.criteria_to_tests`");
-    expect(resumeRules).not.toMatch(/redefina os dez `gates` para `pending`/i);
-    expect(resumeRules).toMatch(
-      /gate(?:s)?[^\n]{0,220}(?:inválid|invalid)[^\n]{0,220}(?:somente|apenas)[^\n]{0,220}(?:gate_evidence|gate_origins)/i,
-    );
+    const migrated = expectAccepted(api.migrateProgress(progress));
+    expect(migrated.waves[0].status).toBe("in_progress");
+    expect(migrated.waves[0].integration.status).toBe("FAIL");
+    expect(migrated.waves[0].tasks[0].phase).toBe("REVIEW");
+    expect(migrated.waves[0].tasks[0].review).toEqual(pendingReview());
   });
 
-  it("AC-011/AC-013 — reset de matriz conserva tentativa/histórico e todo contador de retry bloqueia em três", () => {
-    const fixture = invalidMatrixResumeFixture();
-    const task = fixture.waves[0].tasks[0];
-    expect(task.attempt).toBe(2);
-    expect(task.blockers).toEqual(["historical blocker retained"]);
-    expect(task.evidence).toBe("historical diagnosis retained");
-    expect(task.red.revision_baseline_tests[NA_AC]).toEqual([
-      `scripts/tdd-state.test.mjs::${NA_AC}`,
-    ]);
-    expect(task.red.criteria_to_tests[NA_AC]).toBeUndefined();
+  it("AC-008 regression — RED_REVISION preserva fase e baseline ao limpar review pendente", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
 
-    const capped = retryCapFixture();
-    for (const source of RETRY_SOURCES) {
-      const counter = source === "INTEGRATION" ? capped.integration : capped.phases[source];
-      expect(counter, `${source} retry counter`).toMatchObject({ attempt: 3, expected: "BLOCKED" });
+    const task = makeTask({ phase: "RED_REVISION", review: pendingReview() });
+    const migrated = expectAccepted(api.migrateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [task],
+      }],
+    })));
+    expect(migrated.waves[0].tasks[0].phase).toBe("RED_REVISION");
+    expect(migrated.waves[0].tasks[0].red.status).toBe("PENDING");
+    expect(migrated.waves[0].tasks[0].red.revision_baseline_tests).toEqual(criteriaMatrix());
+  });
+  it("AC-008 regression — RED_REVISION parcial permanece na fase com review BLOCKED", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const task = makeTask({
+      phase: "RED_REVISION",
+      review: {
+        status: "APPROVED",
+        agent: "peer-reviewer",
+        independent: true,
+        revision: "",
+        evidence: "partial reviewer proof",
+      },
+    });
+    const migrated = expectAccepted(api.migrateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "pending", attempt: 0, evidence: "" },
+        tasks: [task],
+      }],
+    })));
+    expect(migrated.waves[0].tasks[0].phase).toBe("RED_REVISION");
+    expect(migrated.waves[0].tasks[0].review.status).toBe("BLOCKED");
+  });
+
+  it("AC-008 regression — matriz textual 2.1 acumula referências repetidas do mesmo AC", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const legacy = makeLegacy21Progress();
+    const task = legacy.waves[0].tasks[0];
+    task.phase = "READY";
+    const first = "scripts/tdd-state.test.mjs::legacy duplicate matrix first";
+    const second = "scripts/tdd-state.test.mjs::legacy duplicate matrix second";
+    task.red.criteria_to_tests = [
+      `AC-008 -> ${first}`,
+      `AC-008: ${second}`,
+      "AC-009 -> scripts/tdd-state.test.mjs::legacy duplicate matrix readiness",
+      "AC-010 -> scripts/tdd-state.test.mjs::legacy duplicate matrix evidence",
+    ].join("\n");
+
+    const migrated = expectAccepted(api.migrateProgress(legacy));
+    expect(migrated.waves[0].tasks[0].red.criteria_to_tests).toEqual({
+      "AC-008": [first, second],
+      "AC-009": ["scripts/tdd-state.test.mjs::legacy duplicate matrix readiness"],
+      "AC-010": ["scripts/tdd-state.test.mjs::legacy duplicate matrix evidence"],
+    });
+  });
+
+  it("AC-008 regression — review incompleta retém diagnóstico/prova ou permanece BLOCKED sem apagar o motivo", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const diagnosis = "incomplete review diagnosis";
+    const taskEvidence = "task resume evidence";
+    const reviewProof = "partial reviewer proof";
+    const progress = makeProgress();
+    const task = progress.waves[0].tasks[0];
+    task.phase = "VALIDATE";
+    task.review = {
+      status: "APPROVED",
+      agent: "peer-reviewer",
+      independent: true,
+      revision: "",
+      evidence: reviewProof,
+    };
+    task.blockers = [diagnosis];
+    task.evidence = taskEvidence;
+
+    const migrated = api.migrateProgress(progress);
+    if (!migrated.ok) {
+      const errors = migrated.errors.join(" ");
+      expect(errors).toContain(diagnosis);
+      expect(errors).toContain(taskEvidence);
+      expect(errors).toContain(reviewProof);
+      return;
     }
 
-    const resumeRules = sectionBetween(skill, "### Passo 0 — Retomada", "### Esquema do `progress.json`");
-    expect(resumeRules).not.toMatch(/attempt:\s*0/i);
-    expect(resumeRules).not.toMatch(/limpe `blockers` e `evidence`/i);
-    expect(resumeRules).toMatch(/attempt[^\n]{0,180}(?:preserv|mant)[^\n]{0,180}(?:blockers|evidence)/i);
-    expect(resumeRules).toMatch(/integration\.attempt[^\n]{0,180}attempt\s*>=\s*3/i);
+    const migratedTask = migrated.value.waves[0].tasks[0];
+    expect(migratedTask.blockers).toContain(diagnosis);
+    expect(migratedTask.evidence).toContain(taskEvidence);
+    if (migratedTask.phase === "BLOCKED") return;
 
-    const schema = sectionBetween(skill, "### Esquema do `progress.json`", "## Fase 0 — Planejamento");
-    expect(schema).toMatch(/"integration"\s*:\s*\{[^}]*"attempt"\s*:\s*0/i);
+    expect(migratedTask.phase).toBe("REVIEW");
+    const retainedProof = [migratedTask.review?.evidence, migratedTask.evidence]
+      .filter((value) => typeof value === "string")
+      .join(" ");
+    expect(retainedProof).toContain(reviewProof);
   });
 
-  it("AC-011 — divergência de branch exige decisão explícita e nunca faz checkout automático", () => {
-    const fixture = baseProgress();
-    const divergence = {
-      expectedBranch: fixture.repo.branch_work,
-      observedBranch: "main",
-      headInState: fixture.repo.head_current,
-      headObserved: "stale-head",
-      decision: "",
-      automaticCheckout: false,
-    };
-
-    expect(divergence.expectedBranch).not.toBe(divergence.observedBranch);
-    expect(divergence.headInState).not.toBe(divergence.headObserved);
-    expect(divergence.decision).toBe("");
-    expect(divergence.automaticCheckout).toBe(false);
-
-    const resumeRules = sectionBetween(skill, "### Passo 0 — Retomada (antes de tudo)", "### Esquema do `progress.json`");
-    expect(resumeRules).not.toMatch(/se não for, faça `git checkout <branch_work>`/i);
-    expect(resumeRules).toMatch(
-      /divergência[^\n]{0,180}(?:decisão|decision)[^\n]{0,180}(?:retomar|reconciliar|abortar)/i,
-    );
-  });
-
-  it("AC-015 — TOOLING_FIX só avança com as duas evidências verdes do gate e da suíte", () => {
-    const fixture = toolingFixFixture();
-    const task = fixture.waves[0].tasks[0];
-
-    expect(toolingEvidenceReady(task)).toBe(false);
-    task.green.tooling_suite_evidence = "npm test — 117 passed";
-    expect(toolingEvidenceReady(task)).toBe(true);
-
-    const taskRules = sectionBetween(skill, "## Máquina de estados por tarefa", "## Diagrama da máquina de estados");
-    expect(taskRules).toMatch(
-      /TOOLING_FIX[\s\S]{0,500}origin:\s*TOOLING[\s\S]{0,500}green\.tooling_evidence[\s\S]{0,180}green\.tooling_suite_evidence[\s\S]{0,180}(?:ambos|não vazios|preenchidos)/i,
-    );
-  });
-
-  it("AC-014 — seam NA mantém a entrada do AC e exige referência exata ao mesmo AC", () => {
-    const complete = Object.fromEntries(
-      T003_AC.map((ac) => [ac, [`scripts/tdd-state.test.mjs::${ac} fixture`]]),
-    );
-    const validNa = {
-      status: "NA",
-      reason: "critério exclusivamente normativo",
-      validator: "validator",
-      evidence: "interface-contract.md#invariantes",
-      reference: `spec.md#${NA_AC}`,
-    };
-    const validMatrix = { ...complete, [NA_AC]: validNa };
-    const wrongReference = {
-      ...validMatrix,
-      [NA_AC]: { ...validNa, reference: "spec.md#AC-015" },
-    };
-    const emptyReference = {
-      ...validMatrix,
-      "AC-011": ["::teste sem arquivo"],
-    };
-
-    expect(strictMatrixErrors(validMatrix)).toEqual([]);
-    expect(strictMatrixErrors(wrongReference)).toContain(`${NA_AC} NA reference`);
-    expect(strictMatrixErrors(emptyReference)).toContain("AC-011 invalid reference");
-
-    const matrixRules = sectionBetween(skill, "## Máquina de estados por tarefa", "## Paralelismo");
-    expect(matrixRules).toMatch(
-      /NA[\s\S]{0,220}(?:reference|referência)[\s\S]{0,180}(?:mesmo|próprio|same)[\s\S]{0,180}(?:AC|id)/i,
-    );
-  });
-
-  it("AC-016 — ordem de onda separa DONE das integrações e só conclui após review/validation", () => {
-    const beforeIntegration = baseProgress().waves[0];
-    beforeIntegration.status = "in_progress";
-    beforeIntegration.tasks[0].phase = "DONE";
-    beforeIntegration.integration = { status: "pending", evidence: "" };
-
-    const integrating = structuredClone(beforeIntegration);
-    integrating.status = "integrating";
-    const completed = structuredClone(integrating);
-    completed.status = "completed";
-    completed.integration = { status: "PASS", evidence: "validator + peer-review PASS" };
-    const prematureIntegration = structuredClone(beforeIntegration);
-    prematureIntegration.integration = { status: "PASS", evidence: "premature" };
-    prematureIntegration.tasks[0].phase = "VALIDATE";
-
-    expect(waveOrderingErrors(beforeIntegration)).toEqual([]);
-    expect(waveOrderingErrors(integrating)).toEqual([]);
-    expect(waveOrderingErrors(completed)).toEqual([]);
-    expect(waveOrderingErrors(prematureIntegration)).toContain("integration before all tasks DONE");
-
-    const taskRules = sectionBetween(skill, "## Máquina de estados por tarefa", "## Diagrama da máquina de estados");
-    expect(taskRules).not.toMatch(/DONE[^\n]{0,220}integration\.status[^\n]{0,100}PASS/i);
-
-    const diagram = sectionBetween(skill, "## Diagrama da máquina de estados", "### Estado por estado");
-    const taskDone = diagram.indexOf("CICLO_TAREFA --> INTEGRATE");
-    const postReview = diagram.indexOf("POST_INTEGRATION_REVIEW");
-    const postValidation = diagram.indexOf("POST_INTEGRATION_VALIDATE");
-    const waveCommit = diagram.indexOf("COMMIT_ONDA");
-    expect(taskDone).toBeGreaterThanOrEqual(0);
-    expect(taskDone).toBeLessThan(postReview);
-    expect(postReview).toBeLessThan(postValidation);
-    expect(postValidation).toBeLessThan(waveCommit);
-    expect(diagram).toMatch(
-      /COMMIT_ONDA[\s\S]{0,500}(?:integration\.status|integração)[\s\S]{0,120}PASS/i,
-    );
-  });
-
-
-  it("mantém os fixtures ancorados no contrato 0.1.0 e nos critérios T-003, sem rede", () => {
-    expect(contract).toMatch(/Versão:\**\s*0\.1\.0/);
-    expect(contract).toContain('schema_version: "2.2"');
-    expect(contract).toMatch(/`DONE`\s*só é válido/);
-    expect(contract).toContain("gate_evidence");
-    for (const ac of T003_AC) expect(spec).toContain(`**${ac}:**`);
-  });
 });
+
+export {
+  ACCEPTANCE_CRITERIA,
+  GATES,
+  VALID_GATE_ORIGINS,
+  makeProgress,
+  makeTask,
+  fullyValidTask,
+  criteriaMatrix,
+};

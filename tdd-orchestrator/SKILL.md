@@ -13,6 +13,7 @@ description: >-
   tarefas", "implemente este backlog com TDD", "rode este TASKS.md com revisão e
   validação".
 ---
+> Runtime suportado: Node.js >=20.
 
 # Orquestrador de Pipeline de Desenvolvimento (TDD + Peer Review + Validação)
 
@@ -82,7 +83,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste`, ou objeto NA exato (`status`, `reason`, `validator`, `evidence`, `reference`) para AC exclusivamente normativo | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste`, ou objeto NA exato (`status`, `reason`, `validator: "spec-kit-validator"`, `evidence`, `reference`) para AC exclusivamente normativo | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
 | `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe conjuntamente `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
@@ -247,13 +248,13 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
    `integration.status: PASS`. Falha em qualquer invariável preserva diagnóstico,
    tentativa e histórico, reabre a onda e retoma a fase apropriada.
    `READY` é alias transitório legado de pré-integração, não fase persistível:
-   antes da validação de enums, converta `phase: READY` para `VALIDATE` se gates ou
-   prova de review estiverem incompletos; converta para `DONE` só quando os
-   invariantes de DONE e `integration.status: PASS` forem comprovados. Nunca
-   escreva ou retome `READY` no JSON canônico. A tarefa pode aguardar integração
-   como `phase: DONE` com prova completa enquanto a onda está `in_progress` e
-   `integration.status: pending`; isso não autoriza entrega ou commit. Nunca retome
-   `DONE` final sem essas provas e evidência por gate.
+   antes da validação de enums, converta sempre `phase: READY` para `REVIEW` e
+   exija a matriz AC→teste objetual, a prova de review compatível e os campos 2.2;
+   nunca converta READY diretamente em DONE nem persista READY. A tarefa pode
+   aguardar integração como `phase: DONE` com provas finais enquanto a onda está
+   `in_progress` e `integration.status: pending`; isso não autoriza entrega ou
+   commit. Nunca retome `DONE` final sem ACs vinculados em estado final, review
+   independente e evidência por gate.
    Se algum gate de um `DONE` legado estiver inválido, preserve os demais gates e evidências válidas; gate inválido limpa somente `gate_origins.<gate>` e `gate_evidence.<gate>` daquele gate e reabre a validação.
    Ao migrar `red.criteria_to_tests` legado em formato texto, valide cada linha
    no formato `AC-NNN -> arquivo::teste` (aceite também `AC-NNN: arquivo::teste`),
@@ -340,7 +341,7 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
           "review": { "status": "PENDING|APPROVED|BLOCKED", "agent": "", "independent": false, "revision": "", "evidence": "" },
-          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": { "AC-001": ["arquivo::teste"], "AC-016": { "status": "NA", "reason": "critério exclusivamente normativo", "validator": "validator", "evidence": "interface-contract.md#invariantes", "reference": "spec.md#AC-016" } }, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
+          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": { "AC-001": ["arquivo::teste"], "AC-016": { "status": "NA", "reason": "critério exclusivamente normativo", "validator": "spec-kit-validator", "evidence": "interface-contract.md#invariantes", "reference": "spec.md#AC-016" } }, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
           "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
           "doc_impact": "none|applied",
@@ -364,7 +365,7 @@ BLOCKED` com `blockers`/`evidence` preservados. Na migração, `wave.status: BLO
 Para retomar, uma decisão explícita do usuário deve restaurar `wave.status:
 in_progress`, manter o contador e reabrir somente a tarefa indicada; nunca limpe o
 diagnóstico nem crie um estado de onda fora do contrato.
-Para um AC exclusivamente normativo, a entrada permanece na matriz e é exatamente o objeto `{ "status": "NA", "reason": "<razão não vazia>", "validator": "validator", "evidence": "<contrato ou spec>", "reference": "<referência ao mesmo AC>" }`; `reference` deve conter o próprio id do AC. Os demais ACs usam listas não vazias de `arquivo::teste`.
+Para um AC exclusivamente normativo, a entrada permanece na matriz e é exatamente o objeto `{ "status": "NA", "reason": "<razão não vazia>", "validator": "spec-kit-validator", "evidence": "<contrato ou spec>", "reference": "<referência ao mesmo AC>" }`; `reference` deve conter o próprio id do AC. Os demais ACs usam listas não vazias de `arquivo::teste`.
 
 > Quando `tests` ou `build` for `NA`, `known_failures` deve conter uma entrada com `gate` igual a `tests` ou `build`, `reason` e `evidence` correspondentes; sem ela, `baseline.status` não pode ser `PASS`. Uma justificativa de outro gate não satisfaz essa condição.
 Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase, veredito de gate e bloqueio; para cada gate `PASS`, `FAIL` ou `NA`, persista `gate_evidence.<gate>` antes de qualquer reentrada, grave `gate_origins.<gate>` quando o status for `FAIL` e limpe essa origem quando o novo status for `PASS` ou `NA`; renove `updated_at`.
@@ -541,7 +542,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 **Pré-condições de estado e entrega:** uma tarefa pode atingir `DONE` antes da integração, desde que não seja entregue/commitada; nessa etapa `blockers` deve estar vazio, AC completo (todo AC em `COVERED`, `IMPLEMENTED` ou `VALIDATED`), `red` não bloqueado nem `PENDING`, e cada gate deve ser `PASS`/`NA` com `gate_evidence` válida. A promoção e qualquer commit da onda exigem ainda a validação consolidada, review independente e integração aprovada; `NA` não substitui `PASS` e só é aceito com justificativa objetiva, comando/saída registrados.
 `DONE` pré-integração é apenas um registro de prontidão da tarefa: não autoriza entrega ou commit; a promoção final aguarda a validação consolidada e a aprovação da integração. A prova de review deve registrar agente diferente de `implemented_by`, revisão exata da HEAD/revisão consumida e evidência correspondente; prova ausente, própria ou stale reabre `REVIEW`.
 `red.criteria_to_tests` é exatamente um **objeto AC→teste**: suas chaves são todos e somente os `AC-NNN` da tarefa (sem ausentes ou extras), e cada valor é uma lista não vazia de strings no formato `arquivo::teste`, exceto o objeto `NA` normativo. Texto, matriz incompleta ou matriz com AC extra é inválido e mantém a tarefa fora de GREEN.
-Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato `{ status: "NA", reason, validator, evidence, reference }`: razão/motivo não vazia, `validator` identificado, evidência documental no contrato/spec e `reference` apontando para o mesmo AC/id; isso não remove a entrada do AC da matriz nem autoriza promoção final sem os demais critérios.
+Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato `{ status: "NA", reason, validator: "spec-kit-validator", evidence, reference }`: razão/motivo não vazia, `validator` deve ser exatamente `"spec-kit-validator"` (aliases como `"validator"` são rejeitados), evidência documental no contrato/spec e `reference` apontando para o mesmo AC/id; isso não remove a entrada do AC da matriz nem autoriza promoção final sem os demais critérios.
 
 
 1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
@@ -550,6 +551,7 @@ Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato 
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + tarefa (id/título, `implemented_by` e `reviewed_by`) + `spec.md`, `plan.md`, `tasks.md`/critérios + contrato `interface-contract.md`/versão quando aplicável + `red.criteria_to_tests` (objeto AC→test) + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Quando `implemented_by: existing-code`, trate sempre a tarefa como revisão de implementação existente: leia os arquivos de produção e testes atuais referenciados pelos critérios, independentemente de o diff isolado estar vazio ou conter apenas os testes RED; não bloqueie por ausência de patch de produção.
    - **APROVADO** → DOC.
    - **BLOQUEADO** → roteie por tipo: *código* → `RED_REVISION` para o `test-author` criar primeiro o teste de regressão; só depois `GREEN_FIX`; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
+   - Para agregação de resultados, use exatamente `aggregateReview(results, expectedRevision, expectedReviewers)`. `expectedReviewers` é obrigatório, não vazio, explícito e sem duplicatas; a agregação deve rejeitar reviewer ausente, inesperado ou duplicado, revisão divergente e `protocol_mode`/`agent` incompatíveis. Cada envelope `{ ok, value?, errors }` deve preservar seus erros e diagnóstico no resultado `BLOCKED`; nunca derive aprovação de uma lista parcial nem descarte o diagnóstico.
 5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
    - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**

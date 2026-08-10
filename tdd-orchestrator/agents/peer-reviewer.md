@@ -103,6 +103,18 @@ adaptador usa o schema normalizado (`agent`, `status: VALID`, `reviewed_revision
 `overall_correctness`, `explanation`, `confidence` e `findings`). O agregador
 valida esse objeto como saída de deep-review; uma saída normal APROVADO/BLOQUEADO
 sem a adaptação explícita é inválida e resulta em `BLOCKED`.
+## Agregação fail-closed
+
+Quando o dispatcher solicitar agregação, a chamada canônica é
+`aggregateReview(results, expectedRevision, expectedReviewers)`. A lista
+`expectedReviewers` deve ser fornecida explicitamente, não vazia e sem
+duplicatas. O agregador rejeita reviewer ausente, inesperado ou duplicado,
+`reviewed_revision` divergente e qualquer incompatibilidade entre
+`protocol_mode` e `agent`; identidade válida no protocolo TDD é exatamente
+`peer-reviewer`. Envelopes `{ ok, value?, errors }` são transportados sem
+perder `errors`, findings ou diagnóstico: um envelope inválido resulta em
+`BLOCKED`, nunca em aprovação por fallback ou por lista parcial.
+
 
 ## Fallback nomeado do deep-review
 Quando o assignment declarar `deep-review` e `peer-reviewer` como fallback, o

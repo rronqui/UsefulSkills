@@ -1,8 +1,10 @@
+// Runtime suportado: Node.js >=20.
 // Funções puras do motor ship.mjs — sem efeitos colaterais, testáveis isoladamente.
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
-import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, existsSync, lstatSync, linkSync, mkdirSync, openSync, readFileSync, readSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+const DEFAULT_SCHEMA_WATCH_PATH = "src/lib/db.ts";
 
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
 
@@ -38,10 +40,12 @@ export function extractIssueNumber(url) {
 // v(X.Y.Z[-prerelease][+build]) a partir do texto âncora "Versão da aplicação"
 // (se presente) senão a primeira ocorrência. Retorna a versão ou null.
 export function extractServedVersion(html) {
-  let text = (html ?? "").replace(/<!--[\s\S]*?-->/g, "");
+  let text = String(html ?? "").replace(/<!--[\s\S]*?-->/g, "");
   const anchor = text.indexOf("Versão da aplicação");
   if (anchor !== -1) text = text.slice(anchor);
-  return (text.match(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^\p{L}\p{N}_+.-]|\.(?=$|[^\p{L}\p{N}_+.-]))/u) || [])[1] ?? null;
+  const match = text.match(/(?<![\p{L}\p{N}_-])v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^\p{L}\p{N}_+.-]|\.(?=$|[^\p{L}\p{N}_+.-]))/u);
+  const candidate = match?.[1] ?? null;
+  return candidate && isValidSemVer(candidate) ? candidate : null;
 }
 
 
@@ -49,9 +53,9 @@ export function extractServedVersion(html) {
 // → default legado ["src/lib/db.ts"] (manifestos antigos não perdem o aviso);
 // lista explícita → usa-a (inclusive [] para desligar o aviso).
 export function resolveSchemaWatch(value) {
-  if (value === undefined || value === null) return ["src/lib/db.ts"];
+  if (value === undefined || value === null) return [DEFAULT_SCHEMA_WATCH_PATH];
   if (Array.isArray(value)) return value.filter((p) => typeof p === "string");
-  return ["src/lib/db.ts"];
+  return [DEFAULT_SCHEMA_WATCH_PATH];
 }
 
 // Etapa de backup do deploy. Sem dbPath → null; arquivo ausente → null (o chamador
@@ -62,7 +66,18 @@ export function resolveSchemaWatch(value) {
 export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
   const src = path.resolve(root, cfg.dbPath);
-  if (!existsSync(src)) return null;
+  let sourceStat;
+  try {
+    sourceStat = lstatSync(src);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+  if (!sourceStat.isFile()) {
+    const error = new Error(`Backup source must be a regular file: ${src}`);
+    error.code = "E_BACKUP_UNSAFE";
+    throw error;
+  }
   const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
   mkdirSync(dir, { recursive: true });
   const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);

@@ -28,7 +28,8 @@ can1357/oh-my-pi, renomeada para evitar colisão). Ela define:
 - Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`;
   pode spawnar `scout`; roda no modelo definido no frontmatter do agente
   (`openai-codex/gpt-5.6-luna`);
-- Schema de saída: veredito (`overall_correctness` enum correct/incorrect,
+- Schema de saída: identidade com `protocol_mode` (`DEEP_REVIEW` ou
+  `DEEP_REVIEW_FALLBACK`), veredito (`overall_correctness` enum correct/incorrect,
   `explanation`, `confidence`) + achados opcionais (`findings`: title, body,
   priority, confidence, file_path, line_start, line_end) preenchidos via seções
   incrementais de `yield`;
@@ -42,6 +43,23 @@ desconhecido, tente a resolução nomeada no escopo de projeto e depois de usuá
 se não houver `deep-reviewer` nesses escopos, tente somente `peer-reviewer`. Se
 nenhum agente nomeado compatível estiver disponível, a rodada é `BLOCKED`; não há
 fallback genérico ou anônimo.
+
+## API executável e fail-closed
+
+`deep-review/lib/protocol.mjs` é o seam puro e determinístico do protocolo. Ele
+exporta `validateRequest(request)`, `validateReviewerResult(result, expected)`,
+`aggregateReview(results, expectedRevision, expectedReviewers)` e
+`resolveReviewer({ projectCandidates, userCandidates })`. Cada chamada retorna um
+envelope `{ ok, value?, errors }`; por compatibilidade operacional, os campos
+normalizados também ficam no nível superior (`status`, `findings`, etc.).
+`aggregateReview` exige `expectedReviewers` como array explícito de agentes nomeados:
+o conjunto observado deve ser exatamente igual, sem ausentes, inesperados ou
+duplicados, e a identidade esperada nunca é inferida dos resultados. `ok: false`/
+`status: "BLOCKED"` preserva diagnóstico em `errors`; envelope `ok: true` com erros
+também é bloqueado e nunca autoriza inferir aprovação. O módulo não acessa GitHub,
+Git, workspace ou agentes: coleta, resolução de fonte e despacho continuam
+responsabilidades do orquestrador.
+
 
 ## FASE 0 — Resolução do escopo (modo)
 
@@ -72,7 +90,7 @@ por conta própria e ancoram achados nas linhas atuais.
   Caso contrário, `totalLines` é a soma das linhas atuais e `fileCount` o tamanho do
   inventário já restrito; só então a tabela de dimensionamento define a equipe.
 
-- **PR**: colete uma única fonte remota exata em `patch_source`: `gh pr diff <N> -R <owner>/<repo>` com o SHA retornado pelos metadados da PR, ou `pr://<owner>/<repo>/<N>/diff/all` com esse SHA. Registre `kind`, `uri` (quando houver), conteúdo e `sha`/`head-sha`; não misture fontes nem recupere um patch local.
+- **PR**: colete uma única fonte remota exata em `patch_source`: `gh pr diff <N> -R <owner>/<repo>` com o SHA retornado pelos metadados da PR, ou `pr://<owner>/<repo>/<N>/diff/all` com esse SHA. Registre `kind`, `uri` (quando houver), conteúdo e qualquer alias entre `sha`, `head_sha` e `head-sha`; se mais de um for fornecido, todos devem ser strings não vazias e iguais. Para `pr-uri` e para `gh-pr-diff` quando `uri` existir, a URI deve seguir `pr://owner/repo/<n>/...` e coincidir exatamente com `repository` e `pull_request`; não misture fontes nem recupere um patch local.
   Se a fonte remota falhar, estiver vazia ou indisponível, a rodada é `BLOCKED` e o erro é preservado; nunca use o workspace como fallback silencioso.
 - **Branch/base**: se o chamador informou a branch base (ex.: outra skill
   orquestrando o fluxo), use-a diretamente sem perguntar; caso contrário pergunte
@@ -195,13 +213,17 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
      `patch_source`, SHA/head-SHA de PR ou `consumer_context`; a checagem cross-boundary
      usa somente o contexto local declarado para branch/base, não commitadas, commit ou
      custom.
-3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
-4. Registro de achados, identidade e veredito via seções incrementais de `yield`
-   (`type: ["findings"]` quando houver achados; `type: ["agent"]`,
-   `type: ["status"]`, `type: ["reviewed_revision"]`,
+3. "MAY read full file context as needed via `read`": leia sempre os arquivos atribuídos
+   e, para cada valor que cruza fronteira, localize e leia também o consumidor/dispatcher
+   antes de concluir; em PR, o patch continua exclusivamente remoto e o workspace é
+   apenas contexto do consumidor;
+4. Registro de achados, identidade e veredito somente via seções incrementais nativas
+   de `yield` (`type: ["findings"]` quando houver achados; `type: ["agent"]`,
+   `type: ["protocol_mode"]`, `type: ["status"]`, `type: ["reviewed_revision"]`,
    `type: ["overall_correctness"]`, `type: ["explanation"]` e
-   `type: ["confidence"]`); cada seção escalar recebe somente seu próprio
-   `result.data`, jamais uma ferramenta separada de finding.
+   `type: ["confidence"]`). Cada seção escalar recebe somente seu próprio
+   `result.data`; não envie JSON externo, objeto completo ou ferramenta separada de
+   finding.
 
 Dispare todos em paralelo na mesma chamada; não serialize.
 
@@ -222,7 +244,7 @@ Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,
 2. Ler os arquivos modificados ou atribuídos para contexto completo;
 3. Registrar cada achado com `yield` incremental `type: ["findings"]` quando houver
    achados;
-4. Registrar cada campo de identidade e veredito (`agent`, `status`,
+4. Registrar cada campo de identidade e veredito (`agent`, `protocol_mode`, `status`,
    `reviewed_revision`, `overall_correctness`, `explanation`, `confidence`) em uma
    seção incremental escalar separada e parar — a finalização em idle monta o
    resultado.
@@ -292,20 +314,23 @@ como texto final.
 
 ### Validação e limiar
 
-Todos os revisores atribuídos devem retornar um resultado estruturado completo. Revisor
-esperado ausente ou faltante, timeout, resultado sem veredito, schema inválido, status
-ausente/diferente de `VALID`, `reviewed_revision` ausente/divergente ou finding
-incompleto produz `BLOCKED`; o agregador preserva o diagnóstico de cada falha e nunca
+Todos os revisores atribuídos devem retornar um resultado estruturado completo. O
+agregador recebe `expectedReviewers` explícitos e exige conjunto exato: revisor
+esperado ausente, inesperado ou duplicado, timeout, resultado sem identidade/protocolo,
+schema inválido, status ausente/diferente de `VALID`, `reviewed_revision` ausente/
+divergente ou finding incompleto produz `BLOCKED`; a identidade esperada não é
+inferida do resultado. O agregador preserva o diagnóstico de cada falha e nunca
 infere `correct` ou aprovação por falta de dados.
+O pareamento é exato: `deep-reviewer` usa `DEEP_REVIEW` e `peer-reviewer` usa
+`DEEP_REVIEW_FALLBACK`; ausência de `protocol_mode` também bloqueia.
 O schema nativo do OMP trata `findings` como uma coleção incremental opcional:
 quando não há achados, a seção pode estar ausente. O dispatcher deve normalizar
 essa ausência para `findings: []` antes da validação do resultado normalizado; uma
-seção presente, mas incompleta ou inválida, continua produzindo `BLOCKED`.
+seção presente, mas esparsa, incompleta ou inválida, continua produzindo `BLOCKED`.
+Envelope `ok: true` com `errors` é inconsistente e bloqueia; envelope
+`ok: false`/`status: "BLOCKED"` preserva seus erros no diagnóstico.
 Em particular, revisor esperado ausente => `BLOCKED`, resultado sem veredito =>
 `BLOCKED`, schema inválido => `BLOCKED` e finding incompleto => `BLOCKED`.
-Resultado sem veredito => `BLOCKED`; schema inválido => `BLOCKED`; finding incompleto => `BLOCKED`.
-Nunca inferir `correct` nem aprovação a partir de ausência ou erro de dados.
-Não inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 
 Somente achados válidos P0/P1 bloqueiam a liberação; um veredito `incorrect` sem
 achado válido P0/P1 não bloqueia sozinho. P2/P3 são retidos no relatório com localização e contagem e nunca bloqueiam sozinhos. A validação exige `title`, `body`, prioridade
@@ -318,7 +343,6 @@ P0/P1/P2/P3, `reviewers` e `fallback_agent`. `blockers`
 contém somente achados válidos P0/P1; `findings` retém todos os achados válidos P2/P3
 com localização e contagem (e também os P0/P1 para não perder evidência).
 ### Adaptador de fallback e schema normalizado
-Resumo obrigatório: `blockers` contém somente P0 e P1 válidos; `findings` retém P2 e P3 com localização e contagem.
 
 O dispatcher tem dois contratos distintos e não os mistura:
 
@@ -326,8 +350,9 @@ O dispatcher tem dois contratos distintos e não os mistura:
    **APROVADO** ou **BLOQUEADO**. Essa saída não é validada como resultado
    normalizado de deep-review.
 2. `DEEP_REVIEW_FALLBACK` invoca o `peer-reviewer` nomeado somente como fallback e
-   exige o objeto normalizado `{ agent: "peer-reviewer", status: "VALID",
-   reviewed_revision, overall_correctness, explanation, confidence, findings }`.
+   exige o objeto normalizado `{ agent: "peer-reviewer", protocol_mode:
+   "DEEP_REVIEW_FALLBACK", status: "VALID", reviewed_revision,
+   overall_correctness, explanation, confidence, findings }`.
    O adaptador rejeita status normal sem conversão explícita, valida todos os campos
    e entrega o objeto ao mesmo agregador usado para `deep-reviewer`.
 
@@ -352,13 +377,12 @@ os modos locais, a checagem cross-boundary usa o contexto local declarado e vali
 
 ### Resolução de agentes
 
-A resolução de `deep-reviewer` tenta projeto > usuário de forma determinística. Se
-ambos não estiverem disponíveis, usa somente o `peer-reviewer` nomeado como fallback;
-ele recebe o protocolo completo e produz o mesmo schema, validação e limiar P0/P1 de
-blocker, mantendo P2/P3 não bloqueantes. Nunca usar fallback anônimo. Nenhum
-`deep-reviewer` ou `peer-reviewer` nomeado disponível => `BLOCKED`.
-peer-reviewer é fallback nomeado e recebe protocolo completo, mesmo schema e limiar P0/P1 de blocker.
-Nenhum deep-reviewer ou peer-reviewer nomeado disponível => BLOCKED.
+A resolução procura `deep-reviewer` primeiro no projeto e depois no usuário. Só
+quando ele estiver ausente nos dois escopos usa `peer-reviewer` nomeado como fallback
+(também procurando os dois escopos); ele recebe o protocolo completo e produz o mesmo
+schema, validação e limiar P0/P1 de blocker, mantendo P2/P3 não bloqueantes. Nunca
+usar fallback anônimo. Nenhum `deep-reviewer` ou `peer-reviewer` nomeado disponível
+=> `BLOCKED`.
 
 ### Relatório
 
@@ -375,7 +399,7 @@ P2/P3 permanecem visíveis para decisão posterior.
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
 - Revisor registra achados apenas nos arquivos atribuídos; pode ler contexto fora deles
   para checagens cross-boundary. Sobreposição de ownership gera achados duplicados.
- - Modo PR nunca usa git local nem trata o workspace como fonte do patch; arquivos inalterados
+- Modo PR nunca usa git local nem trata o workspace como fonte do patch; arquivos inalterados
    do workspace podem ser lidos apenas como contexto do consumidor para a checagem cross-boundary.
 - Não passe `outputSchema` na chamada `task` para o agente `deep-reviewer`: a saída
   nativa dele (seções incrementais de `yield`) é o contrato que a TUI renderiza

@@ -66,3 +66,72 @@ describe("protocolo Ship: conflito e fonte de versão", () => {
     expect(versionPolicy).toMatch(/versionCheckUrl[\s\S]{0,260}(?:unit|unidade|package|packages)/i);
   });
 });
+
+describe("RED: contrato operacional de deploy e publicação", () => {
+  it("AC-001: deploy documenta validação de startCommand antes de stop", () => {
+    const deploySection = sectionFrom(shipSource, "async function deploy()", "// ---------- dispatch");
+    const startValidation = deploySection.indexOf("startCommand");
+    const stopExecution = deploySection.indexOf("spawnSync(cfg.stopCommand");
+
+    expect(startValidation).toBeGreaterThanOrEqual(0);
+    expect(stopExecution).toBeGreaterThanOrEqual(0);
+    expect(startValidation).toBeLessThan(stopExecution);
+  });
+
+  it("AC-002: buildCommand=null é reportado como build NA com reason/evidence", () => {
+    expect(shipSource).toMatch(/build\s*:\s*["']?NA/i);
+    expect(shipSource).toMatch(/(?:reason|motivo)/i);
+    expect(shipSource).toMatch(/(?:evidence|evidência)/i);
+  });
+
+  it("AC-002: diff e backup ficam dentro da fronteira de rollback após stop", () => {
+    const deploySection = sectionFrom(shipSource, "async function deploy()", "// ---------- dispatch");
+    const diffSection = sectionFrom(deploySection, "const changed =", "const watch =");
+    const backupSection = sectionFrom(deploySection, "let backupDest;", "if (backupDest)");
+
+    expect(diffSection).toMatch(/failAfterStoppedDeploy|restoreStoppedDeployment/);
+    expect(backupSection).toMatch(/failAfterStoppedDeploy/);
+  });
+});
+
+describe("RED_REVISION: âncoras semânticas do protocolo de deploy", () => {
+  it("AC-001: valida startCommand no guard do deploy antes da chamada inicial de stop", () => {
+    const deploySection = sectionFrom(shipSource, "async function deploy()", "// ---------- dispatch");
+    const startGuard = deploySection.match(
+      /if\s*\(\s*cfg\.stopCommand\s*&&\s*\(typeof startCommand !== "string"\s*\|\|\s*!startCommand\.trim\(\)\)\s*\)\s*\{[\s\S]*?process\.exit\(1\);\s*\}/,
+    );
+    const initialStop = deploySection.match(
+      /if\s*\(\s*cfg\.stopCommand\s*\)\s*\{[\s\S]*?const stopResult = spawnSync\(cfg\.stopCommand,\s*\{[\s\S]*?\}\);\s*if\s*\(stopResult\?\.status !== 0\)/,
+    );
+
+    expect(startGuard, "guard de startCommand não encontrado no preflight").not.toBeNull();
+    expect(initialStop, "chamada inicial de stopCommand não encontrada").not.toBeNull();
+    expect(startGuard.index).toBeLessThan(initialStop.index);
+    expect(startGuard[0]).toMatch(/startCommand/);
+    expect(initialStop[0]).toMatch(/spawnSync\(cfg\.stopCommand/);
+  });
+});
+describe("RED_REVISION: contrato de transições pós-pull e marcadores", () => {
+  it("AC-002: mudanças pós-pull de stop/start permanecem na fronteira de rollback", () => {
+    const deploySection = sectionFrom(shipSource, "async function deploy()", "// ---------- dispatch");
+    const postPullStart = deploySection.lastIndexOf("cfg = validateDeployConfig(readConfig())");
+    const postPullEnd = deploySection.indexOf("const changed =", postPullStart);
+    expect(postPullStart, "releitura de configuração pós-pull não encontrada").toBeGreaterThanOrEqual(0);
+    expect(postPullEnd, "fronteira de diff pós-pull não encontrada").toBeGreaterThan(postPullStart);
+    const postPullSection = deploySection.slice(postPullStart, postPullEnd);
+
+    expect(postPullSection).toMatch(/cfg\.stopCommand\s*!==\s*oldCfg\.stopCommand/);
+    expect(postPullSection).toMatch(/cfg\.startCommand\s*!==\s*oldCfg\.startCommand/);
+    expect(postPullSection).toMatch(/(?:failAfterStoppedDeploy|restoreStoppedDeployment)/);
+  });
+
+  it("AC-003: retry ancora Closes na issue da branch, não no número do PR", () => {
+    const retrySection = sectionFrom(shipSource, "if (bodyFile && prUrl)", "let rollbackAlreadyAttempted");
+    const mergeDecision = retrySection.match(/const mergePayload\s*=\s*([^;]+);/s);
+
+    expect(mergeDecision, "decisão de merge do body-file não encontrada").not.toBeNull();
+    expect(mergeDecision[1]).toMatch(/payloadHasCloseMarker/);
+    expect(mergeDecision[1]).toMatch(/Closes\s+#\$\{n\}/);
+    expect(mergeDecision[1]).not.toMatch(/prIssue|Number\s*\(/);
+  });
+});

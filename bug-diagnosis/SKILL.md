@@ -2,6 +2,7 @@
 name: bug-diagnosis
 description: Disciplina de diagnóstico para bugs difíceis e regressões de performance — construir feedback loop que fica vermelho no bug, minimizar, hipotetizar, instrumentar, corrigir com teste de regressão, limpar e registrar. Use quando o usuário disser "diagnostique"/"debugue isso" ou reportar algo quebrado, falhando, com erro ou lento; e como etapa do fluxo ship antes de implementar correção de bug.
 ---
+> Runtime suportado: Node.js >=20.
 
 # bug-diagnosis — disciplina de diagnóstico de bugs
 
@@ -72,40 +73,41 @@ O predicado de avanço é fechado e exatamente:
 **Only advance** quando o ambiente for reprodutível, a amostra atingir o
 `threshold` e a `rate` observada for estritamente maior que zero e atingir o
 limiar acordado; a regra acima é a única decisão permitida.
-`rate = 0`, `rate = unknown` e `rate = null` são explicitamente **BLOCKED**;
-um ambiente não reprodutível também é **BLOCKED**, mesmo que a amostra pareça
-suficiente. Não trate taxa ausente como zero silencioso nem invente uma
+`rate` ausente, `rate = 0`, `rate = unknown` e `rate = null` são explicitamente
+**BLOCKED**; um ambiente não reprodutível também é **BLOCKED**, mesmo que a amostra
+pareça suficiente. Não trate taxa ausente como zero silencioso nem invente uma
 conclusão.
+Sem `rate`/`taxa` e sem `environment`/`ambiente` reprodutível/capaz de reproduzir, o diagnóstico permanece **BLOCKED**; registre a evidência completa exigida, não avance nem mascare a ausência desses dados.
 
 Toda decisão deve persistir `decision` (o predicado avaliado e o resultado
 `advance` ou `blocked`) e todo handoff **BLOCKED** deve persistir estes campos:
 `status`: blocked, `reason`, `evidence`, `environment`, `last_command`,
 `next_action`. A `evidence` deve conter `attempts`, `successes`, `failures`,
 `rate`, `minimum_sample`, `rate_threshold` e `reproducible_environment`,
-inclusive quando a taxa for zero ou desconhecida. O registro de `resume`: {
+inclusive quando a taxa for zero ou desconhecida. Em `resume`, leia a prova
+persistida e continue do mesmo registro; o registro de `resume`: {
 `attempts`, `successes`, `failures`, `rate`, `minimum_sample`,
-`rate_threshold`, `reproducible_environment` } deve preservar e continuar esses
-valores e a decisão anterior; nunca zere a amostra ao retomar.
-
-Se não houver taxa, se a taxa não for estritamente maior que zero ou não houver
-um `reproducible environment` (ambiente capaz de reproduzir), o diagnóstico fica
-**BLOCKED** com essa evidência. Ao fazer `resume`, leia a prova persistida e
-continue do mesmo registro; se o ambiente continuar incapaz de reproduzir,
-permaneça **BLOCKED**.
+`rate_threshold`, `reproducible_environment` } deve preservar esses valores e a
+decisão anterior, nunca zerar a amostra; se o ambiente continuar incapaz de
+reproduzir, permaneça **BLOCKED**.
 
 ### Persistência, limpeza e execução portátil
 
 Qualquer trace, log ou captura que vá para arquivo deve passar por
 **redact-before-write**: redija primeiro, faça a limpeza final e só então
-persista. O scan final deve rejeitar credenciais brutas e remover toda linha
-com marcador `[DEBUG-*]`; um scan que falhar não publica o artefato. O
-template HITL oferece `TRACE_FILE` opcional e aplica redaction, limpeza e
-scan antes do `mv` atômico, preservando `<REDACTED>` no lugar do segredo.
+persista. O valor capturado em `ERRORED` também é redigido e escaneado antes de
+ser impresso ou persistido. O scanner cobre chaves sensíveis e atribuições
+como `ENCRYPTION_KEY=...`, PEM, JWT, tokens modernos/legados (incluindo `npm_`)
+e remove toda linha com marcador `[DEBUG-*]`; um scan que falhar não publica o
+artefato. O template HITL oferece `TRACE_FILE` opcional e aplica redaction,
+limpeza e scan antes do `mv` atômico, preservando `<REDACTED>` no lugar do segredo.
 
-O harness Bash é explicitamente gated: detecte Bash antes de executar o
-cenário e, quando indisponível, marque o teste como skip com o motivo
-(`Bash indisponível`) em vez de trocar por uma rota que enfraqueça a
-redaction.
+`TRACE_FILE` existente (arquivo regular, diretório, symlink ou hardlink) é
+recusado sem substituição; temporários são removidos em toda falha. O harness
+valida explicitamente Bash e AWK antes de executar o cenário e, quando qualquer
+um estiver indisponível, marca o teste como gated/skip com o motivo (`Bash
+indisponível` ou `AWK indisponível`) em vez de trocar por uma rota que enfraqueça
+a redaction.
 
 
 ### Quando realmente não for possível construir um loop
