@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/rronqui/UsefulSkills/compare/v0.3.1...v0.3.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* corrigir descoberta do deep-reviewer ([#34](https://github.com/rronqui/UsefulSkills/issues/34)) ([c329132](https://github.com/rronqui/UsefulSkills/commit/c329132d8b751d5086a46adde2af3a803607a72c))
+
 ## [0.3.1](https://github.com/rronqui/UsefulSkills/compare/v0.3.0...v0.3.1) (2026-08-10)
 
 
