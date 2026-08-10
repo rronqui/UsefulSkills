@@ -687,6 +687,84 @@ redact() {
     }
   '
 }
+sanitize_trace() {
+  # The only value handed to persistence or output is already redacted.  Keep
+  # this final hygiene pass separate from the redaction state machine so new
+  # credential formats and debug probes cannot bypass redact-before-write.
+  awk '
+    function pem_label(line, marker) {
+      marker = tolower(line)
+      sub(/^.*-----begin[[:space:]]+/, "", marker)
+      sub(/^.*-----end[[:space:]]+/, "", marker)
+      sub(/-----.*$/, "", marker)
+      return marker
+    }
+    BEGIN { pem_label_value = "" }
+    /\[DEBUG-[^]]*\]/ { next }
+    {
+      lower = tolower($0)
+      if (pem_label_value != "") {
+        print "<REDACTED>"
+        if (lower ~ /^[[:space:]]*-----end[[:space:]][a-z0-9 -]+-----[[:space:]]*$/ &&
+            pem_label(lower) == pem_label_value) pem_label_value = ""
+        next
+      }
+      if (lower ~ /-----begin[[:space:]][a-z0-9 -]+-----/) {
+        print "<REDACTED>"
+        pem_label_value = pem_label(lower)
+        next
+      }
+      gsub(/eyJ[[:alnum:]_-]+([.][[:alnum:]_-]+){1,2}|glpat_[[:alnum:]_-]+|glpat-[[:alnum:]_-]+|sk_live_[[:alnum:]_-]+|sk_test_[[:alnum:]_-]+|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/, "<REDACTED>")
+      print
+    }
+  '
+}
+
+scan_clean_trace() {
+  awk '
+    {
+      lower = tolower($0)
+      if ($0 ~ /\[DEBUG-[^]]*\]/ ||
+          $0 ~ /eyJ[[:alnum:]_-]+|glpat_|sk_live_|sk_test_|github_pat_|ghp_|gho_|ghs_|ghr_|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
+          lower ~ /eyj|glpat_|sk_live_|sk_test_|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|akia[[:alnum:]]+|aiza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
+          lower ~ /-----begin[[:space:]][a-z0-9 -]+-----|-----end[[:space:]][a-z0-9 -]+-----/) found = 1
+    }
+    END { exit found ? 1 : 0 }
+  '
+}
+
+
+persist_trace() {
+  local path="$1" tmp
+  [[ -n "$path" ]] || return 0
+  [[ "$path" != -* ]] || return 1
+  [[ ! -d "$path" ]] || return 1
+  umask 077
+  tmp=$(mktemp "${path}.tmp.XXXXXX") || return 1
+  if ! cat > "$tmp"; then
+    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
+    return 1
+  fi
+  if ! scan_clean_trace < "$tmp"; then
+    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
+    return 1
+  fi
+  if [[ -d "$path" ]]; then
+    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
+    return 1
+  fi
+  if ! mv -f -- "$tmp" "$path"; then
+    if ! mv -f "$tmp" "$path"; then
+      if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
+      return 1
+    fi
+  fi
+}
+
+# Set TRACE_FILE to persist a trace.  Persistence is intentionally downstream
+# of redact + sanitize + scan; a failed scan never publishes the artifact.
+TRACE_FILE="${TRACE_FILE:-}"
+
 
 # --- edit below ---------------------------------------------------------
 APP_INSTRUCTIONS="${APP_INSTRUCTIONS:-Open the application and reproduce the issue.}"
@@ -699,12 +777,21 @@ capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 
 printf '\n--- Captured ---\n'
 printf 'ERRORED=%s\n' "$ERRORED"
-if ! redacted_error=$(printf '%s\001' "$ERROR_MSG" | redact); then
+if ! redacted_trace=$(printf '%s\001' "$ERROR_MSG" | redact | sanitize_trace); then
   printf 'ERROR: redaction failed.\n' >&2
   exit 1
 fi
-redacted_error=${redacted_error%$'\001'}
-redacted_error=${redacted_error//\\/\\\\}
+redacted_trace=${redacted_trace%$'\001'}
+if ! printf '%s' "$redacted_trace" | scan_clean_trace; then
+  printf 'ERROR: final trace scan failed; refusing to publish.\n' >&2
+  exit 1
+fi
+if [[ -n "$TRACE_FILE" ]] && ! printf '%s\n' "$redacted_trace" | persist_trace "$TRACE_FILE"; then
+  printf 'ERROR: trace persistence failed; no artifact published.\n' >&2
+  exit 1
+fi
+
+redacted_error=${redacted_trace//\\/\\\\}
 redacted_error=${redacted_error//$'\r'/\\r}
 redacted_error=${redacted_error//$'\n'/\\n}
 printf 'ERROR_MSG=%s\n' "$redacted_error"

@@ -3,51 +3,63 @@ name: alignment
 description: Alinhamento de entendimento antes de implementar — entrevista o usuário em rodadas (árvore de decisões, fronteira de perguntas) até não restar suposição silenciosa; fatos são buscados pelo agente, decisões são do usuário. Use como etapa do fluxo ship antes do roteamento da implementação, ou quando o usuário quiser estressar um plano, ideia ou decisão.
 ---
 
-# alignment — entrevista de alinhamento
+# alignment — checkpoint obrigatório de entendimento
 
-Entreviste o usuário implacavelmente até chegar a um entendimento compartilhado.
-Mapeie a conversa como uma **árvore de decisões**: cada decisão se ramifica nas
-decisões que dependem dela.
+Todo pedido comportamental deve passar pelo checkpoint de alignment (alinhamento);
+todo pedido de correção deve passar pelo checkpoint de alignment (alinhamento).
+Qualquer pedido deve passar pelo alignment antes do roteamento para implementação.
 
-Trabalhe a árvore em **rodadas**. A **fronteira** é o conjunto de decisões cujos
-pré-requisitos já estão resolvidos — as perguntas que podem ser feitas AGORA, sem
-supor respostas ainda não ouvidas. Faça TODA a fronteira em uma rodada: numere cada
-pergunta e dê sua resposta recomendada. Aguarde as respostas do usuário antes da
-próxima rodada.
+## Árvore de decisões e fronteira
 
-Formato de cada pergunta:
+Entreviste o usuário em rodadas até chegar a um entendimento compartilhado.
+Mapeie a conversa como uma árvore de decisões: cada decisão se ramifica nas
+decisões que dependem dela. A fronteira é o conjunto de decisões cujos
+pré-requisitos já estão resolvidos; faça toda a fronteira de uma rodada, sem
+perguntar decisões downstream antes da resposta upstream.
+
+Use o formato:
 
 ```
-❓ **Q1** - **<título da pergunta>**: <corpo; pode ter múltiplos parágrafos e opções>
+❓ **Q1** - **<título da pergunta>**: <corpo>
 
 ➡️ <sua resposta recomendada>
 ```
 
-Cada rodada de respostas remodela a árvore — decisões fechadas empurram a fronteira
-para fora e desbloqueiam perguntas que dependiam delas. Recalcule a fronteira e faça
-a próxima rodada. Pergunta cuja resposta depende de outra ainda em aberto pertence a
-uma rodada POSTERIOR, não à atual.
+Fatos do ambiente são trabalho do agente (`read`/`grep`/`glob` ou `scout`), não
+perguntas ao usuário. Decisões são do usuário e devem ser apresentadas. Recalcule
+a fronteira a cada rodada; a sessão só termina quando todos os ramos foram
+visitados e não resta suposição silenciosa.
 
-**Fatos são trabalho seu, nunca do usuário.** Se uma pergunta da fronteira precisa
-de um fato do ambiente (arquivos, código, ferramentas), descubra você mesmo
-(`read`/`grep`/`glob`, ou sub-agente `scout` via `task`) — não pergunte ao usuário
-nada que você possa descobrir sozinho. Não bloqueie: uma exploração em andamento é
-um pré-requisito não resolvido; apenas as perguntas downstream dela esperam — o
-resto da fronteira é perguntado agora. As **decisões** são do usuário — apresente
-cada uma e aguarde.
+## Fechamento rápido e checkpoint registrado
 
-**Proporcionalidade** (quando invocado pelo protocolo da skill ship):
-- Mudança trivial (docs, texto, config, cosmético): uma rodada rápida de confirmação
-  (até 3 perguntas). Sem perguntas abertas → declare "alinhamento fechado: nenhuma
-  pergunta aberta" e siga.
-- Mudança comportamental: rode até a fronteira esvaziar.
-- Pedido já totalmente especificado (issue com critérios de aceite completos,
-  instrução exata do usuário): declare explicitamente o fechamento rápido COM o
-  motivo — nunca pule em silêncio.
+Quando o pedido já está totalmente especificado, faça o fast-close em uma rodada,
+sem criar perguntas artificiais, mas registre e persista explicitamente o
+fechamento da entrevista e o checkpoint `alignment`; use o marcador
+`fully-specified-fast-close`:
 
-A sessão termina quando a fronteira está vazia: todo ramo da árvore de decisões
-visitado, nada assumido em silêncio. Não aja sobre o resultado até o usuário
-confirmar que o entendimento compartilhado foi alcançado. Quando invocada pelo
-protocolo da skill ship, a confirmação ocorre na própria entrevista: cada rodada
-fecha decisões COM o usuário, e a declaração de fechamento (fronteira vazia) é o
-sinal para prosseguir ao roteamento.
+```json
+{
+  "checkpoint": "alignment",
+  "frontier": [],
+  "closure": "fully-specified-fast-close",
+  "closureRecorded": true,
+  "status": "CLOSED"
+}
+```
+
+Declare: **alinhamento fechado: nenhuma pergunta aberta**. A fronteira vazia e
+esse registro são a prova durável de que o alignment ocorreu; nunca pule esse
+fechamento em silêncio, mesmo em uma solicitação completa.
+
+Quando existir qualquer pergunta sem resposta, a fronteira não está vazia:
+**pergunta sem resposta mantém status `BLOCKED` e não roteia**. Não execute,
+implemente ou declare sucesso até a decisão do usuário; nunca pule o checkpoint
+silenciosamente (never skip silently).
+
+## Proporcionalidade e confirmação
+
+Para mudança trivial, use uma rodada rápida de confirmação (até três perguntas).
+Para mudança comportamental ou correção, repita as rodadas até a fronteira esvaziar.
+Após cada rodada, confirme o entendimento compartilhado. Fora do fluxo `ship`,
+não aja sobre o resultado até essa confirmação; no fluxo `ship`, a confirmação da
+própria entrevista e o checkpoint registrado autorizam o roteamento.

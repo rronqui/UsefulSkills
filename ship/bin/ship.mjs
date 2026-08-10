@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ship.mjs — motor determinístico do fluxo de releases (skill "ship").
-// Subcomandos: setup | new | ship | deploy. Requer: git, gh autenticado, Node >= 18.
+// Subcomandos: setup | new | ship | deploy. Requer: git, gh autenticado, Node >= 20.
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 
@@ -28,6 +28,265 @@ function git(args) {
 }
 function runShell(command) {
   return spawnSync(command, { shell: true, cwd: root, stdio: "inherit" }).status === 0;
+}
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+function versionSourceError(message) {
+  throw new Error(message);
+}
+
+function readJsonObject(file, label) {
+  let value;
+  try {
+    value = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    versionSourceError(`${label} ausente ou inválido`);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    versionSourceError(`${label} deve conter um objeto JSON`);
+  }
+  return value;
+}
+
+function pathInsideRepo(realPath, label) {
+  const repoPath = realpathSync(root);
+  const relative = path.relative(repoPath, realPath);
+  if (!relative || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) {
+    versionSourceError(`${label} está fora do repositório`);
+  }
+}
+function repoRegularPath(file, label) {
+  let stats;
+  try {
+    stats = lstatSync(file);
+  } catch {
+    versionSourceError(`${label} ausente ou inacessível`);
+  }
+  if (stats.isSymbolicLink() || !stats.isFile()) {
+    versionSourceError(`${label} deve ser um arquivo regular dentro do repositório`);
+  }
+  let realPath;
+  try {
+    realPath = realpathSync(file);
+  } catch {
+    versionSourceError(`${label} inacessível`);
+  }
+  pathInsideRepo(realPath, label);
+  return realPath;
+}
+
+function releaseConfigPathOrNull(file) {
+  let stats;
+  try {
+    stats = lstatSync(file);
+  } catch (err) {
+    if (err?.code === "ENOENT") return null;
+    versionSourceError(`release-please-config.json inacessível`);
+  }
+  if (stats.isSymbolicLink()) {
+    versionSourceError("release-please-config.json não pode ser um link simbólico");
+  }
+  if (!stats.isFile()) {
+    versionSourceError("release-please-config.json não é um arquivo regular");
+  }
+  try {
+    const realPath = realpathSync(file);
+    pathInsideRepo(realPath, "release-please-config.json");
+    return realPath;
+  } catch (err) {
+    if (err?.message?.includes("fora do repositório")) throw err;
+    versionSourceError("release-please-config.json inacessível");
+  }
+}
+
+function packagePathForUnit(unit) {
+  if (typeof unit !== "string" || !unit.trim() || path.isAbsolute(unit)) {
+    versionSourceError(`unidade '${String(unit)}' não é um caminho de package válido`);
+  }
+  const packagePath = path.resolve(root, unit, "package.json");
+  const relative = path.relative(root, packagePath);
+  if (!relative || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) {
+    versionSourceError(`unidade '${unit}' está fora do repositório`);
+  }
+  let realPackagePath;
+  try {
+    realPackagePath = realpathSync(packagePath);
+  } catch {
+    versionSourceError(`package.json da unidade '${unit}' inacessível ou ausente`);
+  }
+  pathInsideRepo(realPackagePath, `package.json da unidade '${unit}'`);
+  return realPackagePath;
+}
+
+function validateVersionSources() {
+  const rootPackagePath = path.join(root, "package.json");
+  const releaseConfigPath = path.join(root, "release-please-config.json");
+  const releaseConfigRealPath = releaseConfigPathOrNull(releaseConfigPath);
+  if (!releaseConfigRealPath) {
+    const rootPackage = readJsonObject(repoRegularPath(rootPackagePath, "package.json raiz"), "package.json raiz");
+    if (!isValidSemVer(rootPackage.version)) {
+      versionSourceError("package.json raiz não contém uma versão SemVer resolvível");
+    }
+    return;
+  }
+
+  const releaseConfig = readJsonObject(releaseConfigRealPath, "release-please-config.json");
+  const packages = releaseConfig.packages;
+  if (!packages || typeof packages !== "object" || Array.isArray(packages) || !Object.keys(packages).length) {
+    versionSourceError("release-please-config.json não declara unidades em packages");
+  }
+
+  const manifestPath = path.join(root, ".release-please-manifest.json");
+  const manifest = readJsonObject(repoRegularPath(manifestPath, ".release-please-manifest.json"), ".release-please-manifest.json");
+  const units = Object.keys(packages);
+  const manifestUnits = Object.keys(manifest);
+  if (manifestUnits.length !== units.length || units.some((unit) => !Object.hasOwn(manifest, unit))) {
+    versionSourceError("manifesto release-please não corresponde às unidades declaradas em packages");
+  }
+
+  for (const unit of units) {
+    const unitConfig = packages[unit];
+    if (!unitConfig || typeof unitConfig !== "object" || Array.isArray(unitConfig) || unitConfig["release-type"] !== "node") {
+      versionSourceError(`unidade '${unit}' não usa uma fonte release-please Node`);
+    }
+    if (!isValidSemVer(unitConfig["initial-version"])) {
+      versionSourceError(`initial-version inválida para a unidade '${unit}'`);
+    }
+    const packagePath = packagePathForUnit(unit);
+    const packageJson = readJsonObject(packagePath, `package.json da unidade '${unit}'`);
+    if (!isValidSemVer(packageJson.version)) {
+      versionSourceError(`package.json da unidade '${unit}' não contém uma versão SemVer resolvível`);
+    }
+    if (!isValidSemVer(manifest[unit])) {
+      versionSourceError(`versão inválida no manifesto para a unidade '${unit}'`);
+    }
+    if (manifest[unit] !== packageJson.version) {
+      versionSourceError(`manifesto e package.json divergem para a unidade '${unit}'`);
+    }
+  }
+}
+
+
+function requireVersionSources() {
+  try {
+    validateVersionSources();
+  } catch (err) {
+    fail(`E_VERSION_SOURCE: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+function requireGhAuth() {
+  try {
+    gh(["auth", "status"]);
+  } catch {
+    fail("Pré-requis ausente: gh não está autenticado. Execute 'gh auth login' e tente novamente.");
+  }
+}
+
+function requirePushRemote() {
+  try {
+    git(["remote", "get-url", "--push", "origin"]);
+  } catch {
+    fail("Pré-requisito ausente: remote de push 'origin' indisponível. Configure git remote antes de continuar.");
+  }
+}
+
+function requiredLabel(type) {
+  return type === "fix" ? "bug" : "enhancement";
+}
+
+function requireLabel(type) {
+  const label = requiredLabel(type);
+  try {
+    const raw = gh(["api", `repos/${repoSlug()}/labels`, "--paginate", "-q", ".[].name"]);
+    const labels = raw.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+    if (!labels.includes(label)) throw new Error(`label ${label} ausente`);
+  } catch {
+    fail(`Pré-requisito ausente: a label '${label}' não existe no repositório. Crie-a antes de continuar.`);
+  }
+}
+
+function releaseDescription(raw) {
+  let description = raw.trim();
+  let breaking = /BREAKING\s+CHANGE\s*:/i.test(description);
+  const prefixed = description.match(/^(?:fix|feat)(!)?:\s*/i);
+  if (prefixed) {
+    breaking ||= Boolean(prefixed[1]);
+    description = description.slice(prefixed[0].length).trim();
+  }
+  if (/^!:\s*/.test(description)) {
+    breaking = true;
+    description = description.replace(/^!:\s*/, "");
+  }
+  return { description, breaking };
+}
+
+function releaseTitle(type, raw, issue = null) {
+  const { description, breaking } = releaseDescription(raw);
+  const prefix = `${type}${breaking ? "!" : ""}: `;
+  const suffix = issue === null ? "" : ` (#${issue})`;
+  const available = Math.max(1, 72 - prefix.length - suffix.length);
+  return `${prefix}${description.slice(0, available)}${suffix}`;
+}
+
+
+function mergePrBody(existingBody, payload, issue) {
+  const closes = new RegExp(`^\\s*Closes\\s+#${issue}\\s*$`, "i");
+  const breaking = /^\s*BREAKING\s+CHANGE\s*:/i;
+  const existingLines = String(existingBody ?? "").split("\n");
+  let hasClose = false;
+  let hasBreaking = false;
+  const canonicalLines = [];
+  for (const line of existingLines) {
+    if (closes.test(line)) {
+      if (!hasClose) {
+        canonicalLines.push(`Closes #${issue}`);
+        hasClose = true;
+      }
+    } else if (breaking.test(line)) {
+      if (!hasBreaking) {
+        canonicalLines.push(line);
+        hasBreaking = true;
+      }
+    } else {
+      canonicalLines.push(line);
+    }
+  }
+
+  let payloadHasClose = false;
+  const payloadBreaking = [];
+  const payloadContent = [];
+  for (const line of String(payload ?? "").split("\n")) {
+    if (closes.test(line)) {
+      payloadHasClose = true;
+    } else if (breaking.test(line)) {
+      if (!hasBreaking && !payloadBreaking.length) payloadBreaking.push(line);
+    } else {
+      payloadContent.push(line);
+    }
+  }
+  const sanitized = [...payloadBreaking, ...payloadContent].join("\n");
+  const markerOnlyPayload = !payloadContent.some((line) => line.trim()) && (payloadHasClose || payloadBreaking.length > 0);
+  let body = canonicalLines.join("\n");
+
+  if (!hasClose && payloadHasClose) {
+    body = body.trim()
+      ? `Closes #${issue}${markerOnlyPayload ? "\n" : "\n\n"}${body}`
+      : `Closes #${issue}`;
+    hasClose = true;
+  }
+  if (markerOnlyPayload) {
+    if (payloadBreaking.length && !hasBreaking) {
+      body = body.trim() ? `${body}\n${payloadBreaking[0]}` : payloadBreaking[0];
+    }
+    return body;
+  }
+  if (!sanitized.trim()) return body;
+  if (body.endsWith(sanitized)) return body;
+  return `${body}${sanitized.startsWith("\n") ? sanitized : `\n\n${sanitized}`}`;
 }
 function repoSlug() {
   return gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]);
@@ -89,6 +348,10 @@ function cmdNew(argv) {
     console.error("Working tree sujo — commit ou descarte as mudanças antes.");
     process.exit(1);
   }
+  requireVersionSources();
+  requireGhAuth();
+  requirePushRemote();
+  requireLabel(type);
   const originalBranch = git(["branch", "--show-current"]);
   let originalHead = "";
   try {
@@ -180,8 +443,8 @@ function cmdShip(argv) {
     if (!bodyFile) usage();
     argv = argv.filter((_, i) => i !== flagIndex && i !== flagIndex + 1);
   }
-  const description = argv.join(" ").trim();
-  if (!description) usage();
+  const rawDescription = argv.join(" ").trim();
+  if (!rawDescription) usage();
   const branch = git(["branch", "--show-current"]);
   const m = branch.match(/^(fix|feat)\/(\d+)-/);
   if (!m) {
@@ -189,6 +452,24 @@ function cmdShip(argv) {
     process.exit(1);
   }
   const [, type, n] = m;
+  requireVersionSources();
+  requireGhAuth();
+  requirePushRemote();
+  const repository = repoSlug();
+  let def = "";
+  let prUrl = "";
+  try {
+    def = defaultBranch();
+    prUrl = gh([
+      "pr", "list", "--head", branch, "--base", def, "--state", "open",
+      "--json", "url,headRepository",
+      "-q", `map(select(.headRepository.nameWithOwner == "${repository}")) | .[0].url`,
+    ]);
+    if (prUrl === "null") prUrl = "";
+  } catch {
+    fail("Não consegui determinar a branch default/PR existente; nenhuma alteração foi publicada.");
+  }
+  if (!prUrl) requireLabel(type);
   let bodyExtra = "";
   if (bodyFile) {
     const bodyPath = path.resolve(root, bodyFile);
@@ -199,13 +480,13 @@ function cmdShip(argv) {
     const rawPayload = readFileSync(bodyPath, "utf8");
     if (rawPayload.trim()) bodyExtra = `\n\n${rawPayload}`;
   }
+  const commitTitle = releaseTitle(type, rawDescription, n);
+  const { description } = releaseDescription(rawDescription);
   git(["add", "-A"]);
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
     const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
     if (!unpublished) {
-      let def;
       try {
-        def = defaultBranch();
         git(["fetch", "origin", def]);
         const branchCommits = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
         if (!branchCommits) {
@@ -214,50 +495,72 @@ function cmdShip(argv) {
         }
       } catch {
         console.warn("Não consegui comparar com a branch default local; tentando criar o PR mesmo assim.");
-        console.log("Árvore limpa — branch já publicada; tentando criar o PR.");
       }
     } else {
       console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
     }
   } else {
-    git(["commit", "-m", `${type}: ${description} (#${n})`]);
+    git(["commit", "-m", commitTitle]);
   }
-  git(["push", "-u", "origin", branch]);
-  let prUrl = "";
-  let def = "";
-  const repository = repoSlug();
   try {
-    def = defaultBranch();
-    prUrl = gh(["pr", "list", "--head", branch, "--base", def, "--state", "open", "--json", "url,headRepository", "-q", `map(select(.headRepository.nameWithOwner == "${repository}")) | .[0].url`]);
-    if (prUrl === "null") prUrl = "";
+    git(["push", "-u", "origin", branch]);
   } catch {
-    console.error("Não consegui determinar a branch default; PR não criado automaticamente.");
-    process.exit(1);
+    fail("Falha no remote de push; commit local preservado, mas PR não foi criado.");
   }
   if (!prUrl) {
     prUrl = gh([
       "pr", "create",
       "--base", def,
-      "--title", `${type}: ${description}`,
-      "--body", `Closes #${n}\n\n${description}${bodyExtra}`,
+      "--title", releaseTitle(type, rawDescription),
+      "--body", mergePrBody(`Closes #${n}\n\n${description}`, bodyExtra, n),
     ]);
   } else if (bodyExtra) {
     const existingBodyJson = gh(["pr", "view", prUrl, "--json", "body"]);
     const existingBody = JSON.parse(existingBodyJson).body ?? "";
-    const comparableBody = existingBody.trimEnd();
-    const payload = bodyExtra.trim();
-    const alreadyAppended = comparableBody === payload ||
-      comparableBody.includes(`\n\n${payload}\n`) ||
-      comparableBody.endsWith(`\n\n${payload}`);
-    if (!alreadyAppended) {
-      gh(["pr", "edit", prUrl, "--body", `${existingBody}${bodyExtra}`]);
-    }
+    const mergedBody = mergePrBody(existingBody, bodyExtra, n);
+    if (mergedBody !== existingBody) gh(["pr", "edit", prUrl, "--body", mergedBody]);
   }
   console.log(`PR ${prUrl}`);
   const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
   if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
   else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
 }
+function restoreStoppedDeployment(oldHead, oldCfg) {
+  const failures = [];
+  try {
+    git(["reset", "--hard", oldHead]);
+  } catch (err) {
+    failures.push(`não consegui restaurar o revision ${oldHead}: ${err?.message ?? err}`);
+  }
+  if (oldCfg.buildCommand) {
+    try {
+      if (!runShell(oldCfg.buildCommand)) failures.push("o build da revisão anterior falhou");
+    } catch (err) {
+      failures.push(`o build da revisão anterior falhou: ${err?.message ?? err}`);
+    }
+  }
+  if (oldCfg.startCommand) {
+    try {
+      if (!runShell(oldCfg.startCommand)) failures.push("o startCommand da revisão anterior falhou");
+    } catch (err) {
+      failures.push(`o startCommand da revisão anterior falhou: ${err?.message ?? err}`);
+    }
+  } else {
+    failures.push("startCommand da revisão anterior não está configurado");
+  }
+  if (failures.length) {
+    console.error(`Rollback do deploy incompleto: ${failures.join("; ")}.`);
+  } else {
+    console.error(`Rollback do deploy concluído: revisão ${oldHead} restaurada e servidor reiniciado.`);
+  }
+}
+
+function failAfterStoppedDeploy(stopped, oldHead, oldCfg, message) {
+  console.error(message);
+  if (stopped) restoreStoppedDeployment(oldHead, oldCfg);
+  process.exit(1);
+}
+
 // ---------- deploy ----------
 async function deploy() {
   if (!existsSync(CONFIG)) {
@@ -277,6 +580,10 @@ async function deploy() {
     console.error(`Deploy roda na branch default (${def}); a atual é '${cur}'.`);
     process.exit(1);
   }
+  if (git(["status", "--porcelain"]) !== "") {
+    console.error(`Deploy bloqueado: a árvore da branch default '${def}' está suja. Faça commit ou descarte as mudanças antes de continuar.`);
+    process.exit(1);
+  }
   try {
     git(["fetch", "origin", def]);
     const ahead = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
@@ -289,25 +596,66 @@ async function deploy() {
     process.exit(1);
   }
   const oldHead = git(["rev-parse", "HEAD"]);
+  const oldCfg = cfg;
   const prePullDbPath = cfg.dbPath;
   const prePullBackupDir = backupDirFor(cfg);
-  const backupDest = performBackup(cfg, root);
+  let stopped = false;
+  if (cfg.stopCommand !== null && cfg.stopCommand !== undefined && (typeof cfg.stopCommand !== "string" || !cfg.stopCommand.trim())) {
+    if (cfg.dbPath) {
+      console.error("Deploy cancelado: dbPath configurado exige stopCommand (ou estratégia explícita de quiescência) antes do snapshot.");
+      process.exit(1);
+    }
+    console.warn("stopCommand configurado inválido — deploy continuará sem conseguir parar o servidor.");
+  } else if (typeof cfg.stopCommand === "string" && cfg.stopCommand.trim()) {
+    if (!runShell(cfg.stopCommand)) {
+      if (cfg.dbPath) {
+        console.error("Deploy cancelado: stopCommand não comprovou quiescência; nenhum snapshot ou pull foi executado.");
+        process.exit(1);
+      }
+      console.warn("stopCommand falhou; continuando o deploy porque dbPath não está configurado.");
+    } else {
+      stopped = true;
+    }
+  } else if (cfg.dbPath) {
+    console.error("Deploy cancelado: dbPath configurado exige stopCommand (ou estratégia explícita de quiescência) antes do snapshot.");
+    process.exit(1);
+  }
+  let backupDest;
+  try {
+    backupDest = performBackup(cfg, root);
+  } catch (err) {
+    failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup falhou: ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (backupDest) console.log(`Backup: ${backupDest}`);
   else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   try {
     git(["pull", "--ff-only", "origin", def]);
   } catch {
-    console.error(`git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`);
-    process.exit(1);
+    failAfterStoppedDeploy(
+      stopped,
+      oldHead,
+      oldCfg,
+      `git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`,
+    );
   }
   try {
     cfg = readConfig();
   } catch {
-    console.error("ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
-    process.exit(1);
+    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
   }
   if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
-    const postPullBackup = performBackup(cfg, root);
+    if (cfg.dbPath) {
+      if (!cfg.stopCommand || !runShell(cfg.stopCommand)) {
+        failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Deploy cancelado: a configuração pós-pull não comprovou quiescência para o snapshot.");
+      }
+      stopped = true;
+    }
+    let postPullBackup;
+    try {
+      postPullBackup = performBackup(cfg, root);
+    } catch (err) {
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup pós-pull falhou: ${err instanceof Error ? err.message : String(err)}`);
+    }
     if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
     else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   }
@@ -325,15 +673,10 @@ async function deploy() {
     console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
   }
   if (cfg.buildCommand && !runShell(cfg.buildCommand)) {
-    console.error("Build falhou — servidor antigo continua no ar.");
-    process.exit(1);
-  }
-  if (cfg.stopCommand && !runShell(cfg.stopCommand)) {
-    console.warn("stopCommand retornou não-zero — confira se o servidor antigo realmente parou.");
+    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Build falhou — a revisão nova não foi iniciada.");
   }
   if (cfg.startCommand && !runShell(cfg.startCommand)) {
-    console.error("Start falhou — veja a saída acima / o log do seu startCommand.");
-    process.exit(1);
+    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Start falhou — veja a saída acima / o log do seu startCommand.");
   }
   if (cfg.versionCheckUrl) {
     let pkg = null;

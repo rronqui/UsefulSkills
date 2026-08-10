@@ -38,11 +38,10 @@ can1357/oh-my-pi, renomeada para evitar colisão). Ela define:
 NUNCA use o agente embutido `reviewer` do omp nem qualquer outro revisor: usar o
 `deep-reviewer` garante comportamento idêntico sem conflito de nomes na descoberta
 de agentes. Se a chamada `task` com `agent: "deep-reviewer"` falhar por agente
-desconhecido, instale o arquivo desta skill antes de repetir o fan-out — projeto:
-`<repo>/.omp/agents/deep-reviewer.md`, ou usuário:
-`~/.omp/agent/agents/deep-reviewer.md` (projeto vence usuário em colisão de nome).
-Como último recurso, embuta o conteúdo integral do arquivo no assignment de um
-agente genérico.
+desconhecido, tente a resolução nomeada no escopo de projeto e depois de usuário;
+se não houver `deep-reviewer` nesses escopos, tente somente `peer-reviewer`. Se
+nenhum agente nomeado compatível estiver disponível, a rodada é `BLOCKED`; não há
+fallback genérico ou anônimo.
 
 ## FASE 0 — Resolução do escopo (modo)
 
@@ -73,27 +72,40 @@ por conta própria e ancoram achados nas linhas atuais.
   Caso contrário, `totalLines` é a soma das linhas atuais e `fileCount` o tamanho do
   inventário já restrito; só então a tabela de dimensionamento define a equipe.
 
-- **PR**: `gh pr diff <N> -R <owner>/<repo>` (fallback: `read pr://<owner>/<repo>/<N>/diff/all`).
-  Falha ao buscar → reporte o erro e pare.
-- **Branch base**: se o chamador informou a branch base (ex.: outra skill
+- **PR**: colete uma única fonte remota exata em `patch_source`: `gh pr diff <N> -R <owner>/<repo>` com o SHA retornado pelos metadados da PR, ou `pr://<owner>/<repo>/<N>/diff/all` com esse SHA. Registre `kind`, `uri` (quando houver), conteúdo e `sha`/`head-sha`; não misture fontes nem recupere um patch local.
+  Se a fonte remota falhar, estiver vazia ou indisponível, a rodada é `BLOCKED` e o erro é preservado; nunca use o workspace como fallback silencioso.
+- **Branch/base**: se o chamador informou a branch base (ex.: outra skill
   orquestrando o fluxo), use-a diretamente sem perguntar; caso contrário pergunte
-  ao usuário (liste com `git branch -a` se necessário). Branch atual via
-  `git branch --show-current`. Diff: `git diff <base>...<atual>`.
+  ao usuário (liste com `git branch -a` se necessário). Resolva a branch atual via
+`git branch --show-current` e registre `local_revision_context` com
+`mode: "BRANCH_BASE"`, `revision` (descritor do par local resolvido),
+`base_ref`, `head_ref`, `base_revision` e `head_revision`. O diff é
+`git diff <base>...<atual>`. Esses são identificadores locais das duas refs; não crie
+`patch_source` remoto, SHA/head-SHA de PR ou `consumer_context`.
 - **Não commitadas**: primeiro `git status` (vazio → "sem mudanças não commitadas",
   pare). Depois `git diff` + `git diff --cached`, concatenados. Repositórios `jj`:
-  `jj diff --git` no lugar dos dois.
+  `jj diff --git` no lugar dos dois. Registre `local_revision_context` com
+  `mode: "UNCOMMITTED"`, `revision` como snapshot do estado observado do worktree,
+  os patches staged/unstaged e os arquivos untracked, sem SHA remoto, `patch_source`
+  ou `consumer_context`.
 - **Commit**: liste os últimos 20 com `git log --oneline -20`, pergunte qual
-  (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`.
- - **Custom**: peça as instruções. Se houver mudanças não commitadas (staged ou
-   unstaged), colete um único patch final com `git diff HEAD --`; liste também arquivos
-   untracked via `git status --short --untracked-files=all` e, para cada arquivo não
-   excluído, acrescente um patch `/dev/null`→arquivo usando `git diff --no-index -- /dev/null "<path>"`
-   (ignore o exit code 1 esperado). Aplique exclusões e restrições customizadas antes de calcular
-   estatísticas, particionar e montar assignments. Se o inventário resultante
-   ficar vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie
-   o workspace, aplique as mesmas exclusões/restrições, e particione o inventário;
-   inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
-   por conta própria e ancora achados nas linhas atuais.
+  (ou use o indicado pelo usuário). Diff: `git show --format="" <hash>`. Registre
+  `local_revision_context` com `mode: "COMMIT"`, `revision` igual ao
+  `commit_revision` local resolvido por `git show` e `commit_ref`; não invente SHA
+  remoto nem use `patch_source`/`consumer_context`.
+- **Custom**: peça as instruções. Se houver mudanças não commitadas (staged ou
+  unstaged), colete um único patch final com `git diff HEAD --`; liste também arquivos
+  untracked via `git status --short --untracked-files=all` e, para cada arquivo não
+  excluído, acrescente um patch `/dev/null`→arquivo usando `git diff --no-index -- /dev/null "<path>"`
+  (ignore o exit code 1 esperado). Aplique exclusões e restrições customizadas antes de calcular
+  estatísticas, particionar e montar assignments. Se o inventário resultante
+  ficar vazio, informe "nenhum arquivo revisável" e pare. Sem mudanças → mapeie
+  o workspace, aplique as mesmas exclusões/restrições, e particione o inventário;
+  inclua a lista exata de arquivos em cada assignment; o revisor lê esses arquivos
+  por conta própria e ancora achados nas linhas atuais. Registre
+  `local_revision_context` com `mode: "CUSTOM"`, `revision` como snapshot do estado
+  observado do workspace, as instruções e a lista de arquivos; ele não é um SHA
+  remoto e não exige `patch_source` ou `consumer_context`.
 
 Instruções adicionais do usuário (texto além do ref do PR, ou foco explícito) são
 SEMPRE repassadas aos revisores.
@@ -136,17 +148,24 @@ Cada revisor recebe um conjunto DISJUNTO de arquivos; nada fica sem dono.
 ## FASE 3 — Distribuição (ferramenta `task`)
 
 Uma única chamada `task` em lote: `context` compartilhado + um item em `tasks[]` por
-revisor, todos com `agent: "deep-reviewer"` (não passe `outputSchema` — a saída
-estruturada nativa do agente é que habilita a renderização de veredito/achados na
-TUI). Agente desconhecido no ambiente → instale
-`skill://deep-review/agents/deep-reviewer.md` conforme a seção "O agente revisor"
-e repita; jamais caia para outro agente revisor.
+revisor. Agente `deep-reviewer` é resolvido deterministicamente no escopo de projeto
+primeiro e, se ausente, no escopo de usuário depois. Se ambos faltarem, o fallback
+nomeado `peer-reviewer` é tentado; nenhum agente anônimo ou outro nome pode substituir
+esses agentes. No fallback, o dispatcher define explicitamente
+`protocol_mode: DEEP_REVIEW_FALLBACK` e ativa o adaptador/schema normalizado abaixo;
+isso não altera o contrato `APROVADO`/`BLOQUEADO` da revisão TDD normal. O fallback
+recebe o protocolo completo, a mesma revisão e o mesmo schema **normalizado** e
+limiar de blocker P0/P1. Se nenhum `deep-reviewer` ou `peer-reviewer` nomeado estiver
+disponível, a rodada é `BLOCKED`.
 
-**`context`** (comum a todos): modo da revisão (ex.: "PR owner/repo#N", "branch base
-main → feat/x", "commit abc123", "instruções customizadas"), instruções adicionais
-do usuário, e as regras do protocolo da FASE 4 quando o ambiente não tiver o agente
-`deep-reviewer` instalado (nesse caso use o agente genérico e embuta o protocolo
-completo no assignment).
+**`context`** (comum a todos): modo da revisão (ex.: "PR owner/repo#N", "branch/base
+main → feat/x", "commit abc123", "instruções customizadas") e instruções adicionais
+do usuário. **Somente no modo PR** inclua o `patch_source` remoto, seu `sha`/`head-sha`
+e o `consumer_context` fixado na mesma revisão. Nos modos branch/base, não commitadas,
+commit e custom, inclua apenas o `local_revision_context` correspondente; não invente
+SHA remoto nem exija `patch_source` ou `consumer_context`. Todo consumidor lido para
+checagem cross-boundary deve ser carregado no contexto de revisão declarado para seu
+modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
 
 **Por revisor (`task` do item)** — assignment com:
 1. Lista EXATA dos arquivos atribuídos como alvos de achados. O revisor pode ler
@@ -165,11 +184,17 @@ completo no assignment).
      em **Não commitadas**, rode ambos `git diff -- "<path>"` e `git diff --cached -- "<path>"`; em
      branch/commit, rode `git diff`/`git show` para os arquivos atribuídos; em jj, rode
      `jj --ignore-working-copy diff --git -- "<path>"`.
-   - Modo PR, qualquer tamanho: "leia o patch somente de `pr://<owner>/<repo>/<N>/diff/all` ou
-     por arquivo `pr://<owner>/<repo>/<N>/diff/<índice>`; NUNCA use git diff/show local nem
-     trate o workspace como fonte do patch. Para a checagem cross-boundary obrigatória, MAY
-     ler arquivos inalterados do workspace somente como contexto do consumidor; não registre
-     achados fora dos arquivos atribuídos";
+   - **Modo PR, qualquer tamanho**: leia o patch somente do `patch_source` remoto coletado
+     por `gh pr diff` ou `pr://<owner>/<repo>/<N>/diff/all` (ou seu índice de arquivo).
+     NUNCA use `git diff`/`git show` local nem trate o workspace como fonte do patch.
+     O workspace local é somente contexto do consumidor, fixado no mesmo SHA; se a fonte
+     remota falhar ou estiver vazia, bloqueie sem fallback local. Não registre achados
+     fora dos arquivos atribuídos";
+   - **Demais modos**: leia o patch e os arquivos atribuídos pelas fontes locais
+     indicadas na coleta e no `local_revision_context`. Não procure ou fabrique
+     `patch_source`, SHA/head-SHA de PR ou `consumer_context`; a checagem cross-boundary
+     usa somente o contexto local declarado para branch/base, não commitadas, commit ou
+     custom.
 3. "MAY read full file context as needed via `read`" (em PR, o patch continua exclusivamente remoto; contexto local é apenas para despacho consumidor);
 4. Registro de achados e veredito via seções incrementais de `yield`
    (`type: ["findings"]`, `type: ["overall_correctness"]`, `type: ["explanation"]`,
@@ -224,47 +249,116 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 
 | Nível | Critério | Exemplo |
 |---|---|---|
-| P0 | Bloqueia release/operações; universal (sem supor inputs) | corrupção de dados, bypass de auth |
-| P1 | Alto; corrigir no próximo ciclo | race condition sob carga |
-| P2 | Médio; corrigir eventualmente | edge case mal tratado |
-| P3 | Info; nice to have | subótimo porém correto |
+| P0 | Achado válido que bloqueia release/operações | corrupção de dados, bypass de auth |
+| P1 | Achado válido alto que também bloqueia a liberação | race condition sob carga |
+| P2 | Achado válido médio retido; nunca bloqueia sozinho | edge case mal tratado |
+| P3 | Achado válido informativo retido; nunca bloqueia sozinho | subótimo porém correto |
 
-**Formato de cada achado** (campos validados; incompleto é descartado):
+**Formato de cada achado** (campos obrigatórios; qualquer incompleto torna a rodada
+`BLOCKED` e é preservado como diagnóstico):
 - `title`: imperativo, ≤ 80 caracteres;
 - `body`: um parágrafo — bug, condição de disparo, impacto; tom neutro; blocos de
   sugestão de código apenas quando forem substituição concreta (whitespace exato, sem
   comentário em volta);
-- `priority`: número 0–3 (0 = P0 bloqueia o release; 3 = nice-to-have);
-- `confidence`: 0.0–1.0 de que é bug real;
+- `priority`: número inteiro 0–3;
+- `confidence`: número 0.0–1.0 de que é bug real;
 - `file_path`: arquivo afetado (não vazio);
 - `line_start` / `line_end`: intervalo 1-indexado de ≤ 10 linhas; em modos com patch
   sobrepõe o diff e em Custom sem patch ancora linhas atuais do arquivo atribuído.
 
 **Veredito** (por revisor):
-- `overall_correctness`: `correct` (sem bugs/bloqueios) | `incorrect`;
+- `status`: `VALID` somente quando todos os campos obrigatórios, o schema e a revisão
+  avaliada forem válidos; ausência, timeout ou resultado malformado nunca vira aprovação;
+- `reviewed_revision`: revisão exata do patch/contexto que o revisor leu. No modo
+  PR deve coincidir com `consumer_context.revision`; nos demais modos deve coincidir
+  com o `local_revision_context` declarado, sem exigir SHA remoto.
+- `overall_correctness`: `correct` ou `incorrect`, apenas como diagnóstico, sem tornar
+  P2/P3 blockers por si só;
 - `explanation`: resumo do veredito em 1–3 frases de texto puro;
-- `confidence`: 0.0–1.0.
+- `confidence`: número entre 0.0 e 1.0.
 
 Estilo/docs/nits NÃO contam: corretude ignora questões não bloqueantes. Todo achado
 DEVE ser ancorado no patch, ou nas linhas atuais do arquivo atribuído em Custom sem
 patch, e sustentado por evidência. O revisor nunca emite JSON ou blocos de código
 como texto final.
 
-## FASE 5 — Consolidação e relatório final
+## FASE 5 — Consolidação normativa fail-closed e relatório
 
-Com os resultados de todos os revisores:
+### Validação e limiar
 
-1. **Veredito consolidado**: se qualquer revisor retornou `incorrect`, a mudança NÃO
-   está liberada; relate cada veredito com sua confiança.
-2. **Achados**: valide o formato (descarte malformados), ordene por prioridade
-   (P0 primeiro) e apresente: `[Pn] título — arquivo:linha` + corpo. Em visão
-   resumida mostre os 3 mais graves e a contagem por prioridade
-   (ex.: `1×P0 · 2×P1 · 4×P2`); liste tudo se o usuário quiser.
-3. **Excluídos**: liste os arquivos filtrados com motivo (lock file, generated...).
-4. Responda com: modo da revisão, veredito consolidado, achados por prioridade,
-   excluídos e o que cabe ao usuário decidir (achados P0/P1 são os que bloqueiam).
+Todos os revisores atribuídos devem retornar um resultado estruturado completo. Revisor
+esperado ausente ou faltante, timeout, resultado sem veredito, schema inválido, status
+ausente/diferente de `VALID`, `reviewed_revision` ausente/divergente ou finding
+incompleto produz `BLOCKED`; o agregador preserva o diagnóstico de cada falha e nunca
+infere `correct` ou aprovação por falta de dados. Em particular, revisor esperado
+ausente => `BLOCKED`, resultado sem veredito => `BLOCKED`, schema inválido => `BLOCKED`
+e finding incompleto => `BLOCKED`.
+Revisor esperado ausente => BLOCKED; essa decisão preserva o diagnóstico sem inferir aprovação.
+Resultado sem veredito => BLOCKED; schema inválido => BLOCKED; finding incompleto => BLOCKED.
+Nunca inferir `correct` nem aprovação a partir de ausência ou erro de dados.
+Não inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 
-## Armadilhas
+Somente achados válidos P0/P1 bloqueiam a liberação; um veredito `incorrect` sem
+achado válido P0/P1 não bloqueia sozinho. P2/P3 são retidos no relatório com localização e contagem e nunca bloqueiam sozinhos. A validação exige `title`, `body`, prioridade
+inteira 0–3, confiança 0.0–1.0, `file_path` não vazio e intervalo de até 10 linhas.
+O resultado do revisor (inclusive o fallback adaptado) usa `status: VALID`; esse
+valor não é o veredito consolidado. O resultado consolidado contém `status`
+(`APPROVED` ou `BLOCKED`), `reviewed_revision`, `blockers` somente com achados
+válidos P0/P1, `findings` com todos os achados válidos P0/P1/P2/P3, `counts` por
+P0/P1/P2/P3, `reviewers` e `fallback_agent`. `blockers`
+contém somente achados válidos P0/P1; `findings` retém todos os achados válidos P2/P3
+com localização e contagem (e também os P0/P1 para não perder evidência).
+### Adaptador de fallback e schema normalizado
+Resumo obrigatório: `blockers` contém somente P0 e P1 válidos; `findings` retém P2 e P3 com localização e contagem.
+
+O dispatcher tem dois contratos distintos e não os mistura:
+
+1. `TDD_PEER_REVIEW` invoca `peer-reviewer` e exige a saída textual normal
+   **APROVADO** ou **BLOQUEADO**. Essa saída não é validada como resultado
+   normalizado de deep-review.
+2. `DEEP_REVIEW_FALLBACK` invoca o `peer-reviewer` nomeado somente como fallback e
+   exige o objeto normalizado `{ agent: "peer-reviewer", status: "VALID",
+   reviewed_revision, overall_correctness, explanation, confidence, findings }`.
+   O adaptador rejeita status normal sem conversão explícita, valida todos os campos
+   e entrega o objeto ao mesmo agregador usado para `deep-reviewer`.
+
+O adaptador preserva `reviewed_revision`, findings P0–P3, localização e o limiar:
+somente P0/P1 válidos viram `blockers`; P2/P3 permanecem em `findings` e `counts`.
+Resultado ausente, mistura de modos, schema incompleto ou revisão divergente vira
+`BLOCKED` com diagnóstico preservado; nunca se infere aprovação.
+
+
+### PR, SHA e consumidor
+
+**Somente no modo PR** `patch_source` é obrigatoriamente a fonte remota exata obtida por
+`gh pr diff` ou `pr://.../diff/...`, com conteúdo não vazio e SHA resolvido. Patch remoto
+vazio ou indisponível => `BLOCKED`; nunca usar fallback de patch local nem substituir
+o patch remoto pelo workspace local. Registre o SHA avaliado e fixe o `consumer_context` na mesma revisão antes de distribuir assignments. SHA ausente, divergente ou impossível de resolver => `BLOCKED`, mesmo que o workspace contenha um patch diferente.
+No branch/base, não commitadas, commit e custom, valide o `local_revision_context`
+apropriado (refs/revisões locais ou estado do workspace) e mantenha
+`patch_source`, SHA/head-SHA remoto e `consumer_context` ausentes; nunca invente um
+SHA remoto para preencher esses campos.
+Fixar a revisão do consumidor no contexto é uma regra exclusiva do modo PR; em todos
+os modos locais, a checagem cross-boundary usa o contexto local declarado e validado.
+
+### Resolução de agentes
+
+A resolução de `deep-reviewer` tenta projeto > usuário de forma determinística. Se
+ambos não estiverem disponíveis, usa somente o `peer-reviewer` nomeado como fallback;
+ele recebe o protocolo completo e produz o mesmo schema, validação e limiar P0/P1 de
+blocker, mantendo P2/P3 não bloqueantes. Nunca usar fallback anônimo. Nenhum
+`deep-reviewer` ou `peer-reviewer` nomeado disponível => `BLOCKED`.
+peer-reviewer é fallback nomeado e recebe protocolo completo, mesmo schema e limiar P0/P1 de blocker.
+Nenhum deep-reviewer ou peer-reviewer nomeado disponível => BLOCKED.
+
+### Relatório
+
+Relate modo, revisão fixada (SHA/head-SHA somente no PR), `patch_source` remoto
+somente no PR ou `local_revision_context` nos modos locais, veredito consolidado,
+diagnóstico de cada revisor, blockers P0/P1, findings P0–P3, localização, contagem
+por prioridade e arquivos excluídos com motivo. A liberação só é `APPROVED` quando
+todos os resultados são `VALID`, a revisão é consistente e não há blocker P0/P1;
+P2/P3 permanecem visíveis para decisão posterior.
 
 - Número de revisores segue a tabela da FASE 2 — não invente fan-out maior; 1 revisor
   é o esperado para diffs pequenos.

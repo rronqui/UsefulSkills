@@ -12,7 +12,7 @@ seguem o protocolo abaixo.
 ## Pré-requisitos
 
 - Repo já bootstrapped (`skill://release-bootstrap`): ruleset/CI/release-please/hooks.
-- `gh` autenticado, git, Node >= 18.
+- `gh` autenticado, git, Node >= 20.
 - `ship.config.json` na raiz do repo (crie com `bin/ship.mjs setup` e preencha).
 - Skill `deep-review` (`skill://deep-review`) e o agente `deep-reviewer.md`
   instalados (`<repo>/.omp/agents/` ou `~/.omp/agent/agents/`).
@@ -26,10 +26,28 @@ seguem o protocolo abaixo.
 | backupDir | Diretório do backup (opcional; default: `<dirname(dbPath)>/backup`) |
 | schemaWatchPaths | Array de caminhos (opcional); se qualquer um mudou no pull, o deploy avisa sobre possível migração de schema (forward-only) |
 | buildCommand | Build de produção (null = pular) |
-| stopCommand | Para o servidor (null = pular); retorno não-zero gera aviso (não fatal) |
+| stopCommand | Para o servidor antes de pull/build/start e, quando `dbPath` estiver configurado, prova quiescência antes do snapshot (ausência/falha é bloqueante); sem `dbPath`, retorno não-zero gera aviso e o deploy continua |
 | startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui); DEVE retornar (wrapper/daemonizador como pm2/npm script) — um servidor foreground bloqueia o deploy |
-| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z[-prerelease][+build])` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a `version` SemVer do `package.json` na raiz (ausente/inválido → aviso e checagem pulada) |
+| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z[-prerelease][+build])` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a versão SemVer do `package.json` raiz (ausente/inválida → aviso e checagem pulada; use-a apenas para a unidade raiz) |
 | versionCheckTimeoutMs | Timeout da checagem HTTP de versão em milissegundos (opcional; default 10000; valores não positivos ou inválidos usam o default) |
+
+### Fonte de versão e monorepo
+
+Antes de qualquer efeito remoto de `new` ou `ship`, o motor valida
+`release-please-config.json`, `.release-please-manifest.json` e o `package.json`
+de cada unidade declarada em `packages`. Cada unidade deve usar
+`release-type: node`, possuir uma versão SemVer resolvível e corresponder a uma
+entrada SemVer do manifesto; unidade ausente, inválida, não-Node ou fora do
+repositório falha com `E_VERSION_SOURCE` (fail closed), sem fallback para a raiz.
+O `release-please-config.json` também precisa ser um arquivo regular acessível (não
+link simbólico); configuração inacessível, dangling ou inválida falha fechado.
+Uma configuração sem `release-please-config.json` continua suportando o projeto
+raiz, desde que o `package.json` raiz tenha versão SemVer válida.
+
+Quando `versionCheckUrl` está configurado, a checagem de deploy compara a
+versão servida com o `package.json` raiz; uma configuração multi-package deve
+manter essa URL desabilitada ou definir explicitamente qual unidade raiz ela
+representa, sem mascarar a validação fail-closed das demais unidades.
 
 ## Subcomandos do motor
 
@@ -37,9 +55,9 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
 | Comando | Efeito |
 |---|---|
-| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Issue + branch `fix/N-slug` / `feat/N-slug` a partir da default atualizada |
-| `bin/ship.mjs ship "descrição"` | Commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR `Closes #N`, auto-merge squash; `--body-file <arquivo>` anexa o conteúdo do arquivo ao corpo do PR |
-| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se algum schemaWatchPath mudou → build → restart → confere versão servida |
+| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default atualizada |
+| `bin/ship.mjs ship "descrição"` | Valida fontes de versão e pré-requisitos; depois faz commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR `Closes #N`, auto-merge squash; `--body-file <arquivo>` anexa o conteúdo do arquivo ao corpo do PR |
+| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; executa `stopCommand` (falha avisa sem `dbPath`, bloqueia com `dbPath`) → backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se algum schemaWatchPath mudou → build → restart → confere versão servida; se o stop tiver sido bem-sucedido e pull/build/start falhar, restaura a revisão anterior, refaz o build e reinicia o servidor, reportando também qualquer falha do rollback |
 
 ## Protocolo de entrega (agente)
 
@@ -177,9 +195,12 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
    e mergue manualmente.
 
    Se o PR entrar em conflito com a base antes do merge: na branch do PR rode
-   `git fetch origin` e depois `git merge origin/<default>`, resolva seguindo
-   `skill://conflict-resolution`, commite e dê push; o auto-merge retoma com o CI
-   verde.
+   `git fetch origin` e depois `git merge origin/<default>`, resolva cada hunk
+   seguindo `skill://conflict-resolution`; rode os checks aplicáveis enquanto a
+   resolução está registrada e finalize este merge ativo somente com `git commit`;
+   depois dê push e rode um **deep-review/re-review final** sobre o intervalo final
+   de commits;
+   registre o resultado e o veredito válido/aprovado. Sem publicar o PR, fica bloqueado sem um veredito válido; o auto-merge só retoma após CI verde.
 6. **Release**: NÃO mergue automaticamente o PR de release do release-please. Quando
    o usuário quiser lançar: `gh pr merge <nº do PR de release> --squash` e aguarde a
    tag.
