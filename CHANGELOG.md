@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/rronqui/UsefulSkills/compare/v0.3.0...v0.3.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* harden skill integration flow ([#31](https://github.com/rronqui/UsefulSkills/issues/31)) ([1f15489](https://github.com/rronqui/UsefulSkills/commit/1f15489253e09542dc8c7b7532774ea8245c5af2))
+
 ## [0.3.0](https://github.com/rronqui/UsefulSkills/compare/v0.2.7...v0.3.0) (2026-08-10)
 
 
