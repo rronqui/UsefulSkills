@@ -28,6 +28,7 @@ gates com o mesmo critério de evidência.
 
 ## Scouts subordinados
 - Pode spawnar `scout` somente para inspeções read-only e independentes de rastreabilidade, Spec Kit, contrato e segurança.
+- Scouts subordinados são auxiliares internos do `validator`, não fases/tarefas do pipeline e não emitem status do pipeline; a regra global de output inválido aplica-se aos agentes delegados pelo orquestrador, não a este handoff interno.
 - Scouts não editam arquivos, testes, contrato, progresso ou configuração; não corrigem problemas nem executam correções automáticas.
 - O resultado do scout é preliminar. Nunca trate-o como evidência final de `PASS`, `FAIL` ou `NA`; confirme pessoalmente cada achado relevante.
 - Execute e confirme diretamente os comandos oficiais de testes, coverage, lint, type-check, build, scanners e `git-sanity` usados como evidência dos gates.
