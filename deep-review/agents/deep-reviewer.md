@@ -82,10 +82,12 @@ output:
    fixado ao mesmo `reviewed_revision`. Nos modos locais, carregue consumidores no
    `local_revision_context` declarado e validado.
 3. Registre cada issue com `yield` incremental usando `type: ["findings"]`.
-4. Registre `agent: "deep-reviewer"`, `status: VALID`, `reviewed_revision`,
-   `overall_correctness`, `explanation` e `confidence` com seções incrementais,
-   além de um array `findings` (vazio quando não houver achados), então pare para
-   a finalização. Não omita campos obrigatórios nem emita resultado parcial.
+4. Registre cada campo de identidade e veredito em uma seção incremental separada:
+   `agent`, `status`, `reviewed_revision`, `overall_correctness`, `explanation` e
+   `confidence`. Em cada chamada, `result.data` deve conter somente o valor do
+   campo; nunca envie o objeto completo, nunca combine nomes em `type` e nunca
+   envie um objeto em uma seção escalar. Depois dessas seções, pare para a
+   finalização; não omita campos obrigatórios nem emita resultado parcial.
 
 Bash é somente leitura: `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`.
 Você NUNCA edita arquivos nem dispara builds.
@@ -165,13 +167,18 @@ The complete normalized verdict must also contain:
 - `status`: exactly `VALID`
 - `reviewed_revision`: exact patch/revision read from the assignment (remote SHA only in PR mode)
 - `overall_correctness`: `correct` or `incorrect` as diagnosis only
-- `explanation`: plain-text 1-3 sentence verdict summary; required
-- `confidence`: number 0.0-1.0; required
-
-Verdict fields use incremental `yield` sections:
-- `type: ["overall_correctness"]` with `"correct"` or `"incorrect"`
-- `type: ["explanation"]` with a plain-text 1-3 sentence verdict summary
-- `type: ["confidence"]` with a 0.0-1.0 confidence value
+- `confidence`: number between 0.0 and 1.0; required
+  
+Verdict and identity fields use separate incremental `yield` sections. Use exactly
+one scalar value per call:
+- `type: ["agent"]`, `result.data: "deep-reviewer"`
+- `type: ["status"]`, `result.data: "VALID"`
+- `type: ["reviewed_revision"]`, `result.data: "<exact assignment revision>"`
+- `type: ["overall_correctness"]`, `result.data: "correct"` or `"incorrect"`
+- `type: ["explanation"]`, `result.data: "<plain-text 1-3 sentence summary>"`
+- `type: ["confidence"]`, `result.data: 0.0-1.0`
+Never combine section names in one `type` array or pass the complete result object
+as `result.data` for a scalar section.
 
 Do not emit a separate submit tool call or duplicate `findings` in another payload. Once all sections are recorded, stop and let idle finalization assemble the result.
 

@@ -121,6 +121,10 @@ APROVADO/BLOQUEADO. A saída válida deve declarar explicitamente:
   materializa `[]`; cada item emitido exige `title`, `body`, `priority` inteira 0–3,
   `confidence` entre 0 e 1, `file_path` não vazio e `line_start`/`line_end` válidos
   em no máximo 10 linhas.
+No fallback `DEEP_REVIEW_FALLBACK`, emita cada campo de identidade/veredito em
+uma seção `yield` separada, com `result.data` contendo somente o valor escalar;
+não combine nomes em `type` nem envie o objeto completo em uma seção escalar.
+
 
 O resultado malformado, incompleto, ausente, com revisão divergente ou sem
 `status: VALID` é inválido e o orquestrador deve retornar `BLOCKED`, preservando

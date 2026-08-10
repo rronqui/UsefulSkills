@@ -287,6 +287,12 @@ describe("deep-review — protocolo normativo T-002", () => {
     );
 
   });
+  it("AC-012: yield de identidade e veredito usa seções escalares separadas", () => {
+    expect(reviewer).toMatch(/one scalar value per call/i);
+    expect(reviewer).toMatch(/Never combine section names in one `type` array/i);
+    expect(reviewer).toMatch(/result\.data[\s\S]{0,100}complete result object/i);
+  });
+
 
 
   it("AC-006: bloqueia apenas findings válidos P0/P1 e retém P2/P3 com localização e contagem", () => {
