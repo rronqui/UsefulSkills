@@ -6,6 +6,8 @@ description: >-
   ser o mesmo agente que escreveu o código. Avalia corretude, edge cases,
   segurança, qualidade dos testes, cobertura de 100% do requisito e integridade
   dos testes (se foram adulterados para forçar o verde).
+model: openai-codex/gpt-5.6-luna, @slow
+thinkingLevel: max
 tools: read, grep, glob
 ---
 

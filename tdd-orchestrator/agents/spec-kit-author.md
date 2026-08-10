@@ -8,6 +8,8 @@ description: >-
   Escreve documentação técnica clara, estruturada e consistente. Não implementa
   código, não escreve testes, não altera progress.json. É o único agente
   autorizado a criar ou editar artefatos Spec Kit.
+model: openai-codex/gpt-5.6-luna, @slow
+thinkingLevel: max
 tools: read, write, edit, grep, glob
 ---
 
