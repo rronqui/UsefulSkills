@@ -290,11 +290,14 @@ Todos os revisores atribuídos devem retornar um resultado estruturado completo.
 esperado ausente ou faltante, timeout, resultado sem veredito, schema inválido, status
 ausente/diferente de `VALID`, `reviewed_revision` ausente/divergente ou finding
 incompleto produz `BLOCKED`; o agregador preserva o diagnóstico de cada falha e nunca
-infere `correct` ou aprovação por falta de dados. Em particular, revisor esperado
-ausente => `BLOCKED`, resultado sem veredito => `BLOCKED`, schema inválido => `BLOCKED`
-e finding incompleto => `BLOCKED`.
-Revisor esperado ausente => BLOCKED; essa decisão preserva o diagnóstico sem inferir aprovação.
-Resultado sem veredito => BLOCKED; schema inválido => BLOCKED; finding incompleto => BLOCKED.
+infere `correct` ou aprovação por falta de dados.
+O schema nativo do OMP trata `findings` como uma coleção incremental opcional:
+quando não há achados, a seção pode estar ausente. O dispatcher deve normalizar
+essa ausência para `findings: []` antes da validação do resultado normalizado; uma
+seção presente, mas incompleta ou inválida, continua produzindo `BLOCKED`.
+Em particular, revisor esperado ausente => `BLOCKED`, resultado sem veredito =>
+`BLOCKED`, schema inválido => `BLOCKED` e finding incompleto => `BLOCKED`.
+Resultado sem veredito => `BLOCKED`; schema inválido => `BLOCKED`; finding incompleto => `BLOCKED`.
 Nunca inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 Não inferir `correct` nem aprovação a partir de ausência ou erro de dados.
 

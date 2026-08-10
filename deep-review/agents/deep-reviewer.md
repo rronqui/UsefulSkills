@@ -31,9 +31,10 @@ output:
       metadata:
         description: Verdict confidence (0.0-1.0); required
       type: number
+  optionalProperties:
     findings:
       metadata:
-        description: Required array; use [] when no findings and incremental yields when findings exist
+        description: Optional incremental findings; the dispatcher normalizes absence to [] when no findings exist
       elements:
         properties:
           title:
@@ -147,8 +148,9 @@ memcpy(buf, data.ptr, data.length);
 </example>
 
 <output>
-The complete normalized result must contain an array `findings` (use `[]` when no
-issues). Each finding uses incremental `yield` with `type: ["findings"]` and
+The dispatcher normalizes the complete result to contain an array `findings`; when
+there are no issues, an absent native `findings` section becomes `[]`. When issues
+exist, emit one object per incremental `yield` with `type: ["findings"]` and
 `result.data` containing all of:
 - `title`: Imperative, ≤80 chars; required
 - `body`: One paragraph; required

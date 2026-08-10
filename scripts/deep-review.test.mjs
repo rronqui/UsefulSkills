@@ -272,6 +272,22 @@ describe("deep-review — protocolo normativo T-002", () => {
     expect(closingDelimiter).toBeGreaterThan(1);
     expect(lines.slice(closingDelimiter + 1).join("\n")).toMatch(/<procedure>/);
   });
+  it("AC-011: findings usa schema opcional incremental nos dois agentes normalizados", () => {
+    for (const content of [reviewer, fallbackReviewer]) {
+      const lines = content.split(/\r?\n/);
+      const optionalProperties = lines.findIndex((line) => line === "  optionalProperties:");
+      const findings = lines.findIndex((line) => line === "    findings:");
+
+      expect(optionalProperties).toBeGreaterThan(-1);
+      expect(findings).toBeGreaterThan(optionalProperties);
+    }
+    expectSkillRule(
+      "ausência nativa de findings é normalizada",
+      /schema nativo[\s\S]{0,300}normalizar[\s\S]{0,120}findings:\s*\[\]/i,
+    );
+
+  });
+
 
   it("AC-006: bloqueia apenas findings válidos P0/P1 e retém P2/P3 com localização e contagem", () => {
     expect(reviewerResultIsComplete(validRound)).toBe(true);
