@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/rronqui/UsefulSkills/compare/v0.3.2...v0.3.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* corrigir integração robusta das skills ([#37](https://github.com/rronqui/UsefulSkills/issues/37)) ([c44e88b](https://github.com/rronqui/UsefulSkills/commit/c44e88bc05279c355c7bcd3e7f2f6f985dcbae00))
+
 ## [0.3.2](https://github.com/rronqui/UsefulSkills/compare/v0.3.1...v0.3.2) (2026-08-10)
 
 
