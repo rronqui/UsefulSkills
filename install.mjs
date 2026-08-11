@@ -6,6 +6,8 @@
 // Requer: Node >= 20. Não toca nenhum arquivo fora do inventário abaixo.
 import { createHash } from "node:crypto";
 import {
+  accessSync,
+  constants as fsConstants,
   cpSync,
   lstatSync,
   mkdirSync,
@@ -24,8 +26,11 @@ if (!Number.isInteger(nodeMajor) || nodeMajor < 20) {
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const home = os.homedir();
-const skillsDest = path.join(home, ".omp", "agent", "skills");
-const agentsDest = path.join(home, ".omp", "agent", "agents");
+const agentRoot = path.join(home, ".omp", "agent");
+const skillsDest = path.join(agentRoot, "skills");
+const agentsDest = path.join(agentRoot, "agents");
+const noticeSource = path.join(root, "NOTICE");
+const noticeDest = path.join(agentRoot, "NOTICE");
 const check = process.argv.includes("--check");
 
 const SKILLS = [
@@ -76,6 +81,7 @@ function statType(stat) {
   if (!stat) return "missing";
   if (stat.isSymbolicLink()) return "symlink";
   if (stat.isDirectory()) return "directory";
+  if (stat.isFile() && stat.nlink > 1) return "hardlink";
   if (stat.isFile()) return "file";
   if (typeof stat.isFIFO === "function" && stat.isFIFO()) return "special (FIFO)";
   if (typeof stat.isSocket === "function" && stat.isSocket()) return "special (socket)";
@@ -85,7 +91,7 @@ function statType(stat) {
 }
 
 function isRegularFile(stat) {
-  return Boolean(stat && stat.isFile() && !stat.isSymbolicLink());
+  return Boolean(stat && stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1);
 }
 
 function inspectTree(dir) {
@@ -95,10 +101,8 @@ function inspectTree(dir) {
   while (pending.length > 0) {
     const relative = pending.pop();
     const current = path.join(dir, relative);
-    let names;
-    try {
-      names = readdirSync(current).sort(compareNames);
-    } catch (error) {
+    const { names, error } = safeReaddir(current);
+    if (error) {
       issues.push(`não foi possível ler ${current}: ${error?.code || error?.message || "erro"}`);
       continue;
     }
@@ -173,17 +177,30 @@ function sourceInventory(skill) {
 function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
-
+function safeSha256(file) {
+  try {
+    return { hash: sha256(file), error: null };
+  } catch (error) {
+    return { hash: null, error };
+  }
+}
 function destinationInventory(dir) {
   const result = safeLstat(dir);
   if (result.error || !result.stat || !result.stat.isDirectory() || result.stat.isSymbolicLink()) {
-    return { exists: Boolean(result.stat), nodes: [], issues: [] };
+    return { nodes: [], issues: [] };
   }
   const inspected = inspectTree(dir);
-  return { exists: true, nodes: inspected.nodes, issues: inspected.issues };
+  return { nodes: inspected.nodes, issues: inspected.issues };
 }
 
-function planSyncDir(skill, src, dest, source) {
+function hasDestinationAncestorConflict(relative, target, conflicts) {
+  const conflict = destinationConflict(path.dirname(target));
+  if (!conflict) return false;
+  conflicts.push(`${relative}: ${conflict.kind} no ancestral ${conflict.path}`);
+  return true;
+}
+
+function planSyncDir(dest, source) {
   const issues = [];
   const operations = [];
   const ancestor = destinationConflict(path.dirname(dest));
@@ -195,7 +212,7 @@ function planSyncDir(skill, src, dest, source) {
     issues.push(`conflito de tipo na raiz ${dest}: ${statType(destStat)} onde deveria haver diretório`);
   }
 
-  const destination = destStat?.isDirectory() ? destinationInventory(dest) : { exists: false, nodes: [], issues: [] };
+  const destination = destStat?.isDirectory() ? destinationInventory(dest) : { nodes: [], issues: [] };
   issues.push(...destination.issues);
   const sourceKeys = new Set(source.files.map((node) => inventoryKey(node.relative)));
   const sourceDirs = new Set(source.dirs.map((node) => inventoryKey(node.relative)));
@@ -208,11 +225,7 @@ function planSyncDir(skill, src, dest, source) {
 
   for (const node of source.dirs) {
     const target = path.join(dest, node.relative);
-    const parentConflict = destinationConflict(path.dirname(target));
-    if (parentConflict) {
-      conflicts.push(`${node.relative}: ${parentConflict.kind} no ancestral ${parentConflict.path}`);
-      continue;
-    }
+    if (hasDestinationAncestorConflict(node.relative, target, conflicts)) continue;
     const result = safeLstat(target);
     if (result.error) {
       conflicts.push(`${node.relative}: destino inacessível (${result.error.code || result.error.message})`);
@@ -228,11 +241,7 @@ function planSyncDir(skill, src, dest, source) {
 
   for (const node of source.files) {
     const target = path.join(dest, node.relative);
-    const parentConflict = destinationConflict(path.dirname(target));
-    if (parentConflict) {
-      conflicts.push(`${node.relative}: ${parentConflict.kind} no ancestral ${parentConflict.path}`);
-      continue;
-    }
+    if (hasDestinationAncestorConflict(node.relative, target, conflicts)) continue;
     const result = safeLstat(target);
     if (result.error) {
       conflicts.push(`${node.relative}: destino inacessível (${result.error.code || result.error.message})`);
@@ -291,12 +300,10 @@ function planSyncDir(skill, src, dest, source) {
 function findProjectAgent(file) {
   let current = path.resolve(process.cwd());
   while (true) {
-    for (const relativeDir of [path.join(".omp", "agents")]) {
-      const candidate = path.join(current, relativeDir, file);
-      const result = safeLstat(candidate);
-      if (result.error) return { path: candidate, type: "inacessível" };
-      if (result.stat) return { path: candidate, type: statType(result.stat) };
-    }
+    const candidate = path.join(current, ".omp", "agents", file);
+    const result = safeLstat(candidate);
+    if (result.error) return { path: candidate, type: "inacessível" };
+    if (result.stat) return { path: candidate, type: statType(result.stat) };
     const parent = path.dirname(current);
     if (parent === current) break;
     current = parent;
@@ -314,74 +321,234 @@ function applyOperations(operations) {
     cpSync(operation.source, operation.target);
   }
 }
-
-let drift = false;
-let unsafe = false;
-const plannedOperations = [];
-const skillSources = new Map();
-
-console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
-
-for (const name of SKILLS) {
-  const source = sourceInventory(name);
-  skillSources.set(name, source);
-  if (source.issues.length > 0) {
-    drift = true;
-    unsafe = true;
-    console.log(`skill ${name.padEnd(18)} drift    ${source.issues.join("; ")} — E_INSTALL_DRIFT`);
-    continue;
+function nearestExistingPath(target) {
+  let current = path.resolve(target);
+  while (true) {
+    const result = safeLstat(current);
+    if (result.stat || result.error) return { path: current, ...result };
+    const parent = path.dirname(current);
+    if (parent === current) return { path: current, stat: null, error: new Error("no existing ancestor") };
+    current = parent;
   }
-  const result = planSyncDir(name, path.join(root, name), path.join(skillsDest, name), source);
-  plannedOperations.push(...result.operations);
-  if (result.status === "drift") drift = true;
-  if (result.unsafe) unsafe = true;
-  console.log(`skill ${name.padEnd(18)} ${result.status.padEnd(8)} ${result.detail}`);
+}
+function preflightOperations(operations) {
+  const checked = new Set();
+  for (const operation of operations) {
+    const destination = path.resolve(operation.target);
+    if (!operation.directory) {
+      const sourceResult = safeLstat(operation.source);
+      if (sourceResult.error) return { target: operation.source, error: sourceResult.error };
+      if (!sourceResult.stat || !isRegularFile(sourceResult.stat)) {
+        return { target: operation.source, error: new Error("source must be a regular file") };
+      }
+      try {
+        accessSync(operation.source, fsConstants.R_OK);
+      } catch (error) {
+        return { target: operation.source, error };
+      }
+    }
+    const targetResult = safeLstat(destination);
+    if (targetResult.error) return { target: destination, error: targetResult.error };
+    if (operation.directory && targetResult.stat?.isDirectory()) continue;
+    const paths = [];
+    if (targetResult.stat && !operation.directory) paths.push(destination);
+    const parent = nearestExistingPath(path.dirname(destination));
+    if (parent.error || !parent.stat?.isDirectory()) {
+      return { target: destination, error: parent.error ?? new Error("parent is not a directory") };
+    }
+    paths.push(parent.path);
+    for (const writablePath of paths) {
+      if (checked.has(writablePath)) continue;
+      try {
+        const mode = writablePath === parent.path ? fsConstants.W_OK | fsConstants.X_OK : fsConstants.W_OK;
+        accessSync(writablePath, mode);
+      } catch (error) {
+        return { target: writablePath, error };
+      }
+      checked.add(writablePath);
+    }
+  }
+  return null;
+}
+function copyOperations(source, target) {
+  return check ? [] : [{ source, target }];
 }
 
-const skillsRootConflict = destinationConflict(path.dirname(skillsDest));
-const skillsRootResult = safeLstat(skillsDest);
-if (skillsRootConflict || (skillsRootResult.stat && (!skillsRootResult.stat.isDirectory() || skillsRootResult.stat.isSymbolicLink()))) {
-  const conflict = skillsRootConflict || { kind: statType(skillsRootResult.stat), path: skillsDest };
-  console.log(`skill (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
-  drift = true;
-  unsafe = true;
+function inspectDestinationRoot(target) {
+  const ancestorConflict = destinationConflict(path.dirname(target));
+  const result = safeLstat(target);
+  const conflict = ancestorConflict || (
+    result.stat && (!result.stat.isDirectory() || result.stat.isSymbolicLink())
+      ? { kind: statType(result.stat), path: target }
+      : null
+  );
+  return { ...result, conflict };
 }
-if (skillsRootResult.stat?.isDirectory()) {
-  const expected = new Set(SKILLS.map(inventoryKey));
-  const entriesResult = safeReaddir(skillsDest);
+function reportInventoryExtras(target, expected, messages) {
+  const entriesResult = safeReaddir(target);
   if (entriesResult.error) {
-    console.log(`skill (raiz)          drift    não foi possível ler ${skillsDest}: ${entriesResult.error.code || entriesResult.error.message} — E_INSTALL_DRIFT`);
-    drift = true;
-    unsafe = true;
-  } else {
-    for (const entry of entriesResult.names) {
-      if (!expected.has(inventoryKey(entry))) {
-        console.log(`skill (extra) ${entry.padEnd(32)} drift    diretório fora do inventário`);
-        drift = drift || check;
-      }
+    console.log(messages.error(entriesResult.error));
+    markUnsafe();
+    return;
+  }
+  for (const entry of entriesResult.names) {
+    if (!expected.has(inventoryKey(entry))) {
+      console.log(messages.extra(entry));
+      drift = drift || check;
     }
   }
 }
 
-const agentsRootConflict = destinationConflict(path.dirname(agentsDest));
-const agentsRootResult = safeLstat(agentsDest);
-if (agentsRootConflict || (agentsRootResult.stat && (!agentsRootResult.stat.isDirectory() || agentsRootResult.stat.isSymbolicLink()))) {
-  const conflict = agentsRootConflict || { kind: statType(agentsRootResult.stat), path: agentsDest };
-  console.log(`agent (raiz)           drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
+function planNoticeFile(source, destination) {
+  const sourceResult = safeLstat(source);
+  if (!sourceResult.stat && !sourceResult.error) {
+    return {
+      status: "drift",
+      detail: "origem NOTICE ausente — E_INSTALL_DRIFT",
+      operations: [],
+      unsafe: true,
+    };
+  }
+  if (sourceResult.error || !isRegularFile(sourceResult.stat)) {
+    const reason = sourceResult.error
+      ? sourceResult.error.message
+      : `tipo ${statType(sourceResult.stat)}`;
+    return {
+      status: "drift",
+      detail: `origem NOTICE inválida (${reason}) — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+  const sourceHashResult = safeSha256(source);
+  if (sourceHashResult.error) {
+    return {
+      status: "drift",
+      detail: `origem NOTICE inacessível: ${sourceHashResult.error.message} — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+
+  const ancestorConflict = destinationConflict(path.dirname(destination));
+  if (ancestorConflict) {
+    return {
+      status: "drift",
+      detail: `${ancestorConflict.kind} no ancestral ${ancestorConflict.path} — destino preservado — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+
+  const destinationResult = safeLstat(destination);
+  if (destinationResult.error) {
+    return {
+      status: "drift",
+      detail: `destino NOTICE inacessível: ${destinationResult.error.message} — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+  if (!destinationResult.stat) {
+    return {
+      status: check ? "drift" : "created",
+      detail: check ? "ausente" : "instalado",
+      operations: copyOperations(source, destination),
+      unsafe: false,
+    };
+  }
+  if (!isRegularFile(destinationResult.stat)) {
+    return {
+      status: "drift",
+      detail: `${statType(destinationResult.stat)} no destino — preservado — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+  const destinationHashResult = safeSha256(destination);
+  if (destinationHashResult.error) {
+    return {
+      status: "drift",
+      detail: `destino NOTICE inacessível: ${destinationHashResult.error.message} — E_INSTALL_DRIFT`,
+      operations: [],
+      unsafe: true,
+    };
+  }
+  if (sourceHashResult.hash !== destinationHashResult.hash) {
+    return {
+      status: check ? "drift" : "updated",
+      detail: check ? "divergente (não alterado no --check)" : "atualizado",
+      operations: copyOperations(source, destination),
+      unsafe: false,
+    };
+  }
+  return { status: "equal", detail: "igual", operations: [], unsafe: false };
+}
+
+let drift = false;
+let unsafe = false;
+const plannedOperations = [];
+function recordPlan(result) {
+  plannedOperations.push(...result.operations);
+  if (result.status === "drift") drift = true;
+  if (result.unsafe) unsafe = true;
+}
+function markUnsafe() {
   drift = true;
   unsafe = true;
+}
+
+
+console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
+const noticeResult = planNoticeFile(noticeSource, noticeDest);
+recordPlan(noticeResult);
+console.log(`notice                 ${noticeResult.status.padEnd(8)} ${noticeResult.detail}`);
+
+for (const name of SKILLS) {
+  const source = sourceInventory(name);
+  if (source.issues.length > 0) {
+    markUnsafe();
+    console.log(`skill ${name.padEnd(18)} drift    ${source.issues.join("; ")} — E_INSTALL_DRIFT`);
+    continue;
+  }
+  const result = planSyncDir(path.join(skillsDest, name), source);
+  recordPlan(result);
+  console.log(`skill ${name.padEnd(18)} ${result.status.padEnd(8)} ${result.detail}`);
+}
+
+const skillsRootResult = inspectDestinationRoot(skillsDest);
+if (skillsRootResult.conflict) {
+  const conflict = skillsRootResult.conflict;
+  console.log(`skill (raiz)          drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
+  markUnsafe();
+}
+if (skillsRootResult.stat?.isDirectory()) {
+  reportInventoryExtras(skillsDest, new Set(SKILLS.map(inventoryKey)), {
+    error: (error) => `skill (raiz)          drift    não foi possível ler ${skillsDest}: ${error.code || error.message} — E_INSTALL_DRIFT`,
+    extra: (entry) => `skill (extra) ${entry.padEnd(32)} drift    diretório fora do inventário`,
+  });
+}
+
+const agentsRootResult = inspectDestinationRoot(agentsDest);
+if (agentsRootResult.conflict) {
+  const conflict = agentsRootResult.conflict;
+  console.log(`agent (raiz)           drift    ${conflict.kind} em ${conflict.path}; destino não será alterado — E_INSTALL_DRIFT`);
+  markUnsafe();
 } else {
-  const agentSourceState = [];
   for (const [skill, subdir, file] of AGENTS) {
     const sourcePath = path.join(root, skill, subdir, file);
     const sourceResult = safeLstat(sourcePath);
     const destinationPath = path.join(agentsDest, file);
     const destinationResult = safeLstat(destinationPath);
+    if (destinationResult.error) {
+      console.log(`agent ${skill}/${file.padEnd(32)} drift    destino inacessível (${destinationResult.error.code || destinationResult.error.message}) — E_INSTALL_DRIFT`);
+      markUnsafe();
+      continue;
+    }
     const project = findProjectAgent(file);
     if (project) {
       console.log(`agent ${file.padEnd(40)} drift    duplicata: projeto precede perfil (${project.path}); perfil não será alterado`);
-      drift = true;
-      unsafe = true;
+      markUnsafe();
       continue;
     }
     if (sourceResult.error || !sourceResult.stat || !isRegularFile(sourceResult.stat)) {
@@ -391,59 +558,52 @@ if (agentsRootConflict || (agentsRootResult.stat && (!agentsRootResult.stat.isDi
       } else {
         console.log(`agent ${skill}/${file.padEnd(32)} FALTA na origem (${reason})`);
       }
-      drift = true;
-      unsafe = true;
+      markUnsafe();
       continue;
     }
     const parentConflict = destinationConflict(path.dirname(destinationPath));
     if (parentConflict) {
       console.log(`agent ${skill}/${file.padEnd(32)} drift    ${parentConflict.kind} no ancestral ${parentConflict.path} — destino preservado`);
-      drift = true;
-      unsafe = true;
+      markUnsafe();
       continue;
     }
     if (!destinationResult.stat) {
-      if (!check) plannedOperations.push({ source: sourcePath, target: destinationPath });
+      plannedOperations.push(...copyOperations(sourcePath, destinationPath));
       console.log(`agent ${skill}/${file.padEnd(32)} ${check ? "drift    ausente" : "created  instalado"}`);
       drift = drift || check;
       continue;
     }
     if (!isRegularFile(destinationResult.stat)) {
       console.log(`agent ${skill}/${file.padEnd(32)} drift    ${statType(destinationResult.stat)} no destino — preservado — E_INSTALL_DRIFT`);
-      drift = true;
-      unsafe = true;
+      markUnsafe();
       continue;
     }
     if (sha256(sourcePath) !== sha256(destinationPath)) {
-      if (!check) plannedOperations.push({ source: sourcePath, target: destinationPath });
+      plannedOperations.push(...copyOperations(sourcePath, destinationPath));
       console.log(`agent ${skill}/${file.padEnd(32)} ${check ? "drift    divergente" : "updated  atualizado"}`);
       drift = drift || check;
     } else {
       console.log(`agent ${skill}/${file.padEnd(32)} equal`);
     }
-    agentSourceState.push(file);
   }
 
   if (agentsRootResult.stat?.isDirectory()) {
-    const expected = new Set(AGENTS.map(([, , file]) => inventoryKey(file)));
-    const entriesResult = safeReaddir(agentsDest);
-    if (entriesResult.error) {
-      console.log(`agent (raiz)           drift    não foi possível ler ${agentsDest}: ${entriesResult.error.code || entriesResult.error.message} — E_INSTALL_DRIFT`);
-      drift = true;
-      unsafe = true;
-    } else {
-      for (const entry of entriesResult.names) {
-        if (!expected.has(inventoryKey(entry))) {
-          console.log(`agent (extra) ${entry.padEnd(32)} ${check ? "drift    " : "preservado "}arquivo fora do inventário`);
-          drift = drift || check;
-        }
-      }
-    }
+    reportInventoryExtras(agentsDest, new Set(AGENTS.map(([, , file]) => inventoryKey(file))), {
+      error: (error) => `agent (raiz)           drift    não foi possível ler ${agentsDest}: ${error.code || error.message} — E_INSTALL_DRIFT`,
+      extra: (entry) => `agent (extra) ${entry.padEnd(32)} ${check ? "drift    " : "preservado "}arquivo fora do inventário`,
+    });
   }
 }
 
-// Never apply a write when the inventory has an unsafe source/destination shape.
-// This makes preflight genuinely fail-fast and keeps all conflict paths non-destructive.
+// Probe every target and required parent before the first write. A late
+// permission failure must not leave an earlier operation applied.
+if (!check && !unsafe) {
+  const preflight = preflightOperations(plannedOperations);
+  if (preflight) {
+    console.error(`E_INSTALL_DRIFT: destino não gravável ${preflight.target}: ${preflight.error?.message || preflight.error}`);
+    markUnsafe();
+  }
+}
 if (!check && !unsafe) applyOperations(plannedOperations);
 
 if (check) {

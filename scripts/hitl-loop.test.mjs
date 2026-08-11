@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -20,13 +32,69 @@ function findBash() {
   return null;
 }
 
+function findAwk() {
+  if (!bash) return null;
+  const probe = spawnSync(bash, ["-c", "command -v awk"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (probe.status !== 0) return null;
+  return probe.stdout.trim() || "awk";
+}
+
 const bash = findBash();
 const bashGateReason = bash
   ? `Bash disponível (${bash})`
   : "Bash indisponível; suíte HITL gated para evitar ENOENT";
+const awk = findAwk();
+const awkGateReason = awk
+  ? `AWK disponível (${awk})`
+  : "AWK indisponível; suíte HITL gated para evitar falha de redaction";
+const symlinkCapability = (() => {
+  const probeDir = mkdtempSync(join(tmpdir(), "hitl-loop-symlink-"));
+  const target = join(probeDir, "target");
+  const link = join(probeDir, "link");
+  try {
+    mkdirSync(target);
+    symlinkSync(target, link, "dir");
+    return lstatSync(link).isSymbolicLink()
+      ? { available: true, reason: "" }
+      : { available: false, reason: "symlink indisponível (lstat não confirmou link)" };
+  } catch (error) {
+    return {
+      available: false,
+      reason: `symlink indisponível (${error?.code || error?.message || "erro"})`,
+    };
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
+const hardlinkCapability = (() => {
+  const probeDir = mkdtempSync(join(tmpdir(), "hitl-loop-hardlink-probe-"));
+  const source = join(probeDir, "source");
+  const link = join(probeDir, "link");
+  try {
+    writeFileSync(source, "probe\n");
+    linkSync(source, link);
+    return lstatSync(link).nlink > 1
+      ? { available: true, reason: "" }
+      : { available: false, reason: "hardlink indisponível (nlink não confirmou link)" };
+  } catch (error) {
+    return {
+      available: false,
+      reason: `hardlink indisponível (${error?.code || error?.message || "erro"})`,
+    };
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
+const hardlinkTest = hardlinkCapability.available
+  ? it
+  : (title, testFn) => it.skip(`${title} — skip: ${hardlinkCapability.reason}`, testFn);
+
 
 function runCapture(lines, extraEnv = {}) {
-  if (!bash) throw new Error(bashGateReason);
+  if (!bash || !awk) throw new Error(`${bashGateReason}; ${awkGateReason}`);
   const input = ["x", "y", ...lines, "__END__", ""].join("\n");
   return spawnSync(bash, [TEMPLATE], {
     cwd: repoRoot,
@@ -34,6 +102,24 @@ function runCapture(lines, extraEnv = {}) {
     encoding: "utf8",
     env: {
       ...process.env,
+      TRACE_FILE: "",
+      APP_INSTRUCTIONS: "x",
+      ERROR_QUESTION: "q",
+      ...extraEnv,
+    },
+  });
+}
+
+function runCaptureWithErrored(errored, lines, extraEnv = {}) {
+  if (!bash || !awk) throw new Error(`${bashGateReason}; ${awkGateReason}`);
+  const input = ["x", errored, ...lines, "__END__", ""].join("\n");
+  return spawnSync(bash, [TEMPLATE], {
+    cwd: repoRoot,
+    input,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      TRACE_FILE: "",
       APP_INSTRUCTIONS: "x",
       ERROR_QUESTION: "q",
       ...extraEnv,
@@ -42,14 +128,17 @@ function runCapture(lines, extraEnv = {}) {
 }
 
 describe("hitl-loop platform gate", () => {
-  it("detecta Bash e informa o motivo do gate quando indisponível", () => {
+  it("detecta Bash/AWK e informa o motivo do gate quando indisponível", () => {
     expect(bash === null || typeof bash === "string").toBe(true);
+    expect(awk === null || typeof awk === "string").toBe(true);
     if (!bash) expect(bashGateReason).toMatch(/Bash indisponível/);
+    if (bash && !awk) expect(awkGateReason).toMatch(/AWK indisponível/);
   });
 });
 
-const hitlDescribe = bash ? describe : describe.skip;
-hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
+const hitlDescribe = bash && awk ? describe : describe.skip;
+hitlDescribe(`hitl-loop redaction (${bashGateReason}; ${awkGateReason})`, () => {
+
 
   it("redacts a new sensitive key after ending scalar continuation", () => {
     const result = runCapture([
@@ -64,6 +153,18 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
     expect(result.stdout).not.toContain("second-secret");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts camel-case sensitive assignments before reporting the trace", () => {
+    const result = runCapture([
+      "dbPassword=fixture-secret",
+      "clientSecret=client-secret",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("fixture-secret");
+    expect(result.stdout).not.toContain("client-secret");
+    expect(result.stdout).toContain("normal: visible");
+  });
+
   it("redacts indented continuation after a plain sensitive scalar", () => {
     const result = runCapture([
       "password: first-secret",
@@ -916,6 +1017,30 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
     expect(result.stdout).not.toContain("still # literal");
     expect(result.stdout).toContain("normal: visible");
   });
+  it("redacts encryption-key assignments before output and persistence", () => {
+    const credential = "ENCRYPTION_KEY=fixture-encryption-secret";
+    const result = runCapture([credential, "normal: visible"]);
+    expect(result.status, result.stderr).toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).not.toContain(credential);
+    expect(output).toContain("<REDACTED>");
+    expect(output).toContain("normal: visible");
+  });
+
+  it("keeps debug-marked PEM delimiters in the redaction state machine", () => {
+    const result = runCapture([
+      "[DEBUG-probe] -----BEGIN PRIVATE KEY-----",
+      "base64-private-material",
+      "[DEBUG-probe] -----END PRIVATE KEY-----",
+      "normal: visible",
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).not.toContain("base64-private-material");
+    expect(output).not.toContain("[DEBUG-probe]");
+    expect(output).toContain("<REDACTED>");
+    expect(output).toContain("normal: visible");
+  });
   it("redacts a raw token before writing the captured artifact", () => {
     const rawToken = ["github", "pat", "11TEST_ONLY_1234567890"].join("_");
     const result = runCapture([rawToken, "normal: visible"]);
@@ -977,9 +1102,6 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
     const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
     const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
     expect(persistence).toBeDefined();
-    expect(persistence).toMatch(
-      /if ! scan_clean_trace < "\$tmp"; then[\s\S]*?rm -f -- "\$tmp"[\s\S]*?return 1[\s\S]*?fi[\s\S]*?if ! mv -f -- "\$tmp" "\$path"; then/,
-    );
     const scanner = template.match(/scan_clean_trace\(\) \{[\s\S]*?\n\}/)?.[0];
     expect(scanner).toBeDefined();
     for (const signature of ["eyJ", "glpat_", "sk_live_"]) {
@@ -1009,6 +1131,72 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
       rmSync(traceDir, { recursive: true, force: true });
     }
   });
+  it("AC-015 falha fechado quando a criação do hardlink guard falha e não publica TRACE_FILE", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-guard-failure-"));
+    const shimDir = mkdtempSync(join(tmpdir(), "hitl-loop-ln-shim-"));
+    const traceFile = join(traceDir, "guard-failure.trace");
+    const lnEvents = join(traceDir, "ln-events.log");
+    const lnShim = join(shimDir, "ln");
+    const lnEventsPath = lnEvents.replaceAll("\\", "/");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    writeFileSync(
+      lnShim,
+      [
+        "#!/bin/sh",
+        'printf "%s\\n" "ln-failure-injected" >> "$LN_FAILURE_LOG"',
+        "exit 73",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(lnShim, 0o755);
+    const chmodResult = spawnSync(
+      bash,
+      ["-c", 'chmod +x -- "$1"', "fixture", lnShim],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    expect(chmodResult.status, chmodResult.stderr).toBe(0);
+    const bashShimDir =
+      process.platform === "win32" && /^[A-Za-z]:[\\/]/.test(shimDir)
+        ? `/${shimDir[0].toLowerCase()}${shimDir.slice(2).replaceAll("\\", "/")}`
+        : shimDir.replaceAll("\\", "/");
+    const fixtureScript = [
+      "set +e",
+      'PATH="$LN_SHIM_DIR:$PATH"',
+      "hash -r",
+      persistence,
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'redacted fixture' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+      'if [[ -e "$1" || -L "$1" ]]; then printf "artifact-present\\n"; fi',
+    ].join("\n");
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", traceFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          LN_FAILURE_LOG: lnEventsPath,
+          LN_SHIM_DIR: bashShimDir,
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(existsSync(lnEvents)).toBe(true);
+      if (existsSync(lnEvents)) {
+        expect(readFileSync(lnEvents, "utf8")).toContain("ln-failure-injected");
+      }
+      expect(result.stdout).not.toContain("artifact-present");
+      expect(existsSync(traceFile)).toBe(false);
+      expect(readdirSync(traceDir)).not.toContain("guard-failure.trace");
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
 
   it("removes debug probes from the final captured trace", () => {
     const result = runCapture([
@@ -1021,4 +1209,367 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason})`, () => {
     expect(output).not.toContain("probe=timing");
     expect(output).toContain("normal: visible");
   });
+  it("AC-015 redige ERRORED antes de imprimir o valor capturado", () => {
+    const rawToken = "ghp_11TEST_ONLY_ERRORED_1234567890";
+    const result = runCaptureWithErrored(rawToken, ["normal: visible"]);
+    expect(result.status, result.stderr).toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).not.toContain(rawToken);
+    expect(output).toContain("<REDACTED>");
+    expect(output).toContain("normal: visible");
+  });
+
+  it("AC-015 redige tokens npm antes de alcançar saída ou artefato capturado", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-npm-"));
+    const traceFile = join(traceDir, "npm.trace");
+    const npmToken = "npm_1234567890abcdef1234567890abcdef1234567890";
+    try {
+      const result = runCapture([npmToken, "normal: visible"], {
+        TRACE_FILE: traceFile,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(output).not.toContain(npmToken);
+      expect(output).toContain("<REDACTED>");
+      expect(readFileSync(traceFile, "utf8")).not.toContain(npmToken);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("AC-015 recusa substituir TRACE_FILE regular existente e limpa temporários", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-existing-"));
+    const traceFile = join(traceDir, "existing.trace");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    writeFileSync(traceFile, "sentinel\n");
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+    ].join("\n");
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", traceFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(readFileSync(traceFile, "utf8")).toBe("sentinel\n");
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+  hardlinkTest("AC-015 recusa TRACE_FILE hardlink existente, preserva o sentinel e limpa temporários", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-hardlink-"));
+    const sourcePath = join(traceDir, "sentinel-source.trace");
+    const traceFile = join(traceDir, "existing-hardlink.trace");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    writeFileSync(sourcePath, "sentinel\n");
+    try {
+      linkSync(sourcePath, traceFile);
+      expect(lstatSync(traceFile).nlink).toBeGreaterThan(1);
+      const fixtureScript = [
+        "set +e",
+        persistence,
+        "scan_clean_trace() { return 0; }",
+        "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+        "status=$?",
+        "printf 'status=%s\\n' \"$status\"",
+      ].join("\n");
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", traceFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(readFileSync(sourcePath, "utf8")).toBe("sentinel\n");
+      expect(readFileSync(traceFile, "utf8")).toBe("sentinel\n");
+      expect(lstatSync(traceFile).nlink).toBeGreaterThan(1);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("AC-015 recusa publicação quando escritor concorrente cria destino após precheck e mv não clobbera", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-race-"));
+    const traceFile = join(traceDir, "raced.trace");
+    const eventsFile = join(traceDir, "race-events.log");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      'race_target="$1"',
+      'events_file="$2"',
+      "mktemp() {",
+      '  local candidate="${1:-}"',
+      '  if [[ "$candidate" == "${race_target}.tmp.XXXXXX" ]]; then',
+      '    if [[ -e "$race_target" || -L "$race_target" ]]; then',
+      '      printf "%s\\n" "destination-was-preexisting" > "$events_file"',
+      "      return 97",
+      "    fi",
+      '    printf "%s\\n" "writer-created-after-precheck" > "$events_file"',
+      '    printf "%s\\n" "sentinel" > "$race_target"',
+      "  fi",
+      '  command mktemp "$@"',
+      "}",
+      "mv() {",
+      '  printf "mv:%s\\n" "$*" >> "$events_file"',
+      '  command mv "$@"',
+      "}",
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+    ].join("\n");
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", traceFile, eventsFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(readFileSync(traceFile, "utf8")).toBe("sentinel\n");
+      const events = readFileSync(eventsFile, "utf8").trim().split("\n");
+      expect(events[0]).toBe("writer-created-after-precheck");
+      expect(events.some((event) => event.startsWith("mv:") && event.includes("-n"))).toBe(true);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+  it("AC-015 persiste com fallback quando mv -n/-- não está disponível", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-mv-fallback-"));
+    const traceFile = join(traceDir, "fallback.trace");
+    const eventsFile = join(traceDir, "mv-events.log");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      'events_file="$2"',
+      "mv() {",
+      '  if [[ "${1:-}" == "-n" || "${1:-}" == "--" || "${2:-}" == "-n" || "${2:-}" == "--" ]]; then',
+      '    printf "%s\\n" "mv-no-clobber-unsupported" > "$events_file"',
+      "    return 2",
+      "  fi",
+      '  printf "%s\\n" "mv-fallback:$*" >> "$events_file"',
+      '  command mv "$@"',
+      "}",
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+    ].join("\n");
+    try {
+      const result = spawnSync(
+        bash,
+        ["-c", fixtureScript, "fixture", traceFile, eventsFile],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=0");
+      const events = readFileSync(eventsFile, "utf8").trim().split("\n");
+      expect(events[0]).toBe("mv-no-clobber-unsupported");
+      expect(readFileSync(traceFile, "utf8")).toBe("replacement\n");
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+
+  it("AC-015 recusa substituir TRACE_FILE diretório existente sem criar artefato", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-types-"));
+    const directoryPath = join(traceDir, "existing-dir");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+    ].join("\n");
+    mkdirSync(directoryPath);
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", directoryPath], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(lstatSync(directoryPath).isDirectory()).toBe(true);
+      expect(readdirSync(directoryPath)).toEqual([]);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  if (!symlinkCapability.available) {
+    it.skip(
+      `AC-015 recusa substituir TRACE_FILE symlink existente — skip: ${symlinkCapability.reason}`,
+      () => {},
+    );
+  } else {
+    it("AC-015 recusa substituir TRACE_FILE symlink existente e preserva o alvo", () => {
+      const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-types-"));
+      const targetPath = join(traceDir, "symlink-target");
+      const symlinkPath = join(traceDir, "existing-link");
+      const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+      const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+      expect(persistence).toBeDefined();
+      const fixtureScript = [
+        "set +e",
+        persistence,
+        "scan_clean_trace() { return 0; }",
+        "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+        "status=$?",
+        "printf 'status=%s\\n' \"$status\"",
+      ].join("\n");
+      writeFileSync(targetPath, "sentinel\n");
+      try {
+        symlinkSync(targetPath, symlinkPath);
+        const result = spawnSync(bash, ["-c", fixtureScript, "fixture", symlinkPath], {
+          cwd: repoRoot,
+          encoding: "utf8",
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain("status=1");
+        expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+        expect(readFileSync(targetPath, "utf8")).toBe("sentinel\n");
+        expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+      } finally {
+        rmSync(traceDir, { recursive: true, force: true });
+      }
+    });
+  }
+
+  it("AC-015 recusa diretório TRACE_FILE que surge depois do precheck sem artefato aninhado", () => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-race-dir-"));
+    const directoryPath = join(traceDir, "raced-directory");
+    const eventsFile = join(traceDir, "race-events.log");
+    const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+    const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+    expect(persistence).toBeDefined();
+    const fixtureScript = [
+      "set +e",
+      persistence,
+      'race_target="$1"',
+      'events_file="$2"',
+      "mktemp() {",
+      '  local candidate="${1:-}"',
+      '  if [[ "$candidate" == "${race_target}.tmp.XXXXXX" ]]; then',
+      '    if [[ -e "$race_target" || -L "$race_target" ]]; then',
+      '      printf "%s\\n" "destination-was-preexisting" > "$events_file"',
+      "      return 97",
+      "    fi",
+      '    if ! node -e \'require("node:fs").mkdirSync(process.argv[1])\' "$race_target"; then',
+      '      printf "%s\\n" "directory-create-failed" > "$events_file"',
+      "      return 98",
+      "    fi",
+      '    printf "%s\\n" "directory-created-after-precheck" > "$events_file"',
+      "  fi",
+      '  command mktemp "$@"',
+      "}",
+      "scan_clean_trace() { return 0; }",
+      "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+      "status=$?",
+      "printf 'status=%s\\n' \"$status\"",
+    ].join("\n");
+    try {
+      const result = spawnSync(bash, ["-c", fixtureScript, "fixture", directoryPath, eventsFile], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("status=1");
+      expect(readFileSync(eventsFile, "utf8").trim()).toBe("directory-created-after-precheck");
+      expect(lstatSync(directoryPath).isDirectory()).toBe(true);
+      expect(readdirSync(directoryPath)).toEqual([]);
+      expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
+  });
+
+  if (!symlinkCapability.available) {
+    it.skip(
+      `AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck — skip: ${symlinkCapability.reason}`,
+      () => {},
+    );
+  } else {
+    it("AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck sem artefato aninhado", () => {
+      const traceDir = mkdtempSync(join(tmpdir(), "hitl-loop-race-link-"));
+      const symlinkPath = join(traceDir, "raced-symlink");
+      const targetDirectory = join(traceDir, "symlink-target");
+      const eventsFile = join(traceDir, "race-events.log");
+      const template = readFileSync(join(repoRoot, TEMPLATE), "utf8");
+      const persistence = template.match(/persist_trace\(\) \{[\s\S]*?\n\}/)?.[0];
+      expect(persistence).toBeDefined();
+      const fixtureScript = [
+        "set +e",
+        persistence,
+        'race_target="$1"',
+        'symlink_target="$2"',
+        'events_file="$3"',
+        "mktemp() {",
+        '  local candidate="${1:-}"',
+        '  if [[ "$candidate" == "${race_target}.tmp.XXXXXX" ]]; then',
+        '    if [[ -e "$race_target" || -L "$race_target" ]]; then',
+        '      printf "%s\\n" "destination-was-preexisting" > "$events_file"',
+        "      return 97",
+        "    fi",
+        '    if ! node -e \'const fs = require("node:fs"); fs.symlinkSync(process.argv[1], process.argv[2], "dir")\' "$symlink_target" "$race_target"; then',
+        '      printf "%s\\n" "symlink-create-failed" > "$events_file"',
+        "      return 98",
+        "    fi",
+        '    printf "%s\\n" "symlink-created-after-precheck" > "$events_file"',
+        "  fi",
+        '  command mktemp "$@"',
+        "}",
+        "scan_clean_trace() { return 0; }",
+        "printf '%s\\n' 'replacement' | persist_trace \"$1\"",
+        "status=$?",
+        "printf 'status=%s\\n' \"$status\"",
+      ].join("\n");
+      mkdirSync(targetDirectory);
+      try {
+        const result = spawnSync(
+          bash,
+          ["-c", fixtureScript, "fixture", symlinkPath, targetDirectory, eventsFile],
+          {
+            cwd: repoRoot,
+            encoding: "utf8",
+          },
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain("status=1");
+        expect(readFileSync(eventsFile, "utf8").trim()).toBe("symlink-created-after-precheck");
+        expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+        expect(lstatSync(targetDirectory).isDirectory()).toBe(true);
+        expect(readdirSync(targetDirectory)).toEqual([]);
+        expect(readdirSync(traceDir).filter((name) => name.includes(".tmp.")).length).toBe(0);
+      } finally {
+        rmSync(traceDir, { recursive: true, force: true });
+      }
+    });
+  }
 });

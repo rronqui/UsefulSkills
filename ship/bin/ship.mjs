@@ -4,7 +4,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractIssueNumber, extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
@@ -111,32 +111,30 @@ function packagePathForUnit(unit) {
   if (!relative || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) {
     versionSourceError(`unidade '${unit}' está fora do repositório`);
   }
-  let realPackagePath;
-  try {
-    realPackagePath = realpathSync(packagePath);
-  } catch {
-    versionSourceError(`package.json da unidade '${unit}' inacessível ou ausente`);
-  }
-  pathInsideRepo(realPackagePath, `package.json da unidade '${unit}'`);
-  return realPackagePath;
+  return repoRegularPath(packagePath, `package.json da unidade '${unit}'`);
 }
 
 function validateVersionSources() {
   const rootPackagePath = path.join(root, "package.json");
   const releaseConfigPath = path.join(root, "release-please-config.json");
   const releaseConfigRealPath = releaseConfigPathOrNull(releaseConfigPath);
+  const versions = new Map();
   if (!releaseConfigRealPath) {
     const rootPackage = readJsonObject(repoRegularPath(rootPackagePath, "package.json raiz"), "package.json raiz");
     if (!isValidSemVer(rootPackage.version)) {
       versionSourceError("package.json raiz não contém uma versão SemVer resolvível");
     }
-    return;
+    versions.set(".", rootPackage.version);
+    return versions;
   }
 
   const releaseConfig = readJsonObject(releaseConfigRealPath, "release-please-config.json");
   const packages = releaseConfig.packages;
   if (!packages || typeof packages !== "object" || Array.isArray(packages) || !Object.keys(packages).length) {
     versionSourceError("release-please-config.json não declara unidades em packages");
+  }
+  if (Object.hasOwn(releaseConfig, "release-as")) {
+    versionSourceError("release-please-config.json não pode congelar a versão com release-as");
   }
 
   const manifestPath = path.join(root, ".release-please-manifest.json");
@@ -152,6 +150,12 @@ function validateVersionSources() {
     if (!unitConfig || typeof unitConfig !== "object" || Array.isArray(unitConfig) || unitConfig["release-type"] !== "node") {
       versionSourceError(`unidade '${unit}' não usa uma fonte release-please Node`);
     }
+    if (units.length > 1 && unitConfig["include-component-in-tag"] !== true) {
+      versionSourceError(`unidade '${unit}' deve exigir include-component-in-tag=true para múltiplas unidades`);
+    }
+    if (Object.hasOwn(unitConfig, "release-as")) {
+      versionSourceError(`unidade '${unit}' não pode congelar a versão com release-as`);
+    }
     if (!isValidSemVer(unitConfig["initial-version"])) {
       versionSourceError(`initial-version inválida para a unidade '${unit}'`);
     }
@@ -166,17 +170,86 @@ function validateVersionSources() {
     if (manifest[unit] !== packageJson.version) {
       versionSourceError(`manifesto e package.json divergem para a unidade '${unit}'`);
     }
+    versions.set(unit, packageJson.version);
   }
+  return versions;
 }
-
 
 function requireVersionSources() {
   try {
-    validateVersionSources();
+    return validateVersionSources();
   } catch (err) {
     fail(`E_VERSION_SOURCE: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
+function validateVersionCheckUnit(cfg, versions) {
+  if (!cfg.versionCheckUrl) return null;
+  const unit = cfg.versionCheckUnit ?? ".";
+  if (!versions.has(unit)) {
+    throw new Error(`versionCheckUnit desconhecida: unidade '${unit}' não foi encontrada nas fontes SemVer`);
+  }
+  return unit;
+}
+
+function requireVersionCheckUnit(cfg, versions) {
+  try {
+    return validateVersionCheckUnit(cfg, versions);
+  } catch (err) {
+    fail(`E_VERSION_SOURCE: ${err.message}`);
+  }
+}
+
+
+function validateOptionalString(value, field) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${field} deve ser uma string não vazia ou null`);
+  }
+  return value;
+}
+
+function validateCommand(value, field, { required = false } = {}) {
+  const normalized = validateOptionalString(value, field);
+  if (normalized === null && required) {
+    throw new Error(`${field} é obrigatório quando stopCommand é usado`);
+  }
+  return normalized;
+}
+
+function validateDeployConfig(cfg) {
+  if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) {
+    throw new Error("ship.config.json deve conter um objeto JSON");
+  }
+  validateOptionalString(cfg.dbPath, "dbPath");
+  validateOptionalString(cfg.backupDir, "backupDir");
+  if (cfg.schemaWatchPaths !== undefined && cfg.schemaWatchPaths !== null && (!Array.isArray(cfg.schemaWatchPaths) || cfg.schemaWatchPaths.some((item) => typeof item !== "string"))) {
+    throw new Error("schemaWatchPaths deve ser uma lista de strings");
+  }
+  const stopCommand = validateCommand(cfg.stopCommand, "stopCommand");
+  const startCommand = validateCommand(cfg.startCommand, "startCommand", { required: Boolean(stopCommand) });
+  const buildCommand = validateCommand(cfg.buildCommand, "buildCommand");
+  const versionCheckUrl = validateCommand(cfg.versionCheckUrl, "versionCheckUrl");
+  if (versionCheckUrl) {
+    try {
+      const parsed = new URL(versionCheckUrl);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("protocolo");
+    } catch {
+      throw new Error("versionCheckUrl deve ser uma URL HTTP(S) válida");
+    }
+  }
+  if (cfg.versionCheckUnit !== undefined && (typeof cfg.versionCheckUnit !== "string" || !cfg.versionCheckUnit.trim())) {
+    throw new Error("versionCheckUnit deve ser uma unidade não vazia");
+  }
+  if (cfg.versionCheckTimeoutMs !== undefined && (typeof cfg.versionCheckTimeoutMs !== "number" || !Number.isFinite(cfg.versionCheckTimeoutMs))) {
+    throw new Error("versionCheckTimeoutMs deve ser numérico");
+  }
+  if (cfg.dbPath && !stopCommand) {
+    throw new Error("dbPath configurado exige stopCommand para comprovar quiescência");
+  }
+  return { ...cfg, dbPath: cfg.dbPath ?? null, stopCommand, startCommand, buildCommand, versionCheckUrl };
+}
+
+
 
 function requireGhAuth() {
   try {
@@ -210,7 +283,7 @@ function requireLabel(type) {
 }
 
 function releaseDescription(raw) {
-  let description = raw.trim();
+  let description = String(raw ?? "").trim();
   let breaking = /BREAKING\s+CHANGE\s*:/i.test(description);
   const prefixed = description.match(/^(?:fix|feat)(!)?:\s*/i);
   if (prefixed) {
@@ -219,48 +292,64 @@ function releaseDescription(raw) {
   }
   if (/^!:\s*/.test(description)) {
     breaking = true;
-    description = description.replace(/^!:\s*/, "");
+    description = description.replace(/^!:\s*/, "").trim();
   }
   return { description, breaking };
 }
 
+function requireReleaseDescription(raw) {
+  const normalized = releaseDescription(raw);
+  if (!normalized.description) {
+    throw new Error("descrição normalizada vazia");
+  }
+  return normalized;
+}
+
 function releaseTitle(type, raw, issue = null) {
-  const { description, breaking } = releaseDescription(raw);
+  const { description, breaking } = requireReleaseDescription(raw);
   const prefix = `${type}${breaking ? "!" : ""}: `;
   const suffix = issue === null ? "" : ` (#${issue})`;
   const available = Math.max(1, 72 - prefix.length - suffix.length);
   return `${prefix}${description.slice(0, available)}${suffix}`;
 }
 
-
 function mergePrBody(existingBody, payload, issue) {
-  const closes = new RegExp(`^\\s*Closes\\s+#${issue}\\s*$`, "i");
+  const closeMarker = /^\s*Closes\s+#(\d+)\s*$/i;
   const breaking = /^\s*BREAKING\s+CHANGE\s*:/i;
   const existingLines = String(existingBody ?? "").split("\n");
   let hasClose = false;
   let hasBreaking = false;
+  let existingCloseSeen = false;
   const canonicalLines = [];
   for (const line of existingLines) {
-    if (closes.test(line)) {
-      if (!hasClose) {
+    const marker = line.match(closeMarker);
+    if (marker) {
+      if (!existingCloseSeen) {
         canonicalLines.push(`Closes #${issue}`);
+        existingCloseSeen = true;
         hasClose = true;
       }
-    } else if (breaking.test(line)) {
+      continue;
+    }
+    if (breaking.test(line)) {
       if (!hasBreaking) {
         canonicalLines.push(line);
         hasBreaking = true;
       }
-    } else {
-      canonicalLines.push(line);
+      continue;
     }
+    canonicalLines.push(line);
   }
 
   let payloadHasClose = false;
   const payloadBreaking = [];
   const payloadContent = [];
   for (const line of String(payload ?? "").split("\n")) {
-    if (closes.test(line)) {
+    const marker = line.match(closeMarker);
+    if (marker) {
+      if (marker[1] !== String(issue)) {
+        throw new Error(`body contém marcador Closes de outra issue (#${marker[1]})`);
+      }
       payloadHasClose = true;
     } else if (breaking.test(line)) {
       if (!hasBreaking && !payloadBreaking.length) payloadBreaking.push(line);
@@ -270,12 +359,12 @@ function mergePrBody(existingBody, payload, issue) {
   }
   const sanitized = [...payloadBreaking, ...payloadContent].join("\n");
   const markerOnlyPayload = !payloadContent.some((line) => line.trim()) && (payloadHasClose || payloadBreaking.length > 0);
+  const payloadHasContent = Boolean(sanitized.trim());
   let body = canonicalLines.join("\n");
 
   if (!hasClose && payloadHasClose) {
-    body = body.trim()
-      ? `Closes #${issue}${markerOnlyPayload ? "\n" : "\n\n"}${body}`
-      : `Closes #${issue}`;
+    const separator = markerOnlyPayload ? "\n" : "\n\n";
+    body = body.trim() ? `Closes #${issue}${separator}${body}` : `Closes #${issue}`;
     hasClose = true;
   }
   if (markerOnlyPayload) {
@@ -291,9 +380,58 @@ function mergePrBody(existingBody, payload, issue) {
 function repoSlug() {
   return gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]);
 }
-function defaultBranch() {
-  return gh(["api", `repos/${repoSlug()}`, "-q", ".default_branch"]);
+function defaultBranch(repository = repoSlug()) {
+  return gh(["api", `repos/${repository}`, "-q", ".default_branch"]);
 }
+function redactUrlForMessage(raw) {
+  const value = String(raw ?? "").trim();
+  try {
+    const parsed = new URL(value);
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "<URL inválida>";
+  }
+}
+function redactUrlsInMessage(raw) {
+  return String(raw ?? "").replace(/https?:\/\/[^\s"'`<>]+/gi, (candidate) => redactUrlForMessage(candidate));
+}
+function validateResourceUrl(raw, repository, resource) {
+  const value = String(raw ?? "").trim();
+  if (!value) return null;
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return null;
+  }
+  const expectedHost = String(process.env.GH_HOST ?? "github.com").trim().toLowerCase();
+  if (
+    !["http:", "https:"].includes(parsed.protocol) ||
+    parsed.hostname.toLowerCase() !== expectedHost ||
+    parsed.port ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    return null;
+  }
+  const prefix = `/${repository}/${resource}/`;
+  if (!parsed.pathname.startsWith(prefix)) return null;
+  const number = parsed.pathname.slice(prefix.length);
+  if (!/^\d+$/.test(number)) return null;
+  return { url: value, number };
+}
+function enableAutoMerge(prUrl) {
+  const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
+  if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
+  else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
+}
+
 function usage() {
   console.log(`Uso:
   ship.mjs setup
@@ -303,18 +441,23 @@ function usage() {
   process.exit(1);
 }
 
-function issueNumberOrDie(url) {
-  const n = extractIssueNumber(url);
-  if (n === null) {
-    console.error(`Não consegui extrair o número da issue/PR de: ${url}`);
-    process.exit(1);
+// ---------- setup ----------
+function normalizeGitignore() {
+  const gi = path.join(root, ".gitignore");
+  const existed = existsSync(gi);
+  const original = existed ? readFileSync(gi, "utf8") : "";
+  const lines = original.replace(/\r\n?/g, "\n").split("\n").filter((line, index, all) => !(line === ".omp/" && all.indexOf(line) !== index));
+  while (lines.at(-1) === "") lines.pop();
+  if (!lines.includes(".omp/")) lines.push(".omp/");
+  const normalized = `${lines.join("\n")}\n`;
+  if (!existed || normalized !== original) {
+    writeFileSync(gi, normalized);
+    console.log(".omp/ normalizado no .gitignore");
   }
-  return n;
 }
 
-
-// ---------- setup ----------
 function setup() {
+  normalizeGitignore();
   if (existsSync(CONFIG)) {
     console.log("ship.config.json já existe:");
     console.log(readFileSync(CONFIG, "utf8"));
@@ -328,11 +471,6 @@ function setup() {
       2,
     ) + "\n",
   );
-  const gi = path.join(root, ".gitignore");
-  if (existsSync(gi) && !readFileSync(gi, "utf8").split("\n").includes(".omp/")) {
-    appendFileSync(gi, ".omp/\n");
-    console.log(".omp/ adicionado ao .gitignore");
-  }
   console.log("ship.config.json criado — edite com os valores do projeto.");
 }
 
@@ -340,10 +478,19 @@ function setup() {
 function cmdNew(argv) {
   const bug = flagValue(argv, "--bug");
   const feat = flagValue(argv, "--feat");
+  if (argv.includes("--bug") && argv.includes("--feat")) {
+    console.error("--bug e --feat não podem ser usados simultaneamente; escolha exatamente um.");
+    process.exit(1);
+  }
   const desc = flagValue(argv, "--desc");
-  if ((bug && feat) || (!bug && !feat)) usage();
   const type = bug ? "fix" : "feat";
   const title = bug || feat;
+  try {
+    requireReleaseDescription(title);
+  } catch (err) {
+    console.error(`Título/descrição inválido: ${err.message}`);
+    process.exit(1);
+  }
   if (git(["status", "--porcelain"]) !== "") {
     console.error("Working tree sujo — commit ou descarte as mudanças antes.");
     process.exit(1);
@@ -359,7 +506,8 @@ function cmdNew(argv) {
   } catch {
     // orphan branches have no HEAD to restore
   }
-  const def = defaultBranch();
+  const repository = repoSlug();
+  const def = defaultBranch(repository);
   const restoreBranch = () => {
     try {
       if (originalBranch && originalBranch !== def) {
@@ -388,6 +536,7 @@ function cmdNew(argv) {
   try {
     git(["switch", def]);
     git(["pull", "--ff-only"]);
+    validateVersionSources();
   } catch {
     restoreBranch();
     console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
@@ -406,12 +555,13 @@ function cmdNew(argv) {
     restoreBranch();
     throw err;
   }
-  const n = extractIssueNumber(url);
-  if (n === null) {
+  const issue = validateResourceUrl(url, repository, "issues");
+  if (!issue) {
     restoreBranch();
-    console.error(`Não consegui extrair o número da issue/PR de: ${url}`);
+    console.error(`Não consegui validar a URL da issue criada: ${redactUrlForMessage(url)}`);
     process.exit(1);
   }
+  const n = issue.number;
   const branch = `${type}/${n}-${slugify(title)}`;
   try {
     git(["switch", "-c", branch]);
@@ -444,7 +594,12 @@ function cmdShip(argv) {
     argv = argv.filter((_, i) => i !== flagIndex && i !== flagIndex + 1);
   }
   const rawDescription = argv.join(" ").trim();
-  if (!rawDescription) usage();
+  let normalized;
+  try {
+    normalized = requireReleaseDescription(rawDescription);
+  } catch (err) {
+    fail(`Descrição inválida: ${err.message}`);
+  }
   const branch = git(["branch", "--show-current"]);
   const m = branch.match(/^(fix|feat)\/(\d+)-/);
   if (!m) {
@@ -452,6 +607,24 @@ function cmdShip(argv) {
     process.exit(1);
   }
   const [, type, n] = m;
+
+  let rawPayload = "";
+  if (bodyFile) {
+    const bodyPath = path.resolve(root, bodyFile);
+    if (!existsSync(bodyPath)) {
+      console.error(`--body-file: arquivo não encontrado: ${bodyFile}`);
+      process.exit(1);
+    }
+    rawPayload = readFileSync(bodyPath, "utf8");
+    try {
+      // Validate the payload before any auth, PR lookup, commit, push or PR creation.
+      mergePrBody("", rawPayload, n);
+    } catch (err) {
+      console.error(`--body-file inválido: ${err?.message ?? err}`);
+      process.exit(1);
+    }
+  }
+
   requireVersionSources();
   requireGhAuth();
   requirePushRemote();
@@ -459,7 +632,7 @@ function cmdShip(argv) {
   let def = "";
   let prUrl = "";
   try {
-    def = defaultBranch();
+    def = defaultBranch(repository);
     prUrl = gh([
       "pr", "list", "--head", branch, "--base", def, "--state", "open",
       "--json", "url,headRepository",
@@ -469,19 +642,27 @@ function cmdShip(argv) {
   } catch {
     fail("Não consegui determinar a branch default/PR existente; nenhuma alteração foi publicada.");
   }
-  if (!prUrl) requireLabel(type);
-  let bodyExtra = "";
-  if (bodyFile) {
-    const bodyPath = path.resolve(root, bodyFile);
-    if (!existsSync(bodyPath)) {
-      console.error(`--body-file: arquivo não encontrado: ${bodyFile}`);
-      process.exit(1);
-    }
-    const rawPayload = readFileSync(bodyPath, "utf8");
-    if (rawPayload.trim()) bodyExtra = `\n\n${rawPayload}`;
+  if (prUrl && !validateResourceUrl(prUrl, repository, "pull")) {
+    fail(`PR existente retornou URL inválida: ${redactUrlForMessage(prUrl)}`);
   }
+  if (!prUrl) requireLabel(type);
+  // Retry body-only is deliberately independent of the local commit state.
+  if (bodyFile && prUrl) {
+    const existingBodyJson = gh(["pr", "view", prUrl, "--json", "body"]);
+    const existingBody = JSON.parse(existingBodyJson).body ?? "";
+    const payloadHasCloseMarker = String(rawPayload).split(/\r?\n/).some((line) => /^\s*Closes\s+#\d+\s*$/i.test(line));
+    const mergePayload = payloadHasCloseMarker ? rawPayload : `${rawPayload}\nCloses #${n}`;
+    const mergedBody = rawPayload.trim() ? mergePrBody(existingBody, mergePayload, n) : existingBody;
+    if (mergedBody !== existingBody) gh(["pr", "edit", prUrl, "--body", mergedBody]);
+    enableAutoMerge(prUrl);
+    return;
+  }
+
+
+  // Retry body-only is deliberately independent of the local commit state.
+  const bodyExtra = rawPayload.trim() ? `\n\n${rawPayload}` : "";
+
   const commitTitle = releaseTitle(type, rawDescription, n);
-  const { description } = releaseDescription(rawDescription);
   git(["add", "-A"]);
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
     const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
@@ -512,68 +693,134 @@ function cmdShip(argv) {
       "pr", "create",
       "--base", def,
       "--title", releaseTitle(type, rawDescription),
-      "--body", mergePrBody(`Closes #${n}\n\n${description}`, bodyExtra, n),
+      "--body", mergePrBody(`Closes #${n}\n\n${normalized.description}`, bodyExtra, n),
     ]);
-  } else if (bodyExtra) {
-    const existingBodyJson = gh(["pr", "view", prUrl, "--json", "body"]);
-    const existingBody = JSON.parse(existingBodyJson).body ?? "";
-    const mergedBody = mergePrBody(existingBody, bodyExtra, n);
-    if (mergedBody !== existingBody) gh(["pr", "edit", prUrl, "--body", mergedBody]);
+  }
+  const pr = validateResourceUrl(prUrl, repository, "pull");
+  if (!pr) {
+    fail(`PR create retornou URL vazia ou inválida: ${redactUrlForMessage(prUrl)}`);
   }
   console.log(`PR ${prUrl}`);
-  const auto = spawnSync("gh", ["pr", "merge", prUrl, "--auto", "--squash"], { cwd: root, encoding: "utf8" });
-  if (auto.status === 0) console.log("Auto-merge habilitado — o PR mergeia quando o CI ficar verde.");
-  else console.warn("Auto-merge não habilitado (repo sem allow_auto_merge?) — mergue manualmente após o CI.");
+  enableAutoMerge(prUrl);
 }
-function restoreStoppedDeployment(oldHead, oldCfg) {
+let rollbackAlreadyAttempted = false;
+
+function runRollbackCommand(failures, command, failureMessage) {
+  try {
+    if (!runShell(command)) {
+      failures.push(failureMessage);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    failures.push(`${failureMessage}: ${err?.message ?? err}`);
+    return false;
+  }
+}
+
+function restoreStoppedDeployment(oldHead, oldCfg, activeCfg = oldCfg, quiescenceConfirmed = false) {
+  if (rollbackAlreadyAttempted) return;
+  rollbackAlreadyAttempted = true;
   const failures = [];
+  if (!quiescenceConfirmed) {
+    const stopCommands = [...new Set([activeCfg?.stopCommand, oldCfg?.stopCommand].filter((command) => typeof command === "string" && command.trim()))];
+    for (const [index, command] of stopCommands.entries()) {
+      const stopLabel = index === 0 ? "stopCommand ativo" : "stopCommand da revisão anterior";
+      if (runRollbackCommand(failures, command, `não consegui parar o processo parcialmente iniciado (${stopLabel})`)) {
+        quiescenceConfirmed = true;
+        break;
+      }
+    }
+  }
+  if (!quiescenceConfirmed) {
+    failures.push("não consegui comprovar quiescência; reset/start da revisão anterior foram bloqueados");
+    console.error(`rollback do deploy incompleto: ${failures.join("; ")}.`);
+    return;
+  }
+  let resetSucceeded = true;
   try {
     git(["reset", "--hard", oldHead]);
   } catch (err) {
+    resetSucceeded = false;
     failures.push(`não consegui restaurar o revision ${oldHead}: ${err?.message ?? err}`);
   }
-  if (oldCfg.buildCommand) {
-    try {
-      if (!runShell(oldCfg.buildCommand)) failures.push("o build da revisão anterior falhou");
-    } catch (err) {
-      failures.push(`o build da revisão anterior falhou: ${err?.message ?? err}`);
-    }
+  if (!resetSucceeded) {
+    console.error(`rollback do deploy incompleto: ${failures.join("; ")}.`);
+    return;
+  }
+  if (oldCfg.buildCommand && !runRollbackCommand(failures, oldCfg.buildCommand, "o build da revisão anterior falhou")) {
+    console.error(`rollback do deploy incompleto: ${failures.join("; ")}.`);
+    return;
   }
   if (oldCfg.startCommand) {
-    try {
-      if (!runShell(oldCfg.startCommand)) failures.push("o startCommand da revisão anterior falhou");
-    } catch (err) {
-      failures.push(`o startCommand da revisão anterior falhou: ${err?.message ?? err}`);
-    }
+    runRollbackCommand(failures, oldCfg.startCommand, "o startCommand da revisão anterior falhou");
   } else {
     failures.push("startCommand da revisão anterior não está configurado");
   }
   if (failures.length) {
-    console.error(`Rollback do deploy incompleto: ${failures.join("; ")}.`);
+    console.error(`rollback do deploy incompleto: ${failures.join("; ")}.`);
   } else {
-    console.error(`Rollback do deploy concluído: revisão ${oldHead} restaurada e servidor reiniciado.`);
+    console.error(`rollback do deploy concluído: revisão ${oldHead} restaurada e servidor reiniciado.`);
   }
 }
 
-function failAfterStoppedDeploy(stopped, oldHead, oldCfg, message) {
-  console.error(message);
-  if (stopped) restoreStoppedDeployment(oldHead, oldCfg);
-  process.exit(1);
+function failAfterStoppedDeploy(stopped, oldHead, oldCfg, message, activeCfg = oldCfg, quiescenceConfirmed = false) {
+  const error = new Error(message);
+  error.rollbackRequired = Boolean(stopped);
+  error.rollbackArgs = [oldHead, oldCfg, activeCfg, quiescenceConfirmed];
+  throw error;
+}
+
+async function checkServedVersion(cfg, expectedVersion) {
+  let lastError = new Error("versão servida ausente, inválida ou divergente");
+  const timeoutValue = cfg.versionCheckTimeoutMs;
+  const timeoutMs = typeof timeoutValue === "number" && Number.isFinite(timeoutValue) && timeoutValue > 0
+    ? Math.min(timeoutValue, 2_147_483_647)
+    : 10_000;
+  const maxAttempts = 20;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
+      const status = response?.status;
+      if (!response || typeof status !== "number" || status < 200 || status >= 300) {
+        await response?.body?.cancel?.();
+        throw new Error(`HTTP ${status ?? "desconhecido"} não é 2xx`);
+      }
+      const served = extractServedVersion(await response.text());
+      if (!served) throw new Error("versão servida ausente ou não é SemVer estrito");
+      if (served !== expectedVersion) {
+        throw new Error(`versão servida v${served} ≠ unidade resolvida v${expectedVersion}`);
+      }
+      console.log(`Versão servida confere: v${served}`);
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxAttempts - 1) await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(`Não consegui validar ${redactUrlForMessage(cfg.versionCheckUrl)} após ${maxAttempts} tentativas: ${redactUrlsInMessage(lastError.message)}`);
 }
 
 // ---------- deploy ----------
 async function deploy() {
+  rollbackAlreadyAttempted = false;
   if (!existsSync(CONFIG)) {
     console.error("ship.config.json ausente — rode 'ship.mjs setup' e preencha.");
     process.exit(1);
   }
   let cfg;
   try {
-    cfg = readConfig();
-  } catch {
-    console.error("ship.config.json ausente ou inválido — deploy cancelado.");
+    cfg = validateDeployConfig(readConfig());
+  } catch (err) {
+    console.error(`ship.config.json inválido: ${err?.message ?? err}`);
     process.exit(1);
   }
+  const versionsBeforeEffects = requireVersionSources();
+  requireVersionCheckUnit(cfg, versionsBeforeEffects);
   const def = defaultBranch();
   const cur = git(["branch", "--show-current"]);
   if (cur !== def) {
@@ -599,129 +846,164 @@ async function deploy() {
   const oldCfg = cfg;
   const prePullDbPath = cfg.dbPath;
   const prePullBackupDir = backupDirFor(cfg);
-  let stopped = false;
-  if (cfg.stopCommand !== null && cfg.stopCommand !== undefined && (typeof cfg.stopCommand !== "string" || !cfg.stopCommand.trim())) {
-    if (cfg.dbPath) {
-      console.error("Deploy cancelado: dbPath configurado exige stopCommand (ou estratégia explícita de quiescência) antes do snapshot.");
-      process.exit(1);
-    }
-    console.warn("stopCommand configurado inválido — deploy continuará sem conseguir parar o servidor.");
-  } else if (typeof cfg.stopCommand === "string" && cfg.stopCommand.trim()) {
-    if (!runShell(cfg.stopCommand)) {
-      if (cfg.dbPath) {
-        console.error("Deploy cancelado: stopCommand não comprovou quiescência; nenhum snapshot ou pull foi executado.");
-        process.exit(1);
-      }
-      console.warn("stopCommand falhou; continuando o deploy porque dbPath não está configurado.");
-    } else {
-      stopped = true;
-    }
-  } else if (cfg.dbPath) {
-    console.error("Deploy cancelado: dbPath configurado exige stopCommand (ou estratégia explícita de quiescência) antes do snapshot.");
+  const startCommand = cfg.startCommand;
+  if (cfg.stopCommand && (typeof startCommand !== "string" || !startCommand.trim())) {
+    console.error("Deploy cancelado: startCommand inválido antes de executar stopCommand.");
     process.exit(1);
   }
-  let backupDest;
-  try {
-    backupDest = performBackup(cfg, root);
-  } catch (err) {
-    failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup falhou: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (backupDest) console.log(`Backup: ${backupDest}`);
-  else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
-  try {
-    git(["pull", "--ff-only", "origin", def]);
-  } catch {
-    failAfterStoppedDeploy(
-      stopped,
-      oldHead,
-      oldCfg,
-      `git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`,
-    );
-  }
-  try {
-    cfg = readConfig();
-  } catch {
-    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "ship.config.json ficou ausente ou inválido após o pull — deploy cancelado.");
-  }
-  if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
-    if (cfg.dbPath) {
-      if (!cfg.stopCommand || !runShell(cfg.stopCommand)) {
-        failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Deploy cancelado: a configuração pós-pull não comprovou quiescência para o snapshot.");
-      }
-      stopped = true;
-    }
-    let postPullBackup;
+  let stopped = false;
+  let quiescenceConfirmed = false;
+  if (cfg.stopCommand) {
+    // A stop can partially terminate the service before returning non-zero or
+    // throwing. Mark the boundary before invoking it so every failure is
+    // fail-closed and attempts to restore the old revision.
+    stopped = true;
     try {
-      postPullBackup = performBackup(cfg, root);
+      const stopResult = spawnSync(cfg.stopCommand, { shell: true, cwd: root, stdio: "inherit" });
+      if (stopResult?.status !== 0) {
+        restoreStoppedDeployment(oldHead, oldCfg, cfg);
+        console.error(`Deploy cancelado: stopCommand falhou; operação fail-closed para não continuar em estado inseguro${cfg.dbPath ? " antes do snapshot" : ""}.`);
+        process.exit(1);
+      }
+      quiescenceConfirmed = true;
     } catch (err) {
-      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup pós-pull falhou: ${err instanceof Error ? err.message : String(err)}`);
+      restoreStoppedDeployment(oldHead, oldCfg, cfg);
+      console.error(`Deploy cancelado: stopCommand lançou exceção; operação fail-closed (${err?.message ?? err}).`);
+      process.exit(1);
     }
-    if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
-    else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
   }
-  const changed = git(["diff", "--name-only", oldHead, "HEAD"])
-    .split("\n")
-    .map((file) => file.replace(/\r$/, "").replaceAll("\\", "/"))
-    .filter(Boolean);
-  const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
-  const hits = watch.filter((watched) => {
-    const absolute = path.resolve(root, watched);
-    const relative = path.relative(root, absolute).replaceAll("\\", "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
-    return changed.some((file) => !relative || file === relative || file.startsWith(`${relative}/`));
-  });
-  if (hits.length) {
-    console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
-  }
-  if (cfg.buildCommand && !runShell(cfg.buildCommand)) {
-    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Build falhou — a revisão nova não foi iniciada.");
-  }
-  if (cfg.startCommand && !runShell(cfg.startCommand)) {
-    failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Start falhou — veja a saída acima / o log do seu startCommand.");
-  }
-  if (cfg.versionCheckUrl) {
-    let pkg = null;
-    let packageRead = true;
+  if (!cfg.stopCommand) stopped = false;
+
+  try {
+    let backupDest;
     try {
-      pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+      backupDest = performBackup(cfg, root);
+    } catch (err) {
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup falhou: ${err instanceof Error ? err.message : String(err)}`, cfg, quiescenceConfirmed);
+    }
+    if (backupDest === false) {
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup não produziu um snapshot verificável.", cfg, quiescenceConfirmed);
+    }
+    if (backupDest) console.log(`Backup: ${backupDest}`);
+    else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
+
+    try {
+      git(["pull", "--ff-only", "origin", def]);
     } catch {
-      packageRead = false;
-      console.warn("versionCheckUrl configurado mas package.json ausente/inválido na raiz — checagem de versão pulada.");
+      failAfterStoppedDeploy(
+        stopped,
+        oldHead,
+        oldCfg,
+        `git pull --ff-only falhou — ${def} local divergente do origin (commits fora do fluxo?). Reconcilie manualmente e rode deploy de novo.`,
+        cfg,
+        quiescenceConfirmed,
+      );
     }
-    const validVersion = isValidSemVer(pkg?.version);
-    if (packageRead && !validVersion) {
-      console.warn("versionCheckUrl configurado mas package.version ausente ou inválido — checagem de versão pulada.");
+    try {
+      cfg = validateDeployConfig(readConfig());
+    } catch (err) {
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `ship.config.json ficou inválido após o pull: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
     }
-    if (validVersion) {
-      let ok = false;
-      const timeoutValue = cfg.versionCheckTimeoutMs;
-      const timeoutMs = typeof timeoutValue === "number" && Number.isFinite(timeoutValue) && timeoutValue > 0
-        ? Math.min(timeoutValue, 2_147_483_647)
-        : 10_000;
-      for (let attempt = 0; attempt < 5 && !ok; attempt++) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const versionsAfterPull = validateVersionSources();
+      validateVersionCheckUnit(cfg, versionsAfterPull);
+    } catch (err) {
+      failAfterStoppedDeploy(
+        stopped,
+        oldHead,
+        oldCfg,
+        `E_VERSION_SOURCE: ${err instanceof Error ? err.message : String(err)}`,
+        cfg,
+        quiescenceConfirmed,
+      );
+    }
+    const postPullConfigChanged =
+      cfg.stopCommand !== oldCfg.stopCommand ||
+      cfg.startCommand !== oldCfg.startCommand ||
+      cfg.dbPath !== prePullDbPath ||
+      backupDirFor(cfg) !== prePullBackupDir;
+    const postPullQuiescenceChanged =
+      cfg.stopCommand !== oldCfg.stopCommand ||
+      cfg.dbPath !== prePullDbPath ||
+      backupDirFor(cfg) !== prePullBackupDir;
+    if (stopped && !cfg.startCommand) {
+      failAfterStoppedDeploy(
+        stopped,
+        oldHead,
+        oldCfg,
+        "Deploy cancelado: o serviço foi parado, mas a configuração pós-pull não tem startCommand.",
+        cfg,
+        quiescenceConfirmed,
+      );
+    }
+    if (postPullConfigChanged && postPullQuiescenceChanged) {
+      // A changed stop or snapshot boundary must be re-established with the
+      // post-pull command. Mark stopped first: a partial stop is unsafe.
+      if (cfg.stopCommand && cfg.stopCommand !== oldCfg.stopCommand) {
+        quiescenceConfirmed = false;
+        stopped = true;
+        let postPullStop;
         try {
-          const response = await fetch(cfg.versionCheckUrl, { signal: controller.signal });
-          if (!response || response.ok === false || (typeof response.status === "number" && (response.status < 200 || response.status >= 300))) {
-            await response?.body?.cancel();
-            throw new Error(`HTTP ${response?.status ?? "desconhecido"}`);
-          }
-          const html = await response.text();
-          const served = extractServedVersion(html);
-          console.log(
-            served === pkg.version
-              ? `Versão servida confere: v${served}`
-              : `AVISO: versão servida v${served ?? "?"} ≠ package.json v${pkg.version}`,
-          );
-          ok = true;
-        } catch {
-          if (attempt < 4) await new Promise((r) => setTimeout(r, 2_000));
-        } finally {
-          clearTimeout(timer);
+          postPullStop = spawnSync(cfg.stopCommand, { shell: true, cwd: root, stdio: "inherit" });
+        } catch (err) {
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `stopCommand pós-pull lançou exceção: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
         }
+        if (postPullStop?.status !== 0) {
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, "stopCommand pós-pull falhou ao comprovar quiescência.", cfg, quiescenceConfirmed);
+        }
+        quiescenceConfirmed = true;
       }
-      if (!ok) console.warn(`Não consegui checar versão em ${cfg.versionCheckUrl} após 5 tentativas.`);
+      if (cfg.dbPath !== prePullDbPath || backupDirFor(cfg) !== prePullBackupDir) {
+        let postPullBackup;
+        try {
+          postPullBackup = performBackup(cfg, root);
+        } catch (err) {
+          failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Backup pós-pull falhou: ${err instanceof Error ? err.message : String(err)}`, cfg, quiescenceConfirmed);
+        }
+        if (postPullBackup === false) failAfterStoppedDeploy(stopped, oldHead, oldCfg, "Backup pós-pull não produziu um snapshot verificável.", cfg, quiescenceConfirmed);
+        if (postPullBackup) console.log(`Backup pós-pull: ${postPullBackup}`);
+        else if (cfg.dbPath) console.warn(`Backup pulado: '${cfg.dbPath}' no manifesto não existe no repo.`);
+      }
     }
+
+    // const changed = computed inside this rollback boundary
+    let changed;
+    try {
+      changed = git(["diff", "--name-only", oldHead, "HEAD"])
+        .split("\n")
+        .map((file) => file.replace(/\r$/, "").replaceAll("\\", "/"))
+        .filter(Boolean);
+    } catch (err) {
+      failAfterStoppedDeploy(stopped, oldHead, oldCfg, `Leitura do diff falhou: ${err?.message ?? err}`, cfg, quiescenceConfirmed);
+    }
+    const watch = resolveSchemaWatch(cfg.schemaWatchPaths);
+    const hits = watch.filter((watched) => {
+      const absolute = path.resolve(root, watched);
+      const relative = path.relative(root, absolute).replaceAll("\\", "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+      return changed.some((file) => !relative || file === relative || file.startsWith(`${relative}/`));
+    });
+    if (hits.length) {
+      console.warn(`ATENÇÃO: possível migração de schema neste pull: ${hits.join(", ")} (forward-only).`);
+    }
+
+    if (cfg.buildCommand) {
+      if (!runShell(cfg.buildCommand)) throw new Error("Build falhou — a revisão nova não foi iniciada.");
+    } else {
+      console.log("build: NA (reason: Nenhum build configurado; evidence: ship.config.json: buildCommand=null)");
+    }
+    if (cfg.startCommand && !runShell(cfg.startCommand)) {
+      throw new Error("Start falhou — veja a saída acima / o log do seu startCommand.");
+    }
+    if (cfg.versionCheckUrl) {
+      const versions = validateVersionSources();
+      const unit = validateVersionCheckUnit(cfg, versions);
+      const expectedVersion = versions.get(unit);
+      await checkServedVersion(cfg, expectedVersion);
+    }
+  } catch (err) {
+    if (stopped) restoreStoppedDeployment(...(err?.rollbackArgs ?? [oldHead, oldCfg, cfg, quiescenceConfirmed]));
+    console.error(`Deploy falhou: ${err?.message ?? err}`);
+    process.exit(1);
   }
   console.log("Deploy concluído.");
 }
@@ -739,7 +1021,7 @@ try {
     const bin = typeof err.syscall === "string" ? err.syscall.replace(/^spawn(Sync)?\s*/i, "") : "binário";
     console.error(`ship.mjs: binário ausente ou fora do PATH: ${bin}. Instale/corrija (git, gh) e rode de novo.`);
   } else {
-    console.error(`ship.mjs: ${err?.message ?? err}`);
+    console.error(`ship.mjs: ${redactUrlsInMessage(err?.message ?? err)}`);
   }
   process.exit(1);
 }

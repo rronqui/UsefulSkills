@@ -77,7 +77,11 @@ describe("extractServedVersion", () => {
     expect(extractServedVersion("<html></html>")).toBeNull();
     expect(extractServedVersion(null)).toBeNull();
   });
+  it("AC-018: versão servida com prerelease numérico zero-leading não é SemVer resolvível", () => {
+    expect(extractServedVersion("<p>Versão da aplicação v1.2.3-01</p>")).toBeNull();
+  });
 });
+
 
 describe("isValidSemVer", () => {
   it("aceita prerelease e build metadata válidos", () => {

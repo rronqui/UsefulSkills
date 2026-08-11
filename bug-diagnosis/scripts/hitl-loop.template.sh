@@ -6,7 +6,7 @@
 # Usage:
 #   bash hitl-loop.template.sh
 #
-# Two helpers:
+# Helpers:
 #   step "<instruction>"          → show instruction, wait for Enter
 #   capture VAR "<question>"      → show question, read one response into VAR
 #   capture_multiline VAR "<q>"   → read until a line containing __END__
@@ -16,7 +16,19 @@
 # `capture` prints its value back to the terminal, where the agent reads it — so
 # capture observations, and leave signing in to the user as a `step`.
 
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'SKIPPED: Bash indisponível; cenário HITL gated.\n' >&2
+  exit 0
+fi
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 1) )); then
+  printf 'SKIPPED: Bash >= 4.1 necessário para o cenário HITL gated.\n' >&2
+  exit 0
+fi
 set -euo pipefail
+if ! command -v awk >/dev/null 2>&1; then
+  printf 'SKIPPED: AWK indisponível; cenário HITL gated.\n' >&2
+  exit 0
+fi
 
 step() {
   printf '\n>>> %s\n' "$1"
@@ -92,7 +104,7 @@ capture_multiline() {
   printf -v "$var" '%s' "$answer"
 }
 redact() {
-  awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*access[[:space:]_-]*key[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|secret[[:alnum:]_-]*' '
+  awk -v labels='authorization[[:alnum:]_-]*|proxy[[:space:]_-]*authorization[[:alnum:]_-]*|cookie[[:alnum:]_-]*|set[[:space:]_-]*cookie[[:alnum:]_-]*|x[[:space:]_-]*api[[:alnum:]_-]*|x[[:space:]_-]*api[[:space:]_-]*key[[:alnum:]_-]*|api[[:space:]_-]*key[[:alnum:]_-]*|access[[:space:]_-]*token[[:alnum:]_-]*|private[[:space:]_-]*key[[:alnum:]_-]*|encryption[[:space:]_-]*key[[:alnum:]_-]*|secret[[:alnum:]_-]*|secret[[:space:]_-]*key[[:alnum:]_-]*|client[[:space:]_-]*secret[[:alnum:]_-]*|refresh[[:space:]_-]*token[[:alnum:]_-]*|session[[:space:]_-]*token[[:alnum:]_-]*|aws[[:space:]_-]*access[[:space:]_-]*key[[:alnum:]_-]*|aws[[:space:]_-]*secret[[:space:]_-]*access[[:alnum:]_-]*key[[:alnum:]_-]*|jwt[[:space:]_-]*token[[:alnum:]_-]*|jwt[[:alnum:]_-]*|token[[:alnum:]_-]*|password[[:alnum:]_-]*|passphrase[[:alnum:]_-]*|credential[[:alnum:]_-]*|credentials[[:alnum:]_-]*|[[:alnum:]_-]+(password|passphrase|secret|token|private[[:space:]_-]*key|api[[:space:]_-]*key|credential|credentials)' '
     function unescaped_double(s, i, j, slashes, backticks) {
       for (i = 1; i <= length(s); i++) {
         if (substr(s, i, 1) != "\"") continue
@@ -510,7 +522,9 @@ redact() {
       }
       if (pending == 3) {
         print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/ && pem_label(lower) == pem_label_value) {
+        pem_line = lower
+        gsub(/\[debug-[^]]*\][[:space:]]*/, "", pem_line)
+        if (pem_line ~ /^[[:space:]]*-----end[[:space:]].*private[[:space:]]+key-----[[:space:]]*$/ && pem_label(pem_line) == pem_label_value) {
           if (pem_parent_depth > 0) {
             flow_depth = pem_parent_depth
             pending = 2
@@ -700,13 +714,22 @@ sanitize_trace() {
       return marker
     }
     BEGIN { pem_label_value = "" }
-    /\[DEBUG-[^]]*\]/ { next }
     {
       lower = tolower($0)
       if (pem_label_value != "") {
+        pem_line = lower
+        gsub(/\[debug-[^]]*\][[:space:]]*/, "", pem_line)
         print "<REDACTED>"
-        if (lower ~ /^[[:space:]]*-----end[[:space:]][a-z0-9 -]+-----[[:space:]]*$/ &&
-            pem_label(lower) == pem_label_value) pem_label_value = ""
+        if (pem_line ~ /^[[:space:]]*-----end[[:space:]][a-z0-9 -]+-----[[:space:]]*$/ &&
+            pem_label(pem_line) == pem_label_value) pem_label_value = ""
+        next
+      }
+      if (lower ~ /\[debug-[^]]*\]/) {
+        debug_line = lower
+        if (debug_line ~ /-----begin[[:space:]][a-z0-9 -]+-----/) {
+          print "<REDACTED>"
+          pem_label_value = pem_label(debug_line)
+        }
         next
       }
       if (lower ~ /-----begin[[:space:]][a-z0-9 -]+-----/) {
@@ -714,7 +737,7 @@ sanitize_trace() {
         pem_label_value = pem_label(lower)
         next
       }
-      gsub(/eyJ[[:alnum:]_-]+([.][[:alnum:]_-]+){1,2}|glpat_[[:alnum:]_-]+|glpat-[[:alnum:]_-]+|sk_live_[[:alnum:]_-]+|sk_test_[[:alnum:]_-]+|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/, "<REDACTED>")
+      gsub(/eyJ[[:alnum:]_-]+([.][[:alnum:]_-]+){1,2}|glpat_[[:alnum:]_-]+|glpat-[[:alnum:]_-]+|sk_live_[[:alnum:]_-]+|sk_test_[[:alnum:]_-]+|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|npm_[[:alnum:]_-]+|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/, "<REDACTED>")
       print
     }
   '
@@ -724,9 +747,11 @@ scan_clean_trace() {
   awk '
     {
       lower = tolower($0)
-      if ($0 ~ /\[DEBUG-[^]]*\]/ ||
-          $0 ~ /eyJ[[:alnum:]_-]+|glpat_|sk_live_|sk_test_|github_pat_|ghp_|gho_|ghs_|ghr_|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
-          lower ~ /eyj|glpat_|sk_live_|sk_test_|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|akia[[:alnum:]]+|aiza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
+      if (lower ~ /\[debug-[^]]*\]/ ||
+          lower ~ /(^|[^[:alnum:]])encryption[[:space:]_-]*key[[:alnum:]_-]*[[:space:]]*[=:][[:space:]]*[^[:space:]#]/ ||
+          lower ~ /(^|[^[:alnum:]])[[:alnum:]_-]+(password|passphrase|secret|token|private[[:space:]_-]*key|api[[:space:]_-]*key|credential|credentials)[[:space:]]*[=:][[:space:]]*[^[:space:]#]/ ||
+          $0 ~ /eyJ[[:alnum:]_-]+|glpat_|sk_live_|sk_test_|github_pat_|ghp_|gho_|ghs_|ghr_|npm_|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
+          lower ~ /eyj|glpat_|sk_live_|sk_test_|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|npm_[[:alnum:]_-]+|akia[[:alnum:]]+|aiza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
           lower ~ /-----begin[[:space:]][a-z0-9 -]+-----|-----end[[:space:]][a-z0-9 -]+-----/) found = 1
     }
     END { exit found ? 1 : 0 }
@@ -735,35 +760,158 @@ scan_clean_trace() {
 
 
 persist_trace() {
-  local path="$1" tmp
-  [[ -n "$path" ]] || return 0
-  [[ "$path" != -* ]] || return 1
-  [[ ! -d "$path" ]] || return 1
-  umask 077
-  tmp=$(mktemp "${path}.tmp.XXXXXX") || return 1
-  if ! cat > "$tmp"; then
-    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
-    return 1
-  fi
-  if ! scan_clean_trace < "$tmp"; then
-    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
-    return 1
-  fi
-  if [[ -d "$path" ]]; then
-    if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
-    return 1
-  fi
-  if ! mv -f -- "$tmp" "$path"; then
-    if ! mv -f "$tmp" "$path"; then
-      if ! rm -f -- "$tmp"; then rm -f "$tmp"; fi
-      return 1
+  local path="${1:-}" tmp="" guard="" published=0 write_fd="" read_fd="" verify_fd=""
+  local guard_fd="" guard_owned=0 scan_checksum="" verify_checksum=""
+  cleanup_tmp() {
+    local guard_target="" guard_matches=0
+    if [[ -n "$write_fd" ]]; then eval "exec ${write_fd}>&-" || true; write_fd=""; fi
+    if [[ -n "$read_fd" ]]; then eval "exec ${read_fd}<&-" || true; read_fd=""; fi
+    if [[ -n "$verify_fd" ]]; then eval "exec ${verify_fd}<&-" || true; verify_fd=""; fi
+    if [[ -n "$guard_fd" && -e "/dev/fd/$guard_fd" && -e "$guard" && "/dev/fd/$guard_fd" -ef "$guard" ]]; then
+      guard_matches=1
     fi
+    if (( guard_matches )); then
+      if [[ -e "$tmp" && "/dev/fd/$guard_fd" -ef "$tmp" ]]; then
+        guard_target="$tmp"
+      elif [[ -e "$path" && ! -L "$path" && "/dev/fd/$guard_fd" -ef "$path" ]]; then
+        guard_target="$path"
+      fi
+    fi
+    if [[ -n "$tmp" && -e "$tmp" && ( "$guard_owned" -eq 0 || "$guard_target" == "$tmp" ) ]]; then
+      rm -f -- "$tmp" || rm -f "$tmp" || true
+    fi
+    if (( guard_matches )) && [[ -e "$guard" ]]; then
+      rm -f -- "$guard" || rm -f "$guard" || true
+    fi
+    if [[ -n "$guard_fd" ]]; then eval "exec ${guard_fd}<&-" || true; guard_fd=""; fi
+  }
+  cleanup_nested_tmp() {
+    local tmp_name="${tmp##*/}" candidate="" dir_fd="" backslash=""
+    printf -v backslash '%b' '\\'
+    if [[ "$tmp_name" == "$tmp" ]]; then tmp_name="${tmp##*${backslash}}"; fi
+    [[ -d "$path" && ! -L "$path" ]] || return 0
+    [[ -n "$guard_fd" && -e "/dev/fd/$guard_fd" ]] || return 0
+    exec {dir_fd}<"$path" || return 0
+    if [[ ! -e "/dev/fd/$dir_fd" || ! "/dev/fd/$dir_fd" -ef "$path" ]]; then
+      eval "exec ${dir_fd}<&-" || true
+      return 0
+    fi
+    candidate="${path%/}/$tmp_name"
+    for candidate in "$candidate" "$path"/*; do
+      [[ ( -e "$candidate" || -L "$candidate" ) && "$candidate" -ef "/dev/fd/$guard_fd" &&
+          -e "/dev/fd/$dir_fd" && "/dev/fd/$dir_fd" -ef "$path" ]] || continue
+      rm -f -- "$candidate" || rm -f "$candidate" || true
+      break
+    done
+    eval "exec ${dir_fd}<&-" || true
+  }
+  discard_published() {
+    if [[ -e "$path" && ! -L "$path" && -n "$guard_fd" && -e "/dev/fd/$guard_fd" &&
+      "/dev/fd/$guard_fd" -ef "$path" ]]; then
+      rm -f -- "$path" || rm -f "$path" || true
+      published=0
+    fi
+  }
+  cleanup_abort() {
+    local status=$?
+    trap - EXIT TERM INT
+    cleanup_nested_tmp || true
+    cleanup_tmp || true
+    exit "$status"
+  }
+  finish_persist() {
+    local status="$1"
+    trap - EXIT TERM INT
+    cleanup_nested_tmp || true
+    cleanup_tmp || true
+    return "$status"
+  }
+  trap cleanup_abort EXIT TERM INT
+
+  [[ "$path" != -* ]] || { finish_persist 1; return 1; }
+  [[ ! -d "$path" ]] || { finish_persist 1; return 1; }
+  [[ ! -e "$path" && ! -L "$path" ]] || { finish_persist 1; return 1; }
+  umask 077
+  tmp=$(mktemp "${path}.tmp.XXXXXX") || { finish_persist 1; return 1; }
+  guard="${tmp}.guard"
+  if ! ln "$tmp" "$guard"; then
+    finish_persist 1
+    return 1
   fi
+  if ! exec {guard_fd}<"$guard" ||
+    [[ ! -e "/dev/fd/$guard_fd" || ! "/dev/fd/$guard_fd" -ef "$guard" ]]; then
+    guard_owned=0
+    finish_persist 1
+    return 1
+  fi
+  if ! exec {write_fd}<>"$tmp" ||
+    [[ ! -e "/dev/fd/$write_fd" || ! "/dev/fd/$write_fd" -ef "/dev/fd/$guard_fd" ]] ||
+    ! cat >&"$write_fd"; then
+    finish_persist 1
+    return 1
+  fi
+  eval "exec ${write_fd}>&-" || { write_fd=""; finish_persist 1; return 1; }
+  write_fd=""
+  if ! scan_checksum=$(cksum <"$tmp"); then
+    finish_persist 1
+    return 1
+  fi
+  if ! exec {read_fd}<"$tmp" ||
+    [[ ! -e "/dev/fd/$read_fd" || ! "/dev/fd/$read_fd" -ef "/dev/fd/$guard_fd" ]] ||
+    ! scan_clean_trace <&"$read_fd"; then
+    finish_persist 1
+    return 1
+  fi
+  if ! scan_checksum_after=$(cksum <"$tmp") ||
+    [[ "$scan_checksum" != "$scan_checksum_after" ]]; then
+    finish_persist 1
+    return 1
+  fi
+  eval "exec ${read_fd}<&-" || { read_fd=""; finish_persist 1; return 1; }
+  read_fd=""
+
+  if ! mv -n -T -- "$tmp" "$path"; then
+    if [[ -e "$tmp" || -L "$tmp" ]] &&
+      [[ ! -e "$path" && ! -L "$path" ]] &&
+      ln "$tmp" "$path" &&
+      [[ -e "$path" && ! -L "$path" && "$path" -ef "/dev/fd/$guard_fd" ]]; then
+      published=1
+    fi
+  elif [[ -e "$tmp" || -L "$tmp" ]]; then
+    if [[ ! -e "$path" && ! -L "$path" ]] &&
+      ln "$tmp" "$path" &&
+      [[ -e "$path" && ! -L "$path" && "$path" -ef "/dev/fd/$guard_fd" ]]; then
+      published=1
+    fi
+  elif [[ -e "$path" && ! -L "$path" && "$path" -ef "/dev/fd/$guard_fd" ]]; then
+    published=1
+  fi
+  if (( !published )); then
+    finish_persist 1
+    return 1
+  fi
+  if ! exec {verify_fd}<"$path" ||
+    [[ ! -e "/dev/fd/$verify_fd" || ! "/dev/fd/$verify_fd" -ef "/dev/fd/$guard_fd" ]] ||
+    ! verify_checksum=$(cksum <&"$verify_fd") ||
+    [[ "$verify_checksum" != "$scan_checksum" ]]; then
+    discard_published
+    finish_persist 1
+    return 1
+  fi
+  finish_persist 0
 }
 
 # Set TRACE_FILE to persist a trace.  Persistence is intentionally downstream
 # of redact + sanitize + scan; a failed scan never publishes the artifact.
 TRACE_FILE="${TRACE_FILE:-}"
+redact_scalar() {
+  local value="$1" redacted
+  if ! redacted=$(printf '%s\001' "$value" | redact | sanitize_trace); then
+    return 1
+  fi
+  redacted=${redacted%$'\001'}
+  printf '%s' "$redacted"
+}
 
 
 # --- edit below ---------------------------------------------------------
@@ -775,8 +923,16 @@ ERROR_QUESTION="${ERROR_QUESTION:-Did the operation under test fail? (y/n)}"
 capture ERRORED "$ERROR_QUESTION"
 capture_multiline ERROR_MSG "Paste the error message (or 'none'):" || exit 1
 
+if ! redacted_errored=$(redact_scalar "$ERRORED"); then
+  printf 'ERROR: ERRORED redaction failed.\n' >&2
+  exit 1
+fi
+if ! printf '%s' "$redacted_errored" | scan_clean_trace; then
+  printf 'ERROR: ERRORED scan failed; refusing to publish.\n' >&2
+  exit 1
+fi
 printf '\n--- Captured ---\n'
-printf 'ERRORED=%s\n' "$ERRORED"
+printf 'ERRORED=%s\n' "$redacted_errored"
 if ! redacted_trace=$(printf '%s\001' "$ERROR_MSG" | redact | sanitize_trace); then
   printf 'ERROR: redaction failed.\n' >&2
   exit 1

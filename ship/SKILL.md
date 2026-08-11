@@ -22,14 +22,15 @@ seguem o protocolo abaixo.
 
 | Campo | Significado |
 |---|---|
-| dbPath | Banco local para backup no deploy (null se não houver) |
-| backupDir | Diretório do backup (opcional; default: `<dirname(dbPath)>/backup`) |
-| schemaWatchPaths | Array de caminhos (opcional); se qualquer um mudou no pull, o deploy avisa sobre possível migração de schema (forward-only) |
-| buildCommand | Build de produção (null = pular) |
-| stopCommand | Para o servidor antes de pull/build/start e, quando `dbPath` estiver configurado, prova quiescência antes do snapshot (ausência/falha é bloqueante); sem `dbPath`, retorno não-zero gera aviso e o deploy continua |
-| startCommand | Inicia o servidor (o deploy já rebuildou via buildCommand — não usar flag de build aqui); DEVE retornar (wrapper/daemonizador como pm2/npm script) — um servidor foreground bloqueia o deploy |
-| versionCheckUrl | URL para conferir a versão servida (null = pular); a checagem remove comentários HTML, procura `v(X.Y.Z[-prerelease][+build])` a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência, e compara com a versão SemVer do `package.json` raiz (ausente/inválida → aviso e checagem pulada; use-a apenas para a unidade raiz) |
-| versionCheckTimeoutMs | Timeout da checagem HTTP de versão em milissegundos (opcional; default 10000; valores não positivos ou inválidos usam o default) |
+| dbPath | Banco local para backup no deploy (null se não houver); deve resolver para arquivo regular, não symlink nem arquivo especial |
+| backupDir | Diretório do backup (opcional; default: `<dirname(dbPath)>/backup`); origem insegura bloqueia o deploy após stop sem publicar snapshot |
+| schemaWatchPaths | Array de caminhos (opcional; `null` e campo omitido preservam o default legado `["src/lib/db.ts"]`); se qualquer um mudou no pull, o deploy avisa sobre possível migração de schema (forward-only) |
+| buildCommand | Build de produção (`null` = pular, com evidência `build: NA`) |
+| stopCommand | Para o servidor antes de pull/build/start e prova quiescência antes do snapshot; quando configurado, deve ser string não vazia e sua falha bloqueia o deploy (fail-closed), com ou sem `dbPath` |
+| startCommand | Inicia o servidor e é obrigatório, válido e não vazio quando `stopCommand` é usado; o deploy já rebuildou via buildCommand — não usar flag de build aqui; DEVE retornar (wrapper/daemonizador como pm2/npm script) |
+| versionCheckUrl | URL para conferir a versão servida (null = pular); exige HTTP 2xx, versão estrita SemVer existente e igual à unidade resolvida explicitamente (por padrão a unidade raiz); a checagem remove comentários HTML e procura a partir do texto âncora `Versão da aplicação` (se presente na página) senão a primeira ocorrência |
+| versionCheckUnit | Unidade `packages` representada por `versionCheckUrl` (opcional; default `"."`); nunca usa uma unidade raiz implícita equivocada |
+| versionCheckTimeoutMs | Timeout da checagem HTTP de versão em milissegundos (opcional; default 10000; valores não positivos usam o default) |
 
 ### Fonte de versão e monorepo
 
@@ -43,11 +44,13 @@ O `release-please-config.json` também precisa ser um arquivo regular acessível
 link simbólico); configuração inacessível, dangling ou inválida falha fechado.
 Uma configuração sem `release-please-config.json` continua suportando o projeto
 raiz, desde que o `package.json` raiz tenha versão SemVer válida.
-
-Quando `versionCheckUrl` está configurado, a checagem de deploy compara a
-versão servida com o `package.json` raiz; uma configuração multi-package deve
-manter essa URL desabilitada ou definir explicitamente qual unidade raiz ela
-representa, sem mascarar a validação fail-closed das demais unidades.
+Quando `versionCheckUrl` está configurado, a checagem compara a versão servida,
+após resposta HTTP 2xx, com a versão SemVer estrita da `versionCheckUnit`
+explicitamente resolvida no manifesto; ausência, invalidez ou divergência bloqueia
+e aciona rollback quando o serviço já foi parado. Em configuração multi-package,
+defina a unidade representada pela URL, sem mascarar a validação fail-closed das
+demais unidades.
+Se a configuração for multi-package e não houver exatamente uma unidade raiz single-package, mantenha `versionCheckUrl` como `null`/desabilitada; isso não deve mascarar a validação fail-closed das demais unidades.
 
 ## Subcomandos do motor
 
@@ -55,20 +58,36 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
 | Comando | Efeito |
 |---|---|
-| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default atualizada |
-| `bin/ship.mjs ship "descrição"` | Valida fontes de versão e pré-requisitos; depois faz commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR `Closes #N`, auto-merge squash; `--body-file <arquivo>` anexa o conteúdo do arquivo ao corpo do PR |
-| `bin/ship.mjs deploy` | Exige `ship.config.json` e estar na branch default; executa `stopCommand` (falha avisa sem `dbPath`, bloqueia com `dbPath`) → backup do dbPath (arquivo ausente → aviso e pula) → pull --ff-only → aviso se algum schemaWatchPath mudou → build → restart → confere versão servida; se o stop tiver sido bem-sucedido e pull/build/start falhar, restaura a revisão anterior, refaz o build e reinicia o servidor, reportando também qualquer falha do rollback |
+| `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos antes dos efeitos e novamente após atualizar a default; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default validada |
+| `bin/ship.mjs ship "descrição"` | Valida fontes de versão e pré-requisitos; depois faz commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR com exatamente um `Closes #N` canônico, auto-merge squash; `--body-file <arquivo>` valida todos os marcadores `Closes #N` contra a issue da branch antes de qualquer commit/push/PR e, em PR existente, faz retry body-only sem exigir commit |
+| `bin/ship.mjs deploy` | Valida configuração/comandos, `versionCheckUnit` e fontes SemVer antes de qualquer efeito; também revalida as fontes e a unidade após o pull antes do build novo, preservando `build: NA` com reason/evidence quando aplicável. Falha após `stopCommand` aciona o rollback idempotente descrito a seguir. |
+
+### Fronteiras de validação e rollback do deploy
+
+O deploy separa validação de efeitos em duas fronteiras:
+
+- **Pré-efeitos (antes de `stopCommand`)**: valida configuração, comandos, `versionCheckUnit`,
+  fontes SemVer e alinhamento da branch default; quando `stopCommand` existe, `startCommand`
+  já deve ser válido e não vazio. Falhas nesta etapa encerram o deploy sem parar o
+  serviço.
+- **Pós-`stopCommand` bem-sucedido ou potencialmente interrompido**: mantém uma única
+  fronteira de rollback para snapshot, pull/config reread, revalidação das fontes
+  SemVer, diff/schema, build (ou `build: NA` com reason/evidence), restart e
+  `versionCheck`. Qualquer falha após a parada confirmada, ou um stop não-zero
+  interrompido que possa ter parado o serviço, restaura HEAD/config, refaz o build
+  e reinicia a revisão anterior; a tentativa é idempotente e qualquer falha do
+  próprio rollback é reportada.
 
 ## Protocolo de entrega (agente)
 
 1. **Intake**: rode `new`. Se o usuário já forneceu issue/branch, pule.
-2. **Alinhamento (obrigatório para pedidos de implementação ou correção)**: leia
-   `skill://alignment` e conduza a entrevista de alinhamento sobre o pedido:
+2. **Alinhamento (obrigatório para todo pedido)**: leia `skill://alignment` e
+   conduza a entrevista de alinhamento antes de qualquer roteamento:
    mudança trivial → rodada rápida (até 3 perguntas); comportamental → até a
    fronteira esvaziar; pedido totalmente especificado → declare o fechamento
-   rápido com o motivo (nunca pule em silêncio). Pedidos que NÃO são
-   implementação/correção (merge de release, deploy, revisão isolada) pulam este
-   passo. O resultado do alinhamento dirige o roteamento do passo 3.
+   rápido com o motivo (nunca pule em silêncio). O resultado do alinhamento
+   dirige o roteamento do passo 3, inclusive para merge, release, deploy e
+   revisão isolada.
 3. **Roteamento da implementação**:
    - **Trivial** (docs, texto, config, cosmético sem mudança de comportamento):
      implemente diretamente.
@@ -196,11 +215,16 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 
    Se o PR entrar em conflito com a base antes do merge: na branch do PR rode
    `git fetch origin` e depois `git merge origin/<default>`, resolva cada hunk
-   seguindo `skill://conflict-resolution`; rode os checks aplicáveis enquanto a
-   resolução está registrada e finalize este merge ativo somente com `git commit`;
-   depois dê push e rode um **deep-review/re-review final** sobre o intervalo final
-   de commits;
-   registre o resultado e o veredito válido/aprovado. Sem publicar o PR, fica bloqueado sem um veredito válido; o auto-merge só retoma após CI verde.
+   seguindo `skill://conflict-resolution`; rode os checks aplicáveis e calcule o
+   identificador/digest do snapshot resolvido. Para a re-review anterior ao commit,
+   use `deep-review` em modo `UNCOMMITTED`, capturando no mesmo instante `staged`,
+   `unstaged` e `untracked` em `local_revision_context` e fixando sua `revision`
+   ao identificador do snapshot; não use `BRANCH_BASE`, que revisaria a árvore
+   anterior ao conflito. Só então obtenha veredito válido e revisão final aprovada
+   sobre o snapshot resolvido, e execute `git commit` e push.
+   Sem veredito válido, a publicação do PR fica bloqueada; um finding P0/P1,
+   revisão ausente ou snapshot divergente mantém o merge bloqueado e retorna o
+   fluxo à triagem; o auto-merge só retoma após CI verde.
 6. **Release**: NÃO mergue automaticamente o PR de release do release-please. Quando
    o usuário quiser lançar: `gh pr merge <nº do PR de release> --squash` e aguarde a
    tag.
@@ -238,9 +262,8 @@ Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz
 - Commits de correção do gate são manuais; `ship.mjs ship` roda UMA vez, no final.
   No caminho TDD a árvore chega limpa ao ship — o motor publica os commits locais
   não publicados, é esperado.
-- Alinhamento é proporcional mas nunca pulado em silêncio para pedidos de
- implementação/correção: trivial roda confirmação rápida; pedido já especificado
- exige declaração explícita do fechamento. Deploy/release/revisão isolada não
- passam pelo alinhamento.
+- Alinhamento é obrigatório para todo pedido e nunca pode ser pulado em silêncio:
+  trivial roda confirmação rápida; pedido já especificado exige declaração explícita
+  do fechamento. O checkpoint também governa merge, release, deploy e revisão isolada.
 - Diagnóstico de bug exige feedback loop vermelho ANTES de qualquer hipótese;
  pular para hipótese sem loop é a falha que a disciplina previne.

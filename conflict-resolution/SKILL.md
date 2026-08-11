@@ -52,21 +52,31 @@ persista um registro com status/phase **`BLOCKED`** (durável) contendo, no mín
 {
   "status": "BLOCKED",
   "phase": "BLOCKED",
-  "operation": "merge|rebase",
+  "operation": "rebase",
   "files": ["caminho/afetado"],
-  "hunks": ["caminho/afetado:hunk-id"],
+  "hunks": ["caminho/afetado:hunk-2"],
   "attempt": 2,
-  "commandsExecuted": ["git status", "git diff --check"],
-  "redactedEvidence": "evidência redigida sem segredos",
-  "pendingDecision": "decisão que ainda requer o owner",
-  "checks": {"status": "FAIL", "handoff": "implementation-owner/state"}
+  "commandsExecuted": ["git status", "git diff --check", "npm test"],
+  "redactedEvidence": "evidência redigida: conflito no hunk-2",
+  "pendingDecision": "escolher a intenção compatível com a issue",
+  "blockers": ["hunk-2 ainda não resolvido"],
+  "checks": {"status": "FAIL", "handoff": "implementation-owner/state"},
+  "diagnostic": {
+    "code": "E_CONFLICT_STATE",
+    "summary": "hunk-2 ainda não resolvido"
+  },
+  "reviewed_revision": null,
+  "resolved_revision": null,
+  "resultingGitOperation": null,
+  "nextGitOperation": "git rebase --continue"
 }
 ```
 
-`commandsExecuted` (comandos executados), arquivos, hunks, tentativa, operação e
-decisão pendente não podem ser descartados ao atualizar o registro. Evidência
-deve ser redigida **antes** de persistir (`redacted evidence`/evidência redigida)
-e não pode conter tokens, segredos ou probes.
+Ao atualizar o registro, preserve `commandsExecuted` (comandos executados),
+arquivos, hunks, tentativa, decisão pendente e `blockers`; não descarte esses
+campos, a prova persistida ou o diagnóstico. A evidência deve ser redigida
+**antes** de persistir (`redacted evidence`/evidência redigida) e não pode
+conter tokens, segredos ou probes.
 
 Um check que falhar mantém `status: BLOCKED`: registre `FAIL`, a evidência e um
 `handoff` para **`implementation-owner/state`** (owner e fase de implementação).
@@ -74,33 +84,103 @@ Esse handoff encaminha a correção para o dono da implementação. Em `FAIL`, n
 conceda sucesso: o status permanece `BLOCKED` e a resolução não avança. Não altere
 permissões TDD nem marque a resolução como concluída.
 
-Uma retomada (`resume`/retomada) deve ler esse registro persistido e o estado real
-do Git, incrementar `attempt` e continuar do ponto persistido. Preserve, sem zerar
-ou substituir por inferência, todos os campos e provas já registrados: `status`,
-`phase`, `operation`, `files`, `hunks`, `attempt`, `commandsExecuted`,
-`redactedEvidence`, `pendingDecision` e `checks`, além do diagnóstico associado.
-Sem evidência redigida ou decisão pendente, preserve o estado `BLOCKED`; não
-autorize sucesso.
+Todo handoff de bloqueio deve ser redigido e validado antes de qualquer transporte.
 
-## Evidência ausente e estado BLOCKED
+O handoff mínimo preserva: `operation` (merge/rebase), estado atual do Git,
+arquivos/hunks, `attempt`, comandos executados e a prova redigida. Cada campo
+que possa conter segredo, token, credencial, caminho sensível ou conteúdo de
+usuário deve passar por redaction e sanitização antes de persistir ou
+transportar — não apenas `redactedEvidence`; nenhum campo bruto pode atravessar
+o handoff. Registre literalmente `<REDACTED>` no lugar e bloqueie
+(`E_CONFLICT_STATE`) se a sanitização não puder ser provada. `E_CONFLICT_STATE`
+é o código reconhecido para estado de conflito/redaction não comprovada; não
+introduza um código de erro local sem adicioná-lo ao catálogo e ao validator.
+A prova deve incluir o comando e o resultado sanitizados, nunca o valor secreto;
+a operação só pode ser retomada depois de validar esse envelope.
+
+O estado retomável também mantém `reviewed_revision` e `resolved_revision` como
+identidade explícita do snapshot, além de `resultingGitOperation`, `nextGitOperation`,
+`checks` e `pending`; esses campos são validados antes da finalização.
+
+### Evidência ausente: manter o estado `BLOCKED`
 
 Se `redactedEvidence` ou `pendingDecision` estiver ausente, vazio ou não puder ser
 redigido com segurança, mantenha `status` e `phase` como `BLOCKED`, registre a
 ausência no handoff `implementation-owner/state` e não declare nem encaminhe
 sucesso. A prova faltante deve ser resolvida antes de qualquer finalização.
 
-## 4. Checks e finalização
+Uma retomada (`resume`/retomada) deve ler o registro persistido **e o estado real
+do Git**, incrementar `attempt` e continuar do ponto persistido. Preserve, sem
+zerar ou substituir por inferência, os campos e provas já registrados — `status`,
+`phase`, `operation`, `files`, `hunks`, `commandsExecuted`, `redactedEvidence`,
+`pendingDecision`, `blockers`, `checks` (incluindo o handoff
+`implementation-owner/state`), `diagnostic`, `reviewed_revision`,
+`resolved_revision`, `resultingGitOperation` e `nextGitOperation`. Mantenha o
+histórico de `attempt` e grave o novo valor incrementado (`attempt + 1`); não o
+reinicie. `resultingGitOperation` só recebe um comando depois de ele ser
+observado com sucesso no Git; enquanto estiver pendente, mantenha-o `null` e
+use `nextGitOperation`. O comando resultante preservado deve continuar vinculado
+à operação observada no Git, nunca ser trocado pelo comando mais conveniente.
+Sem evidência redigida, decisão pendente, blockers ou operação resultante
+consistentes, preserve o estado `BLOCKED`; não autorize sucesso.
 
-Descubra os checks automatizados do projeto e rode-os (tipicamente typecheck,
-testes e, quando aplicável, build/format). Um check pós-resolução que falhar segue
-o handoff acima e permanece bloqueado. Após todos os checks, inspecione
-`git diff --cached` e `git status --short`; então finalize a operação correta:
-rebase com `git rebase --continue` até não haver commits, ou merge com `git
-commit` após resolver os hunks e passar pelos checks.
+## 4. Checks e finalização
+Após resolver todos os hunks, registre os checks determinísticos com comando,
+saída e status. O snapshot final exige `reviewed_revision` exatamente igual a
+`resolved_revision`, e a prova da re-review deve conter
+`review.reviewed_revision` com o mesmo valor de `resolved_revision`; todos os
+hunks devem estar resolvidos, não pode haver commit pendente,
+`checks.status` deve ser `PASS` e `checks.pending` deve ser `[]`.
+`resultingGitOperation` deve corresponder à operação observada no Git
+(`git commit` no merge ou o último `git rebase --continue` aplicado no rebase),
+e nunca a uma operação apenas planejada.
+
+Para `rebase`, aplique `git rebase --continue` e repita os checks após cada commit
+até não haver commits pendentes; somente depois faça a re-review final
+(`deep-review`) do estado terminal. O campo `resultingGitOperation` registra essa
+última continuação bem-sucedida; quando o rebase já terminou, não execute `git rebase --continue`
+novamente. Nunca faça a re-review antes de aplicar todos os commits pendentes. Para
+`merge`, depois desses checks obtenha a re-review final (`deep-review`) do snapshot
+resolvido e só prossiga com `git commit` se ela estiver `APPROVED`,
+`review.reviewed_revision` for igual a `resolved_revision`, sem blockers e com P0/P1
+iguais a zero.
+No merge, `resolved_revision` identifica o snapshot resolvido e revisado antes do
+commit; `resultingGitOperation` é somente a evidência do comando `git commit`
+observado depois que o gate passou. Se a implementação persistir o SHA criado pelo
+commit, use um campo separado (`resulting_revision`); nunca sobrescreva
+`reviewed_revision`/`resolved_revision` com a revisão pós-commit nem trate essa
+mudança de metadado como motivo para executar a re-review novamente.
+Para que esse gate seja executável antes do commit, o dispatcher deve usar o modo
+`UNCOMMITTED` de `deep-review`, com `local_revision_context.revision` igual ao
+identificador/digest calculado do snapshot resolvido e com `staged`, `unstaged` e
+`untracked` capturados no mesmo instante. Não use `BRANCH_BASE` nesse ponto: ele
+revisaria a árvore anterior ao conflito e não o snapshot que será commitado.
+
+P2/P3 podem permanecer como achados documentados, mas **não bloqueiam** quando
+não houver P0/P1, hunk, check pendente ou divergência de snapshot. Qualquer P0/P1,
+hunk, check pendente ou divergência de snapshot mantém a operação bloqueada. Se
+algum check falhar, preserve a prova e retome do mesmo ponto; não reinicie a
+tentativa nem substitua a decisão pendente por inferência.
+
+Antes de concluir, inspecione `git diff --cached` e `git status --short`; então
+finalize somente quando o gate acima estiver satisfeito. No rebase, a última
+continuação já é a operação de finalização e a re-review aprovada autoriza
+reportar `RESOLVED`; no merge, a re-review aprovada autoriza `git commit`.
+
+No consumidor `ship`/conflict, a re-review aprovada do snapshot resolvido é um
+gate anterior a **qualquer** `git commit` ou `git push`: sem
+`review.status = APPROVED`, sem blockers/P0/P1 e sem
+`review.reviewed_revision === resolved_revision`, mantenha `BLOCKED` e não
+execute nem registre commit/push como realizado.
+
+Caso o rebase ainda tenha commits após uma continuação, repita o ciclo; o comando
+final só ocorre depois que o estado terminal foi revisado.
 
 **Integração com a solução UsefulSkills:**
 - Merge local do `tdd-orchestrator` (Entrega final, caminho "merge local"): em
   conflito, execute este protocolo antes de reportar.
-- PR da skill `ship` em conflito com a base: na branch do PR rode `git fetch origin`
-  e `git merge origin/<branch default>`, resolva cada hunk, commite e dê push; o
-  auto-merge retoma quando o CI ficar verde. Nunca faça rebase da branch do PR.
+- PR da skill `ship` em conflito com a base: na branch do PR, descubra a branch
+  default do repositório, rode `git fetch origin` e `git merge origin/<branch default>`,
+  resolva cada hunk, passe pelos checks e pela re-review aprovada, então commite e dê
+  push; o auto-merge retoma quando o CI ficar verde.
+  Nunca faça rebase da branch do PR.

@@ -315,7 +315,8 @@ códigos de uma API GitHub nova.
 | `E_REVIEW_INVALID` | Reviewer ausente, schema inválido ou SHA inconsistente | Consolidação deep-review | `BLOCKED`, sem entrega |
 | `E_STATE_INVALID` | Schema/status/gate/evidência inválidos | Migração ou resume TDD | Reabre/preserva diagnóstico ou escala |
 | `E_TRACE_SECRET` | Trace contém segredo/probe não limpo | Validator de diagnóstico/security | Gate FAIL, sem publicação |
-| `E_CONFLICT_STATE` | Operação Git ou hunk não resolvido | Merge/rebase | Mantém BLOCKED com resume evidence |
+| `E_ALIGNMENT_BLOCKED` | Snapshot de alignment ausente, inconsistente ou decisão sem resposta | Alignment/resume | Mantém `BLOCKED`, preserva o histórico e não roteia |
+| `E_CONFLICT_STATE` | Operação Git, hunk não resolvido ou sanitização não comprovada | Merge/rebase/handoff de conflito | Mantém BLOCKED com resume evidence e sem segredo |
 | `E_INSTALL_DRIFT` | Inventário, tipo, especial ou extra divergente | Installer `--check`/install | Exit 1; não destrói destino |
 | `E_UNSUPPORTED_NODE` | Runtime abaixo de Node 20 | Preflight do instalador/skills | Abort antes de escrever |
 | `E_RULESET_SCOPE` | Ruleset ou status context fora do escopo | Bootstrap/validator | Gate security FAIL |

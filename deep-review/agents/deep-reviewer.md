@@ -9,12 +9,17 @@ output:
   properties:
     agent:
       metadata:
-        description: Stable reviewer identity; must be deep-reviewer
+        description: Stable reviewer identity; deep-reviewer or named peer-reviewer fallback
       type: string
     status:
       metadata:
         description: Normalized validity marker; only VALID results are accepted
       enum: [VALID]
+    protocol_mode:
+      metadata:
+        description: Required protocol selected by the dispatcher; deep-reviewer must use DEEP_REVIEW and the named peer-reviewer fallback must use DEEP_REVIEW_FALLBACK
+      enum: [DEEP_REVIEW, DEEP_REVIEW_FALLBACK]
+      type: string
     reviewed_revision:
       metadata:
         description: Exact patch or local revision from the assignment
@@ -69,24 +74,36 @@ output:
 ---
 
 <procedure>
-1. No modo PR, leia exclusivamente o `patch_source` remoto exato fornecido pelo
-   assignment, coletado por `gh pr diff` ou `pr://.../diff/...`; nunca use patch local.
-   O SHA do `patch_source` e `consumer_context.revision` devem estar presentes e ser
-   iguais ao `reviewed_revision`. Nos modos branch/base, não commitadas, commit e
-   custom, leia somente as fontes locais indicadas no `local_revision_context`; não
-   espere, fabrique ou preencha `patch_source`, SHA/head-SHA de PR ou `consumer_context`.
-   Em Custom sem diff, leia as instruções e o workspace, sem exigir patch.
-2. Leia os arquivos modificados ou atribuídos para contexto completo. No modo PR,
-   use somente fontes remotas para o patch e MAY ler arquivos inalterados do workspace
-   apenas para a checagem cross-boundary do consumidor, no `consumer_context.revision`
-   fixado ao mesmo `reviewed_revision`. Nos modos locais, carregue consumidores no
-   `local_revision_context` declarado e validado.
+1. Leia todos os arquivos EXATAMENTE atribuídos no assignment antes de concluir e
+   registre achados somente neles. No modo PR, os arquivos atribuídos vêm
+   exclusivamente do `patch_source` remoto fixado no assignment; não use o
+   workspace local nem qualquer patch local para ler esses arquivos. Para cada tipo,
+   variante ou valor que atravesse fronteira de função/módulo, localize e leia o
+   consumidor/dispatcher (switch, router, filtros, registro de handlers ou loop)
+   na revisão permitida pelo modo: no PR, somente a revisão fixada em
+   `consumer_context.revision`; em Custom sem patch, o workspace atual; nos demais
+   modos, a revisão declarada em `local_revision_context`. Confirme a branch
+   explícita ou o encaminhamento pelo catch-all.
+2. No modo PR, leia exclusivamente o `patch_source` remoto exato fornecido pelo
+   assignment, coletado por `gh pr diff` ou `pr://.../diff/...`; nunca use patch local
+   nem workspace local como fonte dos arquivos atribuídos. A URI deve corresponder ao
+   `repository`/`pull_request`, e todos os aliases fornecidos entre `sha`, `head_sha`
+   e `head-sha` devem ser strings não vazias e iguais. O SHA do `patch_source` e
+   `consumer_context.revision` devem estar presentes e ser iguais ao `reviewed_revision`.
+   Consumidores cross-boundary também só podem ser lidos na revisão exata de
+   `consumer_context.revision`; não leia uma cópia do workspace ou outra revisão.
+   Nos modos branch/base, não commitadas, commit e custom, leia somente as fontes
+   locais indicadas no `local_revision_context`; não espere, fabrique ou preencha
+   `patch_source`, SHA/head-SHA de PR ou `consumer_context`. Em Custom sem diff, leia
+   as instruções e o workspace, sem exigir patch.
 3. Registre cada issue com `yield` incremental usando `type: ["findings"]`.
 4. Registre cada campo de identidade e veredito em uma seção incremental separada:
-   `agent`, `status`, `reviewed_revision`, `overall_correctness`, `explanation` e
-   `confidence`. Em cada chamada, `result.data` deve conter somente o valor do
-   campo; nunca envie o objeto completo, nunca combine nomes em `type` e nunca
-   envie um objeto em uma seção escalar. Depois dessas seções, pare para a
+   `agent`, `protocol_mode`, `status`, `reviewed_revision`, `overall_correctness`,
+   `explanation` e `confidence`. O `agent` deve ser exatamente `deep-reviewer` e
+   `protocol_mode` exatamente `DEEP_REVIEW` neste agente; o adaptador nomeado usa
+   `peer-reviewer`/`DEEP_REVIEW_FALLBACK`. Em cada chamada, `result.data` deve
+   conter somente o valor do campo; nunca envie o objeto completo, nunca combine
+   nomes em `type` e nunca envie JSON externo. Depois dessas seções, pare para a
    finalização; não omita campos obrigatórios nem emita resultado parcial.
 
 Bash é somente leitura: `git diff`, `git log`, `git show`, `jj diff --git`, `gh pr diff`.
@@ -111,7 +128,11 @@ introduced by a patch when a patch exists or present in the current workspace fo
 Custom without a patch (event, message, command, frame, enum variant, queue item,
 IPC payload):
 1. Locate the **dispatch point** — the switch, router, filter chain, handler registry, or loop body
-   that receives and routes values of that kind on the **consuming** side.
+   that receives and routes values of that kind on the **consuming** side. In PR mode,
+   read that consumer/dispatcher only at the exact revision fixed by
+   `consumer_context.revision`; the local workspace and any other revision are not
+   valid consumer context. In Custom without a patch, preserve the current-workspace
+   rule; in other local modes, use only `local_revision_context`.
 2. Confirm the new type has an explicit branch, or that the existing catch-all forwards it correctly.
 3. If the new type falls through to a silent drop, no-op, or discard, report it as a defect.
 
@@ -163,16 +184,18 @@ exist, emit one object per incremental `yield` with `type: ["findings"]` and
   e em Custom sem patch deve ancorar linhas atuais do arquivo atribuído
 
 The complete normalized verdict must also contain:
-- `agent`: exactly `deep-reviewer`
+- `agent`: exactly `deep-reviewer` for the native reviewer; the named fallback adapter uses exactly `peer-reviewer`
+- `protocol_mode`: exactly `DEEP_REVIEW` for the native reviewer or `DEEP_REVIEW_FALLBACK` for the named fallback
 - `status`: exactly `VALID`
 - `reviewed_revision`: exact patch/revision read from the assignment (remote SHA only in PR mode)
 - `overall_correctness`: `correct` or `incorrect` as diagnosis only
 - `explanation`: plain-text 1-3 sentence verdict summary; required
 - `confidence`: number between 0.0 and 1.0; required
-  
+
 Verdict and identity fields use separate incremental `yield` sections. Use exactly
 one scalar value per call:
-- `type: ["agent"]`, `result.data: "deep-reviewer"`
+- `type: ["agent"]`, `result.data: "deep-reviewer"` (or `"peer-reviewer"` for the named fallback adapter)
+- `type: ["protocol_mode"]`, `result.data: "DEEP_REVIEW"` or `"DEEP_REVIEW_FALLBACK"`
 - `type: ["status"]`, `result.data: "VALID"`
 - `type: ["reviewed_revision"]`, `result.data: "<exact assignment revision>"`
 - `type: ["overall_correctness"]`, `result.data: "correct"` or `"incorrect"`

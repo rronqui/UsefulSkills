@@ -10,10 +10,214 @@ const skillPath = join(repoRoot, "release-bootstrap", "SKILL.md");
 const skill = readFileSync(skillPath, "utf8");
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const installSource = readFileSync(join(repoRoot, "install.mjs"), "utf8");
-const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+const packageSource = readFileSync(join(repoRoot, "package.json"), "utf8");
+const packageJson = JSON.parse(packageSource);
 const releaseConfig = JSON.parse(readFileSync(join(repoRoot, "release-please-config.json"), "utf8"));
 const releaseManifest = JSON.parse(readFileSync(join(repoRoot, ".release-please-manifest.json"), "utf8"));
 const shipConfig = JSON.parse(readFileSync(join(repoRoot, "ship.config.json"), "utf8"));
+const shipSkill = readFileSync(join(repoRoot, "ship", "SKILL.md"), "utf8");
+const tddSkill = readFileSync(join(repoRoot, "tdd-orchestrator", "SKILL.md"), "utf8");
+const bugDiagnosisSkill = readFileSync(join(repoRoot, "bug-diagnosis", "SKILL.md"), "utf8");
+const vitestConfig = readFileSync(join(repoRoot, "vitest.config.ts"), "utf8");
+const license = readFileSync(join(repoRoot, "LICENSE"), "utf8");
+const notice = existsSync(join(repoRoot, "NOTICE"))
+  ? readFileSync(join(repoRoot, "NOTICE"), "utf8")
+  : "";
+
+function workflowEvents(yaml) {
+  const startAt = yaml.search(/^on:\s*$/m);
+  expect(startAt, "workflow sem seção on").toBeGreaterThanOrEqual(0);
+  const ends = ["concurrency:", "permissions:", "jobs:"]
+    .map((marker) => yaml.indexOf(marker, startAt + 3))
+    .filter((index) => index >= 0);
+  const endAt = ends.length ? Math.min(...ends) : yaml.length;
+  return yaml.slice(startAt, endAt);
+}
+
+function releaseJobGuard(yaml) {
+  const guardAt = yaml.indexOf("if:");
+  return guardAt >= 0 ? yaml.slice(guardAt, guardAt + 300) : "";
+}
+
+function releaseGuardHasBranchScope(yaml) {
+  const guard = releaseJobGuard(yaml);
+  return /github\.ref_type\s*==\s*["']branch["']/i.test(guard)
+    || /github\.ref\s*==[^\n]*(?:refs\/heads|default_branch)/i.test(guard);
+}
+
+function releaseJobHasDefaultGuard(yaml, fixture) {
+  const guard = releaseJobGuard(yaml);
+  const refMatchesDefaultBranch = !fixture.ref
+    || fixture.ref === `refs/heads/${fixture.repository.default_branch}`;
+  return fixture.ref_name === fixture.repository.default_branch
+    && refMatchesDefaultBranch
+    && /github\.ref_name\s*==\s*github\.event\.repository\.default_branch/.test(guard);
+}
+
+function workflowJobSection(yaml, jobName) {
+  const marker = `  ${jobName}:`;
+  const startAt = yaml.indexOf(marker);
+  expect(startAt, `job ausente: ${jobName}`).toBeGreaterThanOrEqual(0);
+  const nextAt = yaml.slice(startAt + marker.length).search(/\n  [^\s]/);
+  return yaml.slice(startAt, nextAt >= 0 ? startAt + marker.length + nextAt : yaml.length);
+}
+function workflowTriggerKeys(yaml) {
+  return workflowEvents(yaml)
+    .split(/\r?\n/)
+    .map((line) => line.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)/)?.[1])
+    .filter(Boolean);
+}
+
+function jobIfExpression(yaml, jobName) {
+  const section = workflowJobSection(yaml, jobName);
+  const match = section.match(/^\s*if:\s*(.+)$/m);
+  expect(match, `guard ausente: ${jobName}`).not.toBeNull();
+  return match[1].trim();
+}
+
+function tokenizeGithubExpression(expression) {
+  const source = expression
+    .replace(/^\s*\$\{\{\s*/, "")
+    .replace(/\s*\}\}\s*$/, "");
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    if (/\s/.test(source[index])) {
+      index += 1;
+      continue;
+    }
+    const operator = source.slice(index).match(/^(===|!==|==|!=|&&|\|\|)/)?.[1];
+    if (operator) {
+      tokens.push({ kind: operator });
+      index += operator.length;
+      continue;
+    }
+    if (source[index] === "(" || source[index] === ")") {
+      tokens.push({ kind: source[index] });
+      index += 1;
+      continue;
+    }
+    if (source[index] === "!") {
+      tokens.push({ kind: "!" });
+      index += 1;
+      continue;
+    }
+    if (source[index] === "'" || source[index] === "\"") {
+      const quote = source[index];
+      let end = index + 1;
+      let value = "";
+      while (end < source.length && source[end] !== quote) {
+        if (source[end] === "\\" && end + 1 < source.length) end += 1;
+        value += source[end];
+        end += 1;
+      }
+      expect(source[end], "literal de guard não terminado").toBe(quote);
+      tokens.push({ kind: "value", value });
+      index = end + 1;
+      continue;
+    }
+    const identifier = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_.]*/)?.[0];
+    expect(identifier, `token inesperado no guard: ${source.slice(index)}`).toBeTruthy();
+    tokens.push({ kind: "value", value: identifier });
+    index += identifier.length;
+  }
+  return tokens;
+}
+
+function evaluateGithubCondition(expression, fixture) {
+  const tokens = tokenizeGithubExpression(expression);
+  const repository = fixture.event?.repository ?? fixture.repository;
+  const values = {
+    "github.event_name": fixture.event_name,
+    "github.ref_type": fixture.ref_type,
+    "github.ref_name": fixture.ref_name,
+    "github.ref": fixture.ref,
+    "github.event.repository.default_branch": repository.default_branch,
+  };
+  let cursor = 0;
+  const resolve = (value) => Object.hasOwn(values, value) ? values[value] : value;
+  const parseValue = () => {
+    const token = tokens[cursor];
+    expect(token?.kind, "valor ausente no guard").toBe("value");
+    cursor += 1;
+    return resolve(token.value);
+  };
+  const parsePrimary = () => {
+    if (tokens[cursor]?.kind === "!") {
+      cursor += 1;
+      return !parsePrimary();
+    }
+    if (tokens[cursor]?.kind === "(") {
+      cursor += 1;
+      const value = parseOr();
+      expect(tokens[cursor]?.kind, "parêntese não fechado no guard").toBe(")");
+      cursor += 1;
+      return value;
+    }
+    const left = parseValue();
+    const operator = tokens[cursor]?.kind;
+    if (operator !== "==" && operator !== "!=" && operator !== "===" && operator !== "!==") {
+      return Boolean(left);
+    }
+    cursor += 1;
+    const right = parseValue();
+    return operator === "==" || operator === "==="
+      ? left === right
+      : left !== right;
+  };
+  const parseAnd = () => {
+    let value = parsePrimary();
+    while (tokens[cursor]?.kind === "&&") {
+      cursor += 1;
+      value = parsePrimary() && value;
+    }
+    return value;
+  };
+  function parseOr() {
+    let value = parseAnd();
+    while (tokens[cursor]?.kind === "||") {
+      cursor += 1;
+      value = parseAnd() || value;
+    }
+    return value;
+  }
+  const result = parseOr();
+  expect(cursor, "tokens não consumidos no guard").toBe(tokens.length);
+  return Boolean(result);
+}
+
+function branchIgnorePatterns(yaml) {
+  const lines = workflowEvents(yaml).split(/\r?\n/);
+  const patterns = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const declaration = lines[index].match(/^(\s*)branches-ignore:\s*(.*?)\s*$/);
+    if (!declaration) continue;
+    const baseIndent = declaration[1].length;
+    const inline = declaration[2];
+    if (inline) {
+      patterns.push(...inline.replace(/[\[\]"']/g, "").split(",").map((entry) => entry.trim()).filter(Boolean));
+    }
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const line = lines[cursor];
+      if (!line.trim()) continue;
+      const indentation = line.match(/^\s*/)[0].length;
+      if (indentation <= baseIndent) break;
+      const entry = line.match(/^\s*-\s*["']?([^"']+)["']?\s*$/);
+      if (entry) patterns.push(entry[1].trim());
+    }
+  }
+  return patterns;
+}
+
+function declaresNode20(text) {
+  return /(?:Node(?:\.js)?|node-version|["']node["'])[\s\S]{0,100}(?:>=\s*20|\b2[0-9]\b)/i.test(text);
+}
+function declaresSupportedNode20(text) {
+  return text.split(/\r?\n/).some((line) => (
+    /(?:Node(?:\.js)?|node-version|["']node["'])/i.test(line)
+    && /(?:>=\s*20\b|node-version\s*:\s*(?:2[0-9]|[3-9][0-9])\b)/i.test(line)
+  ));
+}
 
 const workflowDir = join(repoRoot, ".github", "workflows");
 const workflowPaths = readdirSync(workflowDir)
@@ -27,6 +231,11 @@ function sectionBetween(text, start, end) {
   const endAt = end ? text.indexOf(end, startAt + start.length) : text.length;
   expect(endAt, `seção seguinte ausente: ${end}`).toBeGreaterThan(startAt);
   return text.slice(startAt, endAt);
+}
+function rulesetRefTemplate(ruleset) {
+  const match = ruleset.match(/conditions\.ref_name\.include\s*:\s*\[\s*["'`]([^"'`]+)["'`]\s*\]/i);
+  expect(match, "ruleset sem include de ref").not.toBeNull();
+  return match[1];
 }
 
 function parsePermissionMaps(yaml) {
@@ -85,10 +294,14 @@ function nodeRequirementFiles() {
   const skillFiles = [
     join(repoRoot, "release-bootstrap", "SKILL.md"),
     join(repoRoot, "ship", "SKILL.md"),
+    join(repoRoot, "tdd-orchestrator", "SKILL.md"),
+    join(repoRoot, "bug-diagnosis", "SKILL.md"),
   ];
   const sourceFiles = [
     join(repoRoot, "README.md"),
     join(repoRoot, "install.mjs"),
+    join(repoRoot, "scripts", "install-hooks.mjs"),
+    join(repoRoot, "ship", "bin", "lib.mjs"),
     join(repoRoot, "ship", "bin", "ship.mjs"),
     ...workflowPaths,
     ...skillFiles,
@@ -140,7 +353,7 @@ describe("bootstrap/release static contract", () => {
     expect(ruleset).toMatch(/(?:privad\w*|private)[\s\S]{0,140}(?:plano\s+free|free|server-side|enforcement)/i);
   });
 
-  it("AC-027: cada workflow usa apenas permissões declaradas e mínimas", () => {
+  it("AC-027: CI e release-please usam permissões mínimas por workflow/job", () => {
     expect(workflowPaths.length).toBeGreaterThan(0);
     for (const path of workflowPaths) {
       const maps = parsePermissionMaps(workflowText.get(path));
@@ -148,20 +361,29 @@ describe("bootstrap/release static contract", () => {
       for (const permissions of maps) {
         expect(permissions.__all__, `${relative(repoRoot, path)} usa permissions ampla`).toBeUndefined();
         expect(permissions.actions, `${relative(repoRoot, path)} pede permissão Actions não usada`).toBeUndefined();
-        expect(Object.values(permissions), `${relative(repoRoot, path)} usa write-all/read-all`).not.toContain("write-all");
-        expect(Object.values(permissions), `${relative(repoRoot, path)} usa read-all`).not.toContain("read-all");
+        expect(Object.values(permissions), `${relative(repoRoot, path)} usa write-all`)
+          .not.toContain("write-all");
+        expect(Object.values(permissions), `${relative(repoRoot, path)} usa read-all`)
+          .not.toContain("read-all");
       }
     }
 
     const ciMaps = parsePermissionMaps(workflowText.get(join(workflowDir, "ci.yml")) ?? "");
-    expect(ciMaps.some((permissions) => permissions.contents === "read")).toBe(true);
-    expect(ciMaps.every((permissions) => Object.keys(permissions).every((key) => key === "contents"))).toBe(true);
+    expect(ciMaps).not.toHaveLength(0);
+    expect(ciMaps.every((permissions) => (
+      Object.keys(permissions).length === 1
+      && permissions.contents === "read"
+    ))).toBe(true);
 
     const releaseMaps = parsePermissionMaps(workflowText.get(join(workflowDir, "release-please.yml")) ?? "");
-    expect(releaseMaps.some((permissions) => (
-      permissions.contents === "write" && permissions["pull-requests"] === "write"
+    expect(releaseMaps).not.toHaveLength(0);
+    const releasePermissionKeys = new Set(["contents", "pull-requests", "issues"]);
+    expect(releaseMaps.every((permissions) => (
+      Object.keys(permissions).every((key) => releasePermissionKeys.has(key))
+      && permissions.contents === "write"
+      && permissions["pull-requests"] === "write"
     ))).toBe(true);
-    expect(releaseMaps.every((permissions) => Object.keys(permissions).every((key) => ["contents", "pull-requests"].includes(key)))).toBe(true);
+    // AC-016 é a fonte normativa para issues: write e o token PAT.
   });
 
   it("AC-028: scanner cobre prefixes modernos/legados, histórico e redaction por stdin", () => {
@@ -217,4 +439,274 @@ describe("bootstrap/release static contract", () => {
     expect(releaseSection).toMatch(/(?:fail-fast|falha(?:r)?\s+(?:cedo|explicitamente)|E_VERSION_SOURCE)/i);
     expect(releaseSection).toMatch(/(?:cada|each)[\s\S]{0,120}(?:unidade|unit|package)[\s\S]{0,120}(?:fonte|source)[\s\S]{0,120}(?:resolver|resolv)/i);
   });
+  it("AC-016: CI e release usam a branch default descoberta, inclusive fixture não-main", () => {
+    const ci = workflowText.get(join(workflowDir, "ci.yml")) ?? "";
+    const release = workflowText.get(join(workflowDir, "release-please.yml")) ?? "";
+    const nonMainFixture = {
+      ref_name: "develop",
+      repository: { default_branch: "develop" },
+    };
+
+    expect(workflowEvents(ci), "CI não deve congelar a branch no YAML").not.toMatch(/branches\s*:/i);
+    expect(workflowEvents(release), "release não deve congelar a branch no YAML").not.toMatch(/branches\s*:/i);
+    expect(release).toMatch(/workflow_dispatch/);
+    expect(releaseJobHasDefaultGuard(release, nonMainFixture), "release deve executar para a default descoberta, não apenas main").toBe(true);
+  });
+  it("AC-016: release rejeita tag que reutiliza ref_name da branch default", () => {
+    const release = workflowText.get(join(workflowDir, "release-please.yml")) ?? "";
+    const branchFixture = {
+      ref: "refs/heads/main",
+      ref_name: "main",
+      ref_type: "branch",
+      repository: { default_branch: "main" },
+    };
+    const sameNameTagFixture = {
+      ref: "refs/tags/main",
+      ref_name: "main",
+      ref_type: "tag",
+      repository: { default_branch: "main" },
+    };
+
+    expect(releaseGuardHasBranchScope(release), "guard deve distinguir refs/heads de refs/tags").toBe(true);
+    expect(releaseJobHasDefaultGuard(release, branchFixture)).toBe(true);
+    expect(releaseJobHasDefaultGuard(release, sameNameTagFixture), "tag não pode passar só por repetir ref_name").toBe(false);
+  });
+
+  it("AC-016: token do release action é exatamente o secret PAT autorizado", () => {
+    const release = workflowText.get(join(workflowDir, "release-please.yml")) ?? "";
+    const tokenLines = [...release.matchAll(/^\s+token:\s*(.+)$/gm)].map((match) => match[1].trim());
+
+    expect(tokenLines).toEqual(["${{ secrets.RELEASE_PLEASE_TOKEN }}"]);
+  });
+
+  it("AC-016: CI roda PR e push somente na default, sem branches-ignore que a exclua", () => {
+    const ci = workflowText.get(join(workflowDir, "ci.yml")) ?? "";
+    const quality = workflowJobSection(ci, "quality");
+    const ignoredBranches = branchIgnorePatterns(ci);
+
+    expect(quality).toMatch(/if:\s*\$\{\{[\s\S]{0,220}github\.event_name\s*==\s*["']pull_request["']/i);
+    expect(quality).toMatch(/github\.ref_name\s*==\s*github\.event\.repository\.default_branch/);
+    expect(quality).toMatch(/github\.ref_type\s*==\s*["']branch["']|github\.ref\s*==[^\n]*refs\/heads/i);
+    expect(ignoredBranches).not.toContain("main");
+    expect(ignoredBranches).not.toContain("**");
+  });
+  it("AC-016 REVISION: triggers obrigatórios e guards executam apenas a default não-main", () => {
+    const ci = workflowText.get(join(workflowDir, "ci.yml")) ?? "";
+    const release = workflowText.get(join(workflowDir, "release-please.yml")) ?? "";
+    const expectedCiTriggers = ["pull_request", "push"];
+    const expectedReleaseTriggers = ["push", "workflow_dispatch"];
+
+    expect(workflowTriggerKeys(ci).toSorted()).toEqual(expectedCiTriggers);
+    expect(workflowTriggerKeys(release).toSorted()).toEqual(expectedReleaseTriggers);
+    for (const [name, yaml] of [["CI", ci], ["release", release]]) {
+      expect(workflowEvents(yaml), `${name} não pode filtrar branch por nome estático`)
+        .not.toMatch(/^\s{2,}branches(?:-ignore)?\s*:/im);
+    }
+
+    const repository = { default_branch: "develop" };
+    const fixture = (overrides = {}) => ({
+      event_name: "push",
+      ref_type: "branch",
+      ref_name: "develop",
+      ref: "refs/heads/develop",
+      repository,
+      ...overrides,
+    });
+    const ciGuard = jobIfExpression(ci, "quality");
+    expect(evaluateGithubCondition(ciGuard, fixture())).toBe(true);
+    expect(evaluateGithubCondition(ciGuard, fixture({
+      event_name: "pull_request",
+      ref_name: "feature/topic",
+      ref: "refs/heads/feature/topic",
+    }))).toBe(true);
+    expect(evaluateGithubCondition(ciGuard, fixture({
+      ref_name: "main",
+      ref: "refs/heads/main",
+    }))).toBe(false);
+    expect(evaluateGithubCondition(ciGuard, fixture({
+      ref_type: "tag",
+      ref: "refs/tags/develop",
+    }))).toBe(false);
+
+    const releaseGuard = jobIfExpression(release, "release-please");
+    expect(evaluateGithubCondition(releaseGuard, fixture())).toBe(true);
+    expect(evaluateGithubCondition(releaseGuard, fixture({
+      ref_name: "main",
+      ref: "refs/heads/main",
+    }))).toBe(false);
+    expect(evaluateGithubCondition(releaseGuard, fixture({
+      ref_type: "tag",
+      ref: "refs/tags/develop",
+    }))).toBe(false);
+  });
+
+  it("AC-016: release-please usa PAT e somente permissões mínimas, incluindo Issues", () => {
+    const release = workflowText.get(join(workflowDir, "release-please.yml")) ?? "";
+    const maps = parsePermissionMaps(release);
+
+    expect(release).not.toMatch(/token:\s*\$\{\{[^}\n]*(?:GITHUB_TOKEN|github\.token)/i);
+    expect(maps).toHaveLength(1);
+    expect(maps[0]).toEqual({
+      contents: "write",
+      issues: "write",
+      "pull-requests": "write",
+    });
+  });
+
+  it("AC-016: ruleset preserva tipos, contagem e status quality exatos e fecha sem testes", () => {
+    const ruleset = sectionBetween(skill, "## FASE 1 — Proteção server-side", "## FASE 2 — CI");
+    const strictValues = [...ruleset.matchAll(/strict_required_status_checks_policy\s*[:=]\s*([^\s#`]+)/gi)]
+      .map((match) => match[1].replace(/[`"']/g, "").toLowerCase());
+
+    expect(ruleset).toMatch(/required_approving_review_count\s*[:=]\s*0\b/);
+    expect(strictValues).toEqual(["true"]);
+    expect([...ruleset.matchAll(/context\s*[:=]\s*quality\b/gi)]).toHaveLength(1);
+    expect(vitestConfig).toMatch(/passWithNoTests\s*:\s*false\b/);
+  });
+  it("AC-016 REVISION: ruleset usa refs dinâmicas e escalares tipados sem duplicatas", () => {
+    const ruleset = sectionBetween(skill, "## FASE 1 — Proteção server-side", "## FASE 2 — CI");
+    const approvalValues = [...ruleset.matchAll(/required_approving_review_count\s*[:=]\s*([^\s,;`)]+)/gi)]
+      .map((match) => match[1]);
+    const strictValues = [...ruleset.matchAll(/strict_required_status_checks_policy\s*[:=]\s*([^\s,;`)]+)/gi)]
+      .map((match) => match[1]);
+    const refTemplate = rulesetRefTemplate(ruleset);
+
+    expect(approvalValues).toEqual(["0"]);
+    expect(strictValues).toEqual(["true"]);
+    expect([...ruleset.matchAll(/context\s*[:=]\s*quality\b/gi)]).toHaveLength(1);
+    expect(ruleset).toMatch(/default_branch\s*=\s*\$\(\s*gh api repos\/\{owner\}\/\{repo\}\s+-q\s+\.default_branch\s*\)/);
+    expect(refTemplate).toBe("refs/heads/${default_branch}");
+
+    const nonMainRef = refTemplate.replace("${default_branch}", "develop");
+    expect(nonMainRef).toBe("refs/heads/develop");
+    expect(nonMainRef).not.toBe("refs/heads/main");
+    expect(nonMainRef).not.toMatch(/^refs\/tags\//);
+    expect("refs/heads/develop").toBe(nonMainRef);
+    expect("refs/heads/feature/topic").not.toBe(nonMainRef);
+  });
+
+  it("AC-016: auditoria redige tokens antes de persistir e nunca os imprime", () => {
+    const security = sectionBetween(skill, "## FASE 0 — Auditoria de segurança", "## FASE 1 — Proteção server-side");
+
+    expect(security).toMatch(/(?:redac\w*|redig\w*|redij\w*)[\s\S]{0,120}<REDACTED>/i);
+    expect(security).toMatch(/(?:stdin|StandardInput)/i);
+    expect(security).toMatch(/gh secret set RELEASE_PLEASE_TOKEN/);
+    expect(security).toMatch(/(?:unset\s+token|\$token\s*=\s*\$null)/i);
+    expect(security).not.toMatch(/(?:echo|printf)\s+[^\n]*(?:ghp_|gho_|ghs_|ghr_|github_pat_|eyJ[A-Za-z0-9])/i);
+  });
+
+  it("AC-017: README e skills tornam TDD comportamental obrigatório e declaram Bash/AWK do gate HITL", () => {
+    const docs = `${readme}\n${skill}\n${shipSkill}\n${tddSkill}\n${bugDiagnosisSkill}`;
+    expect(packageJson.engines?.node).toBe(">=20");
+    for (const { path, text } of nodeRequirementFiles()) {
+      expect(text, `${relative(repoRoot, path)} ainda declara runtime legado`).not.toMatch(/(?:Node|node(?:\.js)?)[^\r\n]{0,40}(?:>=\s*18|v?18(?:\.x)?\b)/i);
+    }
+    expect(readme).toMatch(/TDD[\s\S]{0,100}(?:obrigat|mandatory|required)/i);
+    expect(readme).not.toMatch(/TDD[^\n]{0,120}(?:opcional|optional)/i);
+    expect(docs).toMatch(/\bBash\b/i);
+    expect(readme).toMatch(/\bAWK\b/i);
+    expect(docs).toMatch(/(?:HITL|redact\w*|redig\w*)/i);
+  });
+  it("AC-017: documentação não envia variáveis de token para stdout/stderr/log", () => {
+    const docs = `${readme}\n${skill}\n${shipSkill}\n${tddSkill}\n${bugDiagnosisSkill}`;
+    const unsafeTokenOutput = docs.split(/\r?\n/).filter((line) => {
+      const outputSink = /\b(?:echo|printf|Write-Host|console\.(?:log|error|warn)|print)\b/i.test(line);
+      const tokenReference = /(?:\$[{(]?(?:token|TOKEN|GITHUB_TOKEN|RELEASE_PLEASE_TOKEN)|\b(?:GITHUB|RELEASE)_TOKEN\b|(?:ghp_|gho_|ghs_|ghr_|github_pat_))/i.test(line);
+      const safeSecretStdin = /\|\s*gh\s+secret\s+set\s+RELEASE_PLEASE_TOKEN\b/i.test(line);
+      return outputSink && tokenReference && !safeSecretStdin;
+    });
+
+    expect(unsafeTokenOutput, "docs não podem imprimir variáveis/valores de token").toEqual([]);
+  });
+
+  it("AC-017: inventário de runtime cobre fontes Node e declara suporte >=20", () => {
+    const inventory = nodeRequirementFiles();
+    const inventoryPaths = inventory.map(({ path }) => relative(repoRoot, path).replaceAll("\\", "/"));
+    const expectedInventory = [
+      "README.md",
+      "install.mjs",
+      "scripts/install-hooks.mjs",
+      "ship/bin/lib.mjs",
+      "ship/bin/ship.mjs",
+      ".github/workflows/ci.yml",
+      ".github/workflows/release-please.yml",
+      "release-bootstrap/SKILL.md",
+      "ship/SKILL.md",
+      "tdd-orchestrator/SKILL.md",
+      "bug-diagnosis/SKILL.md",
+    ];
+
+    expect(new Set(inventoryPaths).size).toBe(inventoryPaths.length);
+    expect(inventoryPaths).toEqual(expect.arrayContaining(expectedInventory));
+
+    const ciPath = join(workflowDir, "ci.yml");
+    const runtimeSources = [
+      { path: join(repoRoot, "package.json"), text: packageSource },
+      { path: join(repoRoot, "install.mjs"), text: installSource },
+      { path: join(repoRoot, "README.md"), text: readme },
+      { path: join(repoRoot, "release-bootstrap", "SKILL.md"), text: skill },
+      { path: join(repoRoot, "ship", "SKILL.md"), text: shipSkill },
+      { path: ciPath, text: workflowText.get(ciPath) ?? "" },
+    ];
+    for (const { path, text } of runtimeSources) {
+      expect(declaresNode20(text), `${relative(repoRoot, path)} deve declarar Node >=20`).toBe(true);
+    }
+  });
+  it("AC-017 REVISION: inventário Node completo exige declaração >=20 em cada artefato", () => {
+    const inventory = [
+      { path: join(repoRoot, "package.json"), text: packageSource },
+      ...nodeRequirementFiles(),
+    ];
+    const expectedInventory = [
+      "package.json",
+      "README.md",
+      "install.mjs",
+      "scripts/install-hooks.mjs",
+      "ship/bin/lib.mjs",
+      "ship/bin/ship.mjs",
+      ".github/workflows/ci.yml",
+      ".github/workflows/release-please.yml",
+      "release-bootstrap/SKILL.md",
+      "ship/SKILL.md",
+      "tdd-orchestrator/SKILL.md",
+      "bug-diagnosis/SKILL.md",
+    ];
+    const inventoryPaths = inventory.map(({ path }) => relative(repoRoot, path).replaceAll("\\", "/"));
+
+    expect(new Set(inventoryPaths).size).toBe(inventoryPaths.length);
+    expect(inventoryPaths.toSorted()).toEqual(expectedInventory.toSorted());
+    expect(inventory.every(({ path }) => existsSync(path))).toBe(true);
+
+    const unsupported = inventory
+      .filter(({ text }) => !declaresSupportedNode20(text))
+      .map(({ path }) => relative(repoRoot, path).replaceAll("\\", "/"));
+    expect(unsupported, "cada fonte do inventário deve declarar Node >=20").toEqual([]);
+  });
+
+  it("AC-017: NOTICE contém por si só a licença upstream, sem depender de LICENSE", () => {
+    const normalizedLicense = license.replace(/\r\n/g, "\n");
+    const normalizedNotice = notice.replace(/\r\n/g, "\n");
+    const upstreamLicense = normalizedLicense
+      .replace(/Copyright \(c\) 2026 rronqui/, "Copyright (c) Matt Pocock")
+      .trim();
+
+    expect(normalizedNotice.trim()).not.toBe("");
+    expect(normalizedNotice).toContain("https://github.com/mattpocock/skills");
+    expect(normalizedNotice).toContain(upstreamLicense);
+    expect(normalizedNotice).not.toContain("Copyright (c) 2026 rronqui");
+  });
+
+  it("AC-017: LICENSE/NOTICE preservam o notice MIT upstream e docs não contradizem hooks/versionCheck", () => {
+    const noticeText = `${license}\n${notice}`;
+    const docs = `${readme}\n${skill}\n${shipSkill}`;
+
+    expect(noticeText).toMatch(/github\.com\/mattpocock\/skills/i);
+    expect(noticeText).toMatch(/MIT License/i);
+    expect(noticeText).toMatch(/Copyright[^\n]*Matt Pocock/i);
+    expect(noticeText).toMatch(/Permission is hereby granted/i);
+    expect(docs).toMatch(/core\.hooksPath/);
+    expect(readme).toMatch(/versionCheckUrl/);
+    expect(shipSkill).toMatch(/multi-package[\s\S]{0,180}(?:desabilit|disabled|null|raiz)/i);
+  });
+
 });

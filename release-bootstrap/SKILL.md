@@ -10,6 +10,16 @@ entram via issue + branch + PR, CI obrigatório, versão SemVer automática com
 release-please e versão visível na aplicação. Execute em fases, verificando o estado
 real em cada uma. Não assuma nada — leia o código.
 
+O runtime suportado é Node.js `>=20`. O inventário completo que deve permanecer
+coerente com essa exigência inclui `package.json`, `README.md`, `install.mjs`,
+`scripts/install-hooks.mjs`, `ship/bin/lib.mjs`, `ship/bin/ship.mjs`,
+`.github/workflows/ci.yml`, `.github/workflows/release-please.yml`,
+`release-bootstrap/SKILL.md`, `ship/SKILL.md`, `tdd-orchestrator/SKILL.md` e
+`bug-diagnosis/SKILL.md`.
+
+Todos os artefatos desse inventário devem declarar Node.js `>=20`; qualquer
+divergência bloqueia o bootstrap e o release.
+
 ## Antes de tudo — reconhecimento do stack (obrigatório)
 
 1. Linguagem/ecossistema e package manager (manifestos: package.json, pyproject.toml,
@@ -48,12 +58,17 @@ As fases seguintes usam ESSE levantamento, não suposições.
 - Inclua regras `deletion`, `non_fast_forward`, `pull_request`
   (`required_approving_review_count: 0`) e `required_status_checks` exigindo o
   contexto que o CI produzirá (`context: quality`).
-- `strict_required_status_checks_policy: true` (booleano estrito; `false` também é válido) é
-  campo obrigatório do schema de `required_status_checks`, senão HTTP 422
-  "data matches no possible input".
+- O campo `strict_required_status_checks_policy: true` (booleano estrito) é
+  obrigatório no schema de `required_status_checks`, senão HTTP 422 "data matches
+  no possible input".
 - Depois de criar, faça GET de `repos/{owner}/{repo}/rulesets/{id}` e valide
   `target`, `enforcement`, include/exclude de refs, regras e o status `quality`; sem
   resposta compatível, falhe fechado. Não invente uma chamada live em testes.
+
+Os tipos e contagens do ruleset são literais e verificáveis: mantenha a política de
+aprovação em zero e o status obrigatório estrito como booleano, com exatamente um
+contexto de quality produzido pelo job correspondente. Não acrescente contextos de
+teste ou permissões implícitas ao ruleset.
 - ARMADILHA: habilite criação de PRs pelo Actions:
   `gh api repos/{owner}/{repo}/actions/permissions/workflow --method PUT
   --field default_workflow_permissions=write --field can_approve_pull_request_reviews=true`
@@ -72,7 +87,9 @@ As fases seguintes usam ESSE levantamento, não suposições.
 
 - GitHub Actions (ou o provedor do repo): todo PR e push na branch default, com
   `concurrency` cancelando runs obsoletos. Job nomeado para produzir o contexto `quality`
-  (casando com o ruleset).
+  (casando com o ruleset). O guard do job aceita todo `pull_request`, mas em `push`
+  exige `ref_type == "branch"` e `ref_name == event.repository.default_branch`;
+  não use `branches-ignore` que possa excluir a default.
 - Passos, com os comandos reais do projeto: instalar deps com cache → typecheck/lint (se
   existir) → testes → build (se aplicável). Se o projeto não tiver suíte de testes,
   registre explicitamente — não crie testes de fachada.
@@ -83,17 +100,25 @@ As fases seguintes usam ESSE levantamento, não suposições.
 
 - `.github/workflows/release-please.yml`: push na default branch + `workflow_dispatch`,
   `googleapis/release-please-action@v4`, com `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`.
-- `release-please-config.json` com `include-component-in-tag: false` para a unidade
-  única atual e `release-type: node`; cada entrada em `packages` é uma unidade real,
-  com `initial-version` SemVer. Em monorepo, cada package deve manter identidade
-  qualificada no release/tag (não colapse componentes na raiz), ter seu próprio
-  manifesto e uma fonte de versão que o `ship` consiga resolver.
+  O job exige `ref_type == "branch"` e `ref_name == event.repository.default_branch`,
+  portanto uma tag com o mesmo nome da branch default é rejeitada.
+- `.release-please-manifest.json` com uma entrada para cada unidade. Na configuração
+  single-package atual, `include-component-in-tag: false` mantém a tag simples;
+  em qualquer monorepo/multi-package, cada entrada deve usar
+  `include-component-in-tag: true` para preservar tags qualificadas por componente,
+  sem colapsar versões na raiz.
+- `release-type: node` e `initial-version` devem usar SemVer estrito
+  (`MAJOR.MINOR.PATCH`, sem zeros à esquerda; prerelease/build são permitidos).
+  Cada package deve manter identidade qualificada no release/tag, ter seu próprio
+  manifesto e uma fonte SemVer que o `ship` consiga resolver.
 - A configuração é fail-fast: se qualquer unidade de `packages` não for Node ou não
   tiver `package.json`/fonte SemVer resolvível pelo `ship`, interrompa com
-  `E_VERSION_SOURCE`; não compare somente a versão da raiz. `versionCheckUrl` só é
-  habilitado quando há exatamente uma unidade `"."`, nunca para mascarar um monorepo.
-- Cada unidade/package tem uma fonte SemVer que o `ship` consegue resolver; unidade não-Node
-  ou monorepo sem fonte válida falha cedo com `E_VERSION_SOURCE`.
+  `E_VERSION_SOURCE`; uma unidade não-Node ou um monorepo sem fonte válida falha
+  cedo; nunca compare somente a versão da raiz. Quando `versionCheckUrl` estiver
+  configurado, `versionCheckUnit` identifica explicitamente a unidade servida
+  (default `"."`); em multi-package, a URL pode representar uma unidade específica,
+  e sua unidade deve ser resolvível. Se não houver endpoint por unidade, mantenha a
+  URL `null`, sem desabilitar a validação das fontes SemVer de todas as unidades.
 - O manifesto `.release-please-manifest.json` deve conter exatamente as mesmas chaves
   de `packages` e uma versão inicial SemVer igual à versão do `package.json` de cada
   unidade. Não use `release-as` persistente: após inicializar o primeiro release,
