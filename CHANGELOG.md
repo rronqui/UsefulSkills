@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/rronqui/UsefulSkills/compare/v0.3.3...v0.3.4) (2026-08-11)
+
+
+### Bug Fixes
+
+* corrigir diagrama Mermaid do tdd-orchestrator ([#40](https://github.com/rronqui/UsefulSkills/issues/40)) ([d442d95](https://github.com/rronqui/UsefulSkills/commit/d442d95bedfed8b80f1ded5f0be9d81ed16e3b7a))
+
 ## [0.3.3](https://github.com/rronqui/UsefulSkills/compare/v0.3.2...v0.3.3) (2026-08-11)
 
 
