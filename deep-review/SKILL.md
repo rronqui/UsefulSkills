@@ -5,7 +5,7 @@ description: Revisão de código multi-agente — coleta o diff (PR, branch base
 
 # deep-review — revisão de código multi-agente
 
-Extração fiel do comando embutido `/review` do omp (can1357/oh-my-pi). O trabalho se
+Baseado e adaptado do comando embutido `/review` do omp (can1357/oh-my-pi). O trabalho se
 divide em duas camadas:
 
 1. **Camada determinística (você, orquestrador)**: resolver o escopo, coletar o diff
@@ -21,9 +21,9 @@ de achados padronizado.
 ## O agente revisor (`deep-reviewer`)
 
 Esta skill usa SEMPRE o agente `deep-reviewer` desta própria skill —
-`skill://deep-review/agents/deep-reviewer.md` (extração verbatim de
+`skill://deep-review/agents/deep-reviewer.md` (agente adaptado a partir de
 `packages/coding-agent/src/prompts/agents/reviewer.md` do repositório
-can1357/oh-my-pi, renomeada para evitar colisão). Ela define:
+can1357/oh-my-pi, renomeado para evitar colisão). Ele define:
 
 - Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`;
   pode spawnar `scout`; roda no modelo definido no frontmatter do agente
@@ -229,8 +229,7 @@ Dispare todos em paralelo na mesma chamada; não serialize.
 
 ## FASE 4 — Protocolo do revisor (o que cada sub-agente executa)
 
-Fonte primária: `skill://deep-review/agents/deep-reviewer.md` (definição verbatim
-extraída do omp). O resumo abaixo serve para você saber o que esperar do resultado.
+Fonte primária: `skill://deep-review/agents/deep-reviewer.md`. O resumo abaixo serve para você saber o que esperar do resultado.
 
 **Missão**: identificar bugs que o autor gostaria de corrigir antes do merge.
 Ferramentas somente leitura (`read`, `grep`, `glob`, `bash` restrito, `lsp`,

@@ -646,6 +646,7 @@ stateDiagram-v2
         %% ---------- Marco pré-integração ----------
         DONE --> [*] : tarefa pronta; aguarda integração da onda
         BLOCKED --> [*] : escalado ao usuário
+    }
 
 
     %% ============================================================
