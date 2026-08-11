@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/rronqui/UsefulSkills/compare/v0.3.4...v0.4.0) (2026-08-11)
+
+
+### Features
+
+* implementação ([#42](https://github.com/rronqui/UsefulSkills/issues/42)) ([#43](https://github.com/rronqui/UsefulSkills/issues/43)) ([01ea88f](https://github.com/rronqui/UsefulSkills/commit/01ea88fd867613adb8f75d670ecc31be7aeb6113))
+
 ## [0.3.4](https://github.com/rronqui/UsefulSkills/compare/v0.3.3...v0.3.4) (2026-08-11)
 
 
