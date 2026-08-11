@@ -25,9 +25,7 @@ Esta skill usa SEMPRE o agente `deep-reviewer` desta própria skill —
 `packages/coding-agent/src/prompts/agents/reviewer.md` do repositório
 can1357/oh-my-pi, renomeado para evitar colisão). Ele define:
 
-- Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`;
-  pode spawnar `scout`; roda no modelo definido no frontmatter do agente
-  (`openai-codex/gpt-5.6-luna`);
+- Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`; pode spawnar `scout`;
 - Schema de saída: identidade com `protocol_mode` (`DEEP_REVIEW` ou
   `DEEP_REVIEW_FALLBACK`), veredito (`overall_correctness` enum correct/incorrect,
   `explanation`, `confidence`) + achados opcionais (`findings`: title, body,
