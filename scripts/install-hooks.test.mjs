@@ -504,7 +504,7 @@ describe("install-hooks + wrappers gerados", () => {
       expectChildExit(first, 0);
       const destination = join(hooksPath(fixture), "commit-msg");
       const bytes = readFileSync(destination);
-      chmodSync(destination, 0o010);
+      chmodSync(destination, 0o410);
 
       const second = install(fixture);
       expectChildExit(second, 0);
