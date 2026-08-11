@@ -228,10 +228,11 @@ try {
   process.exit(1);
 }
 
+if (input.length === 0) process.exit(0);
+
 const remoteName = process.argv[2] || "origin";
 const defaultBranch = resolveDefaultBranch(remoteName);
 const defaultRef = `refs/heads/${defaultBranch}`;
-if (input.length === 0) process.exit(0);
 
 const lines = input.split(/\r?\n/);
 for (let index = 0; index < lines.length; index += 1) {

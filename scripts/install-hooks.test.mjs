@@ -35,6 +35,25 @@ function initRepo(name) {
   copyFileSync(join(repoRoot, ".commitlintrc.json"), join(dir, ".commitlintrc.json"));
   return dir;
 }
+function createLinkedWorktree() {
+  const main = initRepo("worktree-main");
+  const linked = join(dirname(main), `hooks-worktree-linked-${Date.now()}`);
+  const run = (args, cwd = main) => {
+    const result = spawnSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" },
+    });
+    expectChildExit(result, 0);
+  };
+  run(["config", "--unset", "core.hooksPath"]);
+  writeFileSync(join(main, "tracked.txt"), "worktree fixture\n");
+  run(["add", "scripts", ".commitlintrc.json", "tracked.txt"]);
+  run(["-c", "user.name=UsefulSkills Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "test: linked worktree"]);
+  run(["worktree", "add", "--detach", linked]);
+  symlinkSync(join(repoRoot, "node_modules"), join(linked, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+  return { main, linked };
+}
 
 function install(dir) {
   return spawnSync("node", ["scripts/install-hooks.mjs"], { cwd: dir, encoding: "utf8" });
@@ -193,6 +212,22 @@ describe("install-hooks + wrappers gerados", () => {
   it("instala wrappers executáveis em POSIX", () => {
     if (process.platform === "win32") return;
     expect(statSync(join(hooksPath(dir), "commit-msg")).mode & 0o111).not.toBe(0);
+  });
+  it("aceita o diretório padrão compartilhado de linked worktree", () => {
+    const fixture = createLinkedWorktree();
+    try {
+      const result = install(fixture.linked);
+      expectChildExit(result, 0);
+      expect(existsSync(join(hooksPath(fixture.linked), "commit-msg"))).toBe(true);
+      expect(existsSync(join(hooksPath(fixture.linked), "pre-push"))).toBe(true);
+    } finally {
+      spawnSync("git", ["worktree", "remove", "--force", fixture.linked], {
+        cwd: fixture.main,
+        encoding: "utf8",
+      });
+      rmSync(fixture.linked, { recursive: true, force: true });
+      rmSync(fixture.main, { recursive: true, force: true });
+    }
   });
 
   it("wrapper repassa argumentos: mensagem inválida é rejeitada (exit 1)", () => {

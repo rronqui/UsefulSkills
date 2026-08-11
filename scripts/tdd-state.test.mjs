@@ -239,7 +239,13 @@ function fullyValidTask(overrides = {}) {
       status: "PASS",
       failing_tests: ["scripts/tdd-state.test.mjs::red assertion"],
       failure_reason_expected: true,
-      criteria_to_tests: criteriaMatrix(),
+      criteria_to_tests: {
+        ...criteriaMatrix(),
+        "AC-008": [
+          "scripts/tdd-state.test.mjs::AC-008 behavior",
+          "scripts/tdd-state.test.mjs::red assertion",
+        ],
+      },
       revision_delta: { ac: "", test: "", evidence: "" },
       revision_baseline_tests: {},
     },
@@ -254,6 +260,7 @@ function fullyValidTask(overrides = {}) {
     gates: gateValues("PASS"),
     gate_origins: gateOrigins(),
     gate_evidence: gateEvidence("npm test -- target; output: PASS"),
+    evidence: "red assertion output",
     ...overrides,
   });
 }
@@ -595,19 +602,38 @@ describe("T-003 — state migration and validation seams", () => {
     const extraNaField = structuredClone(normative);
     extraNaField.red.criteria_to_tests["AC-019"].extra = "forbidden";
     expectRejected(api.validateCriteriaMatrix(extraNaField), /exact|extra|chave/i);
-
     const redReady = fullyValidTask({
       phase: "GREEN",
       red: {
         status: "PASS",
         failing_tests: ["scripts/tdd-state.test.mjs::assertion failure"],
         failure_reason_expected: true,
-        criteria_to_tests: criteriaMatrix(),
+        criteria_to_tests: {
+          ...criteriaMatrix(),
+          "AC-008": [
+            "scripts/tdd-state.test.mjs::AC-008 behavior",
+            "scripts/tdd-state.test.mjs::assertion failure",
+          ],
+        },
         revision_delta: { ac: "", test: "", evidence: "" },
         revision_baseline_tests: {},
       },
     });
     expect(api.validateProgress(makeProgress({ waves: [{ wave: 1, status: "in_progress", integration: { status: "pending", attempt: 0, evidence: "" }, tasks: [redReady] }] }))).toMatchObject({ ok: true, errors: [] });
+    const unrelatedRed = structuredClone(redReady);
+    unrelatedRed.red.failing_tests = ["scripts/tdd-state.test.mjs::unrelated assertion"];
+    expectRejected(
+      api.validateProgress(makeProgress({
+        waves: [{
+          wave: 1,
+          status: "in_progress",
+          integration: { status: "pending", attempt: 0, evidence: "" },
+          tasks: [unrelatedRed],
+        }],
+      })),
+      /failing_tests|criteria|matrix|AC/i,
+    );
+
 
     const existingBehavior = fullyValidTask({
       phase: "REVIEW",
@@ -788,6 +814,50 @@ describe("T-003 — state migration and validation seams", () => {
     expect(normalizedNa.baseline.status).toBe("PASS");
     expect(normalizedNa.baseline.known_failures).toEqual(justifiedNa.baseline.known_failures);
   });
+  it("AC-008 regression — build NA exige prova específica de buildCommand=null", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const generic = legacyBaseline({ status: "FAIL", tests: "NA", build: "NA" });
+    generic.baseline.build_evidence = "build ausente sem motivo específico";
+    generic.baseline.known_failures = generic.baseline.known_failures.map((failure) =>
+      failure.gate === "build"
+        ? { ...failure, reason: "build não executado", evidence: "evidência genérica" }
+        : failure,
+    );
+    const direct = makeProgress({
+      baseline: {
+        ...generic.baseline,
+        status: "PASS",
+        tests: "PASS",
+        tests_evidence: "npm test — PASS",
+      },
+    });
+    expectRejected(api.validateProgress(direct), /buildCommand|null|NA/i);
+    const migrated = expectAccepted(api.migrateProgress(generic));
+    expect(migrated.baseline.build).toBe("NOT_RUN");
+    expect(migrated.baseline.status).toBe("NOT_RUN");
+    for (const invalidProof of ["buildCommand=null-ish", "buildCommand=null.foo"]) {
+      const malformed = legacyBaseline({ status: "FAIL", tests: "NA", build: "NA" });
+      malformed.baseline.build_evidence = invalidProof;
+      malformed.baseline.known_failures = malformed.baseline.known_failures.map((failure) =>
+        failure.gate === "build" ? { ...failure, evidence: invalidProof } : failure,
+      );
+      const directMalformed = makeProgress({
+        baseline: {
+          ...malformed.baseline,
+          status: "PASS",
+          tests: "PASS",
+          tests_evidence: "npm test — PASS",
+        },
+      });
+      expectRejected(api.validateProgress(directMalformed), /buildCommand|null|NA/i);
+      const normalizedMalformed = expectAccepted(api.migrateProgress(malformed));
+      expect(normalizedMalformed.baseline.status).toBe("NOT_RUN");
+    }
+  });
+
 
   it("AC-008 regression — baseline FAIL é recalculada e preserva override aprovado", async () => {
     const loaded = await loadStateApi();
@@ -984,6 +1054,20 @@ describe("T-003 — state migration and validation seams", () => {
         tasks: [makeTask()],
       }],
     })), /completed.*integration|integration.*PASS/i);
+  });
+  it("AC-009 regression — integração PASS exige onda completed e todas as tarefas DONE", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    expectRejected(api.validateProgress(makeProgress({
+      waves: [{
+        wave: 1,
+        status: "in_progress",
+        integration: { status: "PASS", attempt: 1, evidence: "npm test — PASS" },
+        tasks: [fullyValidTask()],
+      }],
+    })), /integration.*completed|completed.*DONE|tasks.*DONE/i);
   });
 
   it("AC-010 regression — fase RED com PASS exige falha de asserção", async () => {
@@ -1437,6 +1521,9 @@ describe("T-003 — state migration and validation seams", () => {
     const mismatchedSpecKit = makeProgress();
     mismatchedSpecKit.spec_kit.plan = "./specs/other-feature/plan.md";
     expectRejected(api.validateProgress(mismatchedSpecKit), /Spec Kit|sibling|plan|canonical/i);
+    const invalidFeatureName = makeProgress();
+    invalidFeatureName.spec_kit.spec = "./specs/Specs003-convivencia-robusta-skills/spec.md";
+    expectRejected(api.validateProgress(invalidFeatureName), /Spec Kit|path|canonical/i);
   });
 
   it.each([
@@ -1485,6 +1572,11 @@ describe("T-003 — state migration and validation seams", () => {
     task.red.status = "PASS";
     task.red.failure_reason_expected = true;
     task.red.failing_tests = ["scripts/tdd-state.test.mjs::RED assertion"];
+    task.red.criteria_to_tests["AC-008"] = [
+      ...task.red.criteria_to_tests["AC-008"],
+      "scripts/tdd-state.test.mjs::RED assertion",
+    ];
+    task.evidence = "RED assertion evidence";
 
     const migrated = expectAccepted(api.migrateProgress(progress));
     expect(migrated.baseline.status).toBe("NOT_RUN");
@@ -1505,6 +1597,11 @@ describe("T-003 — state migration and validation seams", () => {
     task.red.status = "PASS";
     task.red.failure_reason_expected = true;
     task.red.failing_tests = ["scripts/tdd-state.test.mjs::RED assertion"];
+    task.red.criteria_to_tests["AC-008"] = [
+      ...task.red.criteria_to_tests["AC-008"],
+      "scripts/tdd-state.test.mjs::RED assertion",
+    ];
+    task.evidence = "RED assertion evidence";
 
     const migrated = expectAccepted(api.migrateProgress(progress));
     expect(migrated.baseline.status).toBe("NOT_RUN");
@@ -1527,12 +1624,21 @@ describe("T-003 — state migration and validation seams", () => {
         status: "PASS",
         failing_tests: ["scripts/tdd-state.test.mjs::RED assertion"],
         failure_reason_expected: true,
+        criteria_to_tests: {
+          ...criteriaMatrix(),
+          "AC-008": [
+            ...criteriaMatrix()["AC-008"],
+            "scripts/tdd-state.test.mjs::RED assertion",
+          ],
+        },
+        revision_delta: { ac: "", test: "", evidence: "" },
+        revision_baseline_tests: {},
       },
       green: { status: "PASS", changed_files: ["tdd-orchestrator/lib/state.mjs"] },
       refactor: { status: "PASS" },
       gates: gateValues("PASS"),
       gate_evidence: gateEvidence("gate output: PASS"),
-      evidence: "done task evidence",
+      evidence: "RED assertion evidence; done task evidence",
     });
     const progress = makeProgress({
       waves: [{

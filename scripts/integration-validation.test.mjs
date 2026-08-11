@@ -78,7 +78,10 @@ function approvedTask() {
       failure_reason_expected: true,
       failing_tests: ["scripts/tdd-state.test.mjs::RED assertion"],
       criteria_to_tests: {
-        "AC-008": ["scripts/tdd-state.test.mjs::migration assertion"],
+        "AC-008": [
+          "scripts/tdd-state.test.mjs::migration assertion",
+          "scripts/tdd-state.test.mjs::RED assertion",
+        ],
         "AC-009": ["scripts/tdd-state.test.mjs::DONE pre-integration assertion"],
         "AC-010": ["scripts/tdd-state.test.mjs::RED matrix assertion"],
       },

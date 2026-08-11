@@ -379,6 +379,16 @@ function main() {
 
   const rawHooksDir = revParse.stdout.trim();
   if (!rawHooksDir) throw new Error("core.hooksPath vazio; Git não informou um destino de hooks.");
+  const commonDirResult = git(["rev-parse", "--git-common-dir"]);
+  if (commonDirResult.absent) throw new Error("falha operacional: Git não informou o diretório comum do repositório.");
+  if (commonDirResult.failure) throw new Error(`falha operacional ao consultar Git: ${commonDirResult.failure.message}`);
+  const rawCommonDir = commonDirResult.stdout.trim();
+  if (!rawCommonDir) throw new Error("Git não informou um diretório comum do repositório.");
+
+  // Em linked worktrees, o destino padrão fica no hooksDir comum do repositório
+  // principal, não em <worktree>/.git/hooks.
+  const canonicalCommonHooksDir = canonicalPath(path.join(path.resolve(root, rawCommonDir), "hooks"));
+
 
   // Canonicalizar o diretório efetivo antes de qualquer preflight ou escrita.
   // Isso expande aliases 8.3 no Windows e também impede que um caminho textual
@@ -388,14 +398,14 @@ function main() {
   const canonicalHooksDir = canonicalPath(hooksDir);
   const hooksInside = inside(canonicalRoot, canonicalHooksDir);
   const consent = hasConsent(canonicalHooksDir);
-  const defaultHooks = samePath(canonicalHooksDir, path.join(root, ".git", "hooks"));
+  const defaultHooks = samePath(canonicalHooksDir, canonicalCommonHooksDir);
   const issues = [
     ...new Set([...validateAncestors(hooksDir), ...validateAncestors(canonicalHooksDir)]),
   ];
   if (samePath(canonicalHooksDir, canonicalRoot) && !consent) {
     issues.push("core.hooksPath aponta para a raiz do projeto");
   }
-  if (!hooksInside && !consent) issues.push(`core.hooksPath externo ao projeto: ${canonicalHooksDir}`);
+  if (!hooksInside && !consent && !defaultHooks) issues.push(`core.hooksPath externo ao projeto: ${canonicalHooksDir}`);
   issues.push(...sharedDirectoryIssues(canonicalHooksDir, defaultHooks, consent));
 
   const canonicalSourceHooksDir = path.join(canonicalRoot, "scripts", "hooks");

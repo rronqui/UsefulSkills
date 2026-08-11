@@ -41,6 +41,12 @@ const CONTRACT_STATUSES = new Set(["DRAFT", "APPROVED", "NA"]);
 const BASELINE_GATES = ["tests", "build"];
 const RED_COMPLETE_PHASES = new Set(["GREEN", "GREEN_FIX", "TOOLING_FIX", "REFACTOR", "REFACTOR_FIX", "REVIEW", "DOC", "VALIDATE", "DONE"]);
 const TEST_REF = /^[^:\r\n]+::[^:\r\n]+$/;
+const FEATURE_NAME_PATTERN = "specs\\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*";
+const SPEC_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/spec\\.md$`);
+const PLAN_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/plan\\.md$`);
+const TASKS_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/tasks\\.md$`);
+const BUILD_COMMAND_NULL_RE = /\bbuildCommand\s*(?:=|:)\s*null(?![A-Za-z0-9_$.-])/i;
+const AC_SOURCE_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/spec\\.md#\\S+$`);
 const NORMATIVE_AC = "AC-019";
 
 const ROOT_KEYS = [
@@ -392,6 +398,15 @@ function validateRed(task, path, errors, { allowLegacyPendingReview = false } = 
     if (task.red.status !== "PASS") errors.push(`${path}.red: expected PASS before ${task.phase}`);
     if (task.red.failure_reason_expected !== true) errors.push(`${path}.red.failure_reason_expected: expected assertion failure required for RED`);
     if (!Array.isArray(task.red.failing_tests) || task.red.failing_tests.length === 0) errors.push(`${path}.red.failing_tests: expected assertion test required`);
+    const matrixRefs = new Set(
+      Object.values(task.red.criteria_to_tests ?? {})
+        .filter(Array.isArray)
+        .flat(),
+    );
+    for (const ref of Array.isArray(task.red.failing_tests) ? task.red.failing_tests : []) {
+      if (!matrixRefs.has(ref)) errors.push(`${path}.red.failing_tests: ${ref} must belong to the AC matrix`);
+    }
+    if (!nonEmptyString(task.evidence)) errors.push(`${path}.evidence: RED assertion evidence required`);
   }
   if (task.implemented_by === "existing-code" && task.phase === "REVIEW") {
     if (task.red.status !== "PASS" || task.red.failure_reason_expected !== false || !Array.isArray(task.red.failing_tests) || task.red.failing_tests.length !== 0) errors.push(`${path}.red: existing behavior requires PASS with no failing tests and false failure_reason_expected`);
@@ -476,7 +491,7 @@ function validateAcceptanceCriteria(criteria, canonicalSpecRoot, errors) {
     ids.add(ac.id);
     if (!nonEmptyString(ac.desc)) errors.push(`${path}.desc: non-empty string required`);
     const source = typeof ac.source === "string" ? ac.source.replaceAll("\\", "/") : "";
-    if (!/^\.\/specs\/[^/]+\/spec\.md#\S+$/i.test(source)) {
+    if (!AC_SOURCE_RE.test(source)) {
       errors.push(`${path}.source: canonical Spec Kit spec reference required`);
     } else if (canonicalSpecRoot && source.slice(0, source.indexOf("#")) !== `${canonicalSpecRoot}/spec.md`) {
       errors.push(`${path}.source: must reference the same Spec Kit spec`);
@@ -486,8 +501,8 @@ function validateAcceptanceCriteria(criteria, canonicalSpecRoot, errors) {
     } else {
       const taskIds = new Set();
       ac.tasks.forEach((taskId, taskIndex) => {
-        if (typeof taskId !== "string" || !/^T-\d{3}$/.test(taskId)) {
-          errors.push(`${path}.tasks[${taskIndex}]: invalid task ID`);
+        if (!nonEmptyString(taskId)) {
+          errors.push(`${path}.tasks[${taskIndex}]: non-empty task ID required`);
         } else if (taskIds.has(taskId)) {
           errors.push(`${path}.tasks: duplicate ${taskId}`);
         } else {
@@ -522,7 +537,7 @@ function validateProgressObject(progress, errors, options = {}) {
       if (!checkKeys(entry, ["gate", "reason", "evidence"], `progress.baseline.known_failures[${index}]`, errors)) return;
       if (!isObject(entry) || !["tests", "build"].includes(entry.gate) || !nonEmptyString(entry.reason) || !nonEmptyString(entry.evidence)) errors.push(`progress.baseline.known_failures[${index}]: gate, reason and evidence required`);
     });
-    for (const gate of BASELINE_GATES) if (progress.baseline[gate] === "NA" && !hasBaselineKnownFailure(progress, gate)) errors.push(`progress.baseline.${gate}: NA requires known_failure reason/evidence`);
+    for (const gate of BASELINE_GATES) if (progress.baseline[gate] === "NA" && !hasBaselineKnownFailure(progress, gate, { requireBuildNaEvidence: gate === "build" })) errors.push(`progress.baseline.${gate}: NA requires known_failure reason/evidence`);
     const aggregate = baselineAggregate(progress.baseline.tests, progress.baseline.build);
     if (aggregate && progress.baseline.status !== aggregate) {
       errors.push(`progress.baseline.status: ${progress.baseline.status} is inconsistent with aggregate ${aggregate}`);
@@ -550,10 +565,10 @@ function validateProgressObject(progress, errors, options = {}) {
       const specPath = String(progress.spec_kit.spec).replaceAll("\\", "/");
       const planPath = String(progress.spec_kit.plan).replaceAll("\\", "/");
       const tasksPath = String(progress.spec_kit.tasks).replaceAll("\\", "/");
-      if (!/^\.\/specs\/[^/]+\/spec\.md$/i.test(specPath)) errors.push("progress.spec_kit.spec: canonical ./specs/<feature>/spec.md path required");
+      if (!SPEC_PATH_RE.test(specPath)) errors.push("progress.spec_kit.spec: canonical ./specs/<feature>/spec.md path required");
       else canonicalSpecRoot = specPath.replace(/\/spec\.md$/i, "");
-      if (!/^\.\/specs\/[^/]+\/plan\.md$/i.test(planPath) || (canonicalSpecRoot && planPath !== `${canonicalSpecRoot}/plan.md`)) errors.push("progress.spec_kit.plan: canonical sibling plan.md path required");
-      if (!/^\.\/specs\/[^/]+\/tasks\.md$/i.test(tasksPath) || (canonicalSpecRoot && tasksPath !== `${canonicalSpecRoot}/tasks.md`)) errors.push("progress.spec_kit.tasks: canonical sibling tasks.md path required");
+      if (!PLAN_PATH_RE.test(planPath) || (canonicalSpecRoot && planPath !== `${canonicalSpecRoot}/plan.md`)) errors.push("progress.spec_kit.plan: canonical sibling plan.md path required");
+      if (!TASKS_PATH_RE.test(tasksPath) || (canonicalSpecRoot && tasksPath !== `${canonicalSpecRoot}/tasks.md`)) errors.push("progress.spec_kit.tasks: canonical sibling tasks.md path required");
       if (!Number.isFinite(Date.parse(progress.spec_kit.written_at))) errors.push("progress.spec_kit.written_at: valid timestamp required");
     }
   }
@@ -582,6 +597,12 @@ function validateProgressObject(progress, errors, options = {}) {
       if (typeof wave.integration.evidence !== "string") errors.push(`${path}.integration.evidence: must be string`);
       if (["FAIL", "PASS"].includes(wave.integration.status) && !nonEmptyString(wave.integration.evidence)) errors.push(`${path}.integration.evidence: evidence required for ${wave.integration.status}`);
       if (wave.status === "completed" && wave.integration.status !== "PASS") errors.push(`${path}: completed wave requires integration PASS`);
+      if (wave.integration.status === "PASS") {
+        if (!["integrating", "completed"].includes(wave.status)) errors.push(`${path}: integration PASS requires integrating or completed wave`);
+        if (!Array.isArray(wave.tasks) || wave.tasks.some((task) => !isDoneTask(task))) {
+          errors.push(`${path}: integration PASS requires all tasks DONE`);
+        }
+      }
     }
     if (!Array.isArray(wave.tasks) || wave.tasks.length === 0) errors.push(`${path}.tasks: non-empty array required`);
     else {
@@ -676,14 +697,19 @@ function parseLegacyCriteriaMatrix(task, errors) {
   }
   if (Object.keys(parsed).length > 0 && errors.length === 0) task.red.criteria_to_tests = parsed;
 }
-function hasBaselineKnownFailure(progress, gate) {
+function hasBaselineKnownFailure(progress, gate, { requireBuildNaEvidence = false } = {}) {
   const knownFailures = progress?.baseline?.known_failures;
   if (!Array.isArray(knownFailures)) return false;
   return knownFailures.some(
     (failure) => isObject(failure)
       && failure.gate === gate
       && nonEmptyString(failure.reason)
-      && nonEmptyString(failure.evidence),
+      && nonEmptyString(failure.evidence)
+      && (!requireBuildNaEvidence
+        || gate !== "build"
+        || BUILD_COMMAND_NULL_RE.test(
+          `${progress?.baseline?.build_evidence ?? ""}\n${failure.reason}\n${failure.evidence}`,
+        )),
   );
 }
 
@@ -719,7 +745,7 @@ function normalizeBaseline(value) {
     }
   }
   for (const gate of BASELINE_GATES) {
-    if (baseline[gate] === "NA" && !hasBaselineKnownFailure(value, gate)) {
+    if (baseline[gate] === "NA" && !hasBaselineKnownFailure(value, gate, { requireBuildNaEvidence: gate === "build" })) {
       baseline[gate] = "NOT_RUN";
       baseline[`${gate}_evidence`] = "";
     }
@@ -733,7 +759,7 @@ function normalizeBaseline(value) {
   const testsResolved = baseline.tests === "PASS" && nonEmptyString(baseline.tests_evidence)
     || baseline.tests === "NA" && hasBaselineKnownFailure(value, "tests");
   const buildResolved = baseline.build === "PASS" && nonEmptyString(baseline.build_evidence)
-    || baseline.build === "NA" && hasBaselineKnownFailure(value, "build");
+    || baseline.build === "NA" && hasBaselineKnownFailure(value, "build", { requireBuildNaEvidence: true });
   if (baseline.tests === "NOT_RUN" || baseline.build === "NOT_RUN") baseline.status = "NOT_RUN";
   else if (baseline.tests === "FAIL" || baseline.build === "FAIL" || !testsResolved || !buildResolved) baseline.status = "FAIL";
   else baseline.status = "PASS";
@@ -1019,7 +1045,7 @@ function validateGateReportEntry(gate, entry, errors) {
   if (entry.status === "NA" && !nonEmptyString(entry.reason)) errors.push(`${path}.reason: reason required for NA`);
   if (entry.status === "NA" && gate === "build") {
     for (const field of ["command", "output", "reason"]) {
-      if (!/\bbuildCommand\s*=\s*null(?![A-Za-z0-9_$])/i.test(String(entry[field] ?? ""))) errors.push(`gate_report.build.${field}: NA requires specific buildCommand=null evidence`);
+      if (!/\bbuildCommand\s*=\s*null(?![A-Za-z0-9_$.-])/i.test(String(entry[field] ?? ""))) errors.push(`gate_report.build.${field}: NA requires specific buildCommand=null evidence`);
     }
   }
   if (entry.status !== "NA" && hasOwn(entry, "reason") && typeof entry.reason !== "string") errors.push(`${path}.reason: must be string`);

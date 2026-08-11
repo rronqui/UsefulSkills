@@ -79,8 +79,8 @@ function invokeHook(cwd, input) {
   });
 }
 
-function invokeHookWithUnsupportedShowRef(cwd, input) {
-  const preload = join(cwd, ".pre-push-show-ref-unsupported.cjs");
+function invokeHookWithUnsupportedRemoteRefLookup(cwd, input) {
+  const preload = join(cwd, ".pre-push-remote-ref-unsupported.cjs");
   writeFileSync(
     preload,
     [
@@ -88,8 +88,9 @@ function invokeHookWithUnsupportedShowRef(cwd, input) {
       "const { syncBuiltinESMExports } = require('node:module');",
       "const originalSpawnSync = childProcess.spawnSync;",
       "childProcess.spawnSync = (file, args, options) => {",
-      "  if (file === 'git' && Array.isArray(args) && args.length === 4 && args[0] === 'show-ref' && args[1] === '--exists' && args[2] === '--quiet' && args[3] === 'refs/remotes/origin/HEAD') {",
-      "    return { status: 129, stdout: '', stderr: 'git: unknown option --exists\\n' };",
+      "  const isGitExecutable = typeof file === \"string\" && (file === \"git\" || /(?:^|[\\\\/])git(?:\\.exe|\\.cmd|\\.bat)?$/i.test(file));",
+      "  if (isGitExecutable && Array.isArray(args) && args.length === 3 && args[0] === 'for-each-ref' && args[1] === '--format=%(refname)' && args[2] === 'refs/remotes/origin/HEAD') {",
+      "    return { status: 129, stdout: '', stderr: 'git: unsupported ref lookup\\n' };",
       "  }",
       "  return originalSpawnSync(file, args, options);",
       "};",
@@ -193,6 +194,14 @@ describe("pre-push CLI respeita a branch default configurada no repositório", (
     expect(result.status, output).not.toBe(0);
     expect(output).toMatch(/reposit[oó]rio|repository|git/i);
   });
+  it("permite stdin vazia fora de um repositório sem resolver branch", () => {
+    const cwd = createTemporaryDirectory();
+    const result = invokeHook(cwd, "");
+    const output = `${result.stdout}${result.stderr}`;
+
+    expect(result.error, output).toBeUndefined();
+    expect(result.status, output).toBe(0);
+  });
 
 
   it("bloqueia o push para develop quando a branch default está no remote ref", () => {
@@ -224,16 +233,18 @@ describe("pre-push CLI respeita a branch default configurada no repositório", (
     expect(result.error, output).toBeUndefined();
     expect(result.status, output).toBe(0);
   });
-  it("usa fallback portátil e permite ref de feature quando show-ref --exists não existe", () => {
+  it("bloqueia quando o lookup for-each-ref do HEAD do remote não existe", () => {
     const cwd = createRepository("develop");
-    const result = invokeHookWithUnsupportedShowRef(
+    makeRemoteHeadNonSymbolic(cwd);
+    const result = invokeHookWithUnsupportedRemoteRefLookup(
       cwd,
       "refs/heads/feature/login 1111111 refs/heads/topic 2222222\n",
     );
     const output = `${result.stdout}${result.stderr}`;
 
     expect(result.error, output).toBeUndefined();
-    expect(result.status, output).toBe(0);
+    expect(result.status, output).toBe(1);
+    expect(output).toMatch(/resolver a branch padrão|unsupported ref lookup/i);
   });
 
 });

@@ -747,8 +747,8 @@ preflight não produz efeito parcial.
 | `E_STATE_INVALID` | TDD | schema, enum, chave, matriz ou evidência inválida | migração/resume bloqueado |
 | `E_ATTEMPT_CAP` | TDD | fase/integração atingiu tentativa 3 | histórico preservado, BLOCKED |
 | `E_GATE_EVIDENCE` | gates | evidência ausente ou NA sem razão específica | transição/promoção recusada |
-| `E_CONFLICT_STATE` | Git | operação/hunk/continuação pendente | BLOCKED retomável |
-| `E_ALIGNMENT_BLOCKED` | alignment | pergunta/decisão pendente | sem rota silenciosa |
+| `E_CONFLICT_STATE` | Git | operação/hunk/continuação pendente ou sanitização/redação não comprovada | BLOCKED retomável |
+| `E_ALIGNMENT_BLOCKED` | alignment | pergunta/decisão pendente ou snapshot ausente, inválido, divergente ou indisponível | sem rota silenciosa |
 | `E_TRACE_SECRET` | HITL/security | segredo/probe após sanitize/scan | gate FAIL, não publica |
 | `E_BASH_UNAVAILABLE` | HITL | Bash/AWK necessário ausente | SKIPPED/BLOCKED explícito |
 | `E_HOOK_CONFLICT` | hooks | hook conflitante, symlink ou tipo inseguro | preserva e reporta |
