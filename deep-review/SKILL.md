@@ -21,9 +21,9 @@ de achados padronizado.
 ## O agente revisor (`deep-reviewer`)
 
 Esta skill usa SEMPRE o agente `deep-reviewer` desta própria skill —
-`skill://deep-review/agents/deep-reviewer.md` (extração verbatim de
+`skill://deep-review/agents/deep-reviewer.md` (agente adaptado a partir de
 `packages/coding-agent/src/prompts/agents/reviewer.md` do repositório
-can1357/oh-my-pi, renomeada para evitar colisão). Ela define:
+can1357/oh-my-pi, renomeado para evitar colisão). Ele define:
 
 - Ferramentas somente leitura: `read, grep, glob, bash, lsp, web_search, ast_grep`;
   pode spawnar `scout`; roda no modelo definido no frontmatter do agente
