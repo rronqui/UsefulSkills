@@ -64,6 +64,7 @@ function paths(c) {
   return {fold,absolute,inside,confined};
 }
 function overlap(a,b,ps){return ps.fold(a.realPath)===ps.fold(b.realPath)||(a.exists&&b.exists&&a.device===b.device&&a.inode===b.inode)||(a.directory&&ps.inside(b.realPath,a.realPath))||(b.directory&&ps.inside(a.realPath,b.realPath));}
+function samePhysical(a,b,ps){return a.exists===b.exists&&(a.exists?a.device===b.device&&a.inode===b.inode:ps.fold(a.realPath)===ps.fold(b.realPath));}
 function base(p,q,c) {
   const errors=[],add=(code,path='',tid=null)=>errors.push(diagnostic(code,path,tid));
   let wave,h;try{wave=staticCheck(p,q);h=staticExecutionDigest(p,q);}catch(e){return envelope(e instanceof ExecutionError?e.errors:[diagnostic('E_SCHEMA')],null);}
@@ -80,6 +81,7 @@ function base(p,q,c) {
   const sourceValid=s=>!!s&&c.artifacts.filter(a=>a.path===s.path&&a.sha256===s.sha256&&a.regular&&a.confined).length===1;
   if(obs.length!==refs.length||refs.some(r=>obs.filter(o=>o.taskId===r.taskId&&o.resourceId===r.id).length!==1)||obs.some(o=>!refs.some(r=>r.taskId===o.taskId&&r.id===o.resourceId)))add('E_RESOURCE');
   for(const o of obs){const r=rs.get(o.resourceId);if(!r||!ps.confined(o.realPath)||!ps.confined(o.parentRealPath)||!ps.inside(o.realPath,o.parentRealPath)||!sourceValid(o.source)||(o.exists?(!o.device||!o.inode||o.linkCount<1):(o.device!==null||o.inode!==null||o.linkCount!==0))||(r.kind==='file'&&o.directory)||(r.kind==='directory'&&!o.directory))add('E_RESOURCE');}
+  const physical=new Map();for(const o of obs){const first=physical.get(o.resourceId);if(first&&!samePhysical(first,o,ps))add('E_RESOURCE','/context/filesystem/resources');else if(!first)physical.set(o.resourceId,o);}
   const cap=c.capacity;if(cap.maxWorkers<1||cap.activeWorkers<0||cap.activeWorkers>cap.maxWorkers||cap.writerSlots<0||!unique(cap.activeWriterTaskIds)||cap.activeWriterTaskIds.some(t=>!tasks.has(t)||!tasks.get(t).resources.some(r=>r.access==='write')||!c.jobs.some(j=>j.taskId===t&&j.state==='RUNNING')))add('E_CAPACITY');
   if(errors.length)return envelope(errors,null);
   const conflicts=[];
@@ -109,9 +111,9 @@ export function evaluateExecution(p,q,returns,c) {
   const artifactValid=(r,expected)=>equalSet(r.artifacts.map(a=>a.path),expected)&&r.artifacts.every(a=>c.artifacts.filter(o=>o.path===a.path&&o.sha256===a.sha256&&o.regular&&o.confined&&sourceValid(o.source)).length===1)&&sourceValid(r.source);
   function checkReturn(r,revision,staticDigest,expectedArtifacts,tid){const j=jobs.get(r.taskId),h=histories.get(r.taskId)?.at(-1);let valid=true;const reject=code=>{add(code,tid,'/returns');valid=false;};if(r.runId!==q.runId||r.wave!==all.get(r.taskId)?.wave||r.revision!==revision||r.staticDigest!==staticDigest||r.returnDigest!==returnHash(r)||(h&&h.status!=='RUNNING'&&h.returnDigest!==r.returnDigest))reject('E_RETURN_STALE');if(!j||!h||!['runId','revision','staticDigest','taskId','attempt','instanceId','jobId','owner'].every(k=>r[k]===j[k])||r.owner!==(tasks.get(r.taskId)?.owner??h.owner)||r.status!==h.status||(r.status==='RUNNING'?j.state!=='RUNNING':j.state!=='TERMINAL'||j.terminalStatus!==r.status))reject('E_JOB');if(!artifactValid(r,expectedArtifacts))reject('E_ARTIFACT');if(r.status==='FAIL'||r.status==='CANCELLED')reject('E_TASK_FAILED');if(blocked.get(r.taskId)?.size)valid=false;return valid&&r.status==='PASS';}
   const requiredPrior=[...new Set(q.tasks.flatMap(t=>t.dependencies.filter(d=>!tasks.has(d))))];
-  // Non-terminal writer attempts retain occupancy until a trusted terminal return.
-  const occupied=new Set([...c.capacity.activeWriterTaskIds,...c.jobs.filter(j=>j.state==='RUNNING').map(j=>j.taskId)]);
-  for(const [tid,hs] of histories)if(hs.at(-1)?.status==='RUNNING'&&tasks.get(tid)?.resources.some(r=>r.access==='write'))occupied.add(tid);
+  // Non-terminal attempts retain occupancy until a trusted terminal return.
+  const occupied=new Set([...c.capacity.activeWriterTaskIds,...c.jobs.filter(j=>j.state==='RUNNING'||j.state==='UNKNOWN').map(j=>j.taskId)]);
+  for(const [tid,hs] of histories)if(hs.at(-1)?.status==='RUNNING')occupied.add(tid);
   const prior=new Map();for(const d of requiredPrior){const wrappers=c.predecessors.filter(o=>o.taskId===d),w=wrappers[0];let valid=wrappers.length===1&&w.result.taskId===d&&w.result.revision===w.expectedRevision&&w.result.staticDigest===w.expectedStaticDigest&&w.result.returnDigest===w.expectedReturnDigest&&sourceValid(w.source);if(valid)valid=checkReturn(w.result,w.expectedRevision,w.expectedStaticDigest,w.result.artifacts.map(a=>a.path),null);prior.set(d,valid?w.result:null);}
   if(c.predecessors.some(o=>!requiredPrior.includes(o.taskId)))add('E_PREDECESSOR',null);
   function resolve(tid,seen=new Set()){if(state.has(tid))return state.get(tid);if(seen.has(tid))return 'blocked';seen.add(tid);const t=tasks.get(tid),r=current.get(tid),j=jobs.get(tid),hs=histories.get(tid)??[],h=hs.at(-1),codes=blocked.get(tid);let dependencies=true;
@@ -120,9 +122,11 @@ export function evaluateExecution(p,q,returns,c) {
     else if(j?.state==='TERMINAL'){add('E_RETURN_MISSING',tid);if(hs.length>=3)codes.add('ATTEMPTS_EXHAUSTED');}
     else if(j?.state==='RUNNING'&&codes.size===0){state.set(tid,'running');return 'running';}
     if(!r&&!j&&h?.status==='RUNNING')codes.add('ATTEMPT_RUNNING');
-    if(!r&&hs.length>=3)codes.add('ATTEMPTS_EXHAUSTED');
-    if(!r&&!j&&c.capacity.activeWorkers>=c.capacity.maxWorkers)codes.add('CAPACITY');
-    if(!r&&!j&&t.resources.some(r=>r.access==='write')&&c.capacity.writerSlots===0)codes.add('CAPACITY');
+    if(!r&&!j&&h?.status!=='RUNNING'&&hs.length>=3)codes.add('ATTEMPTS_EXHAUSTED');
+    const retryEligible=!h||h.status==='RUNNING'||h.status==='PASS'||(h.status==='FAIL'&&one('solution','model-capability')(h.failureClass));
+    if(!r&&!j&&!retryEligible)codes.add('ATTEMPT_INELIGIBLE');
+    if(!r&&!j&&retryEligible&&c.capacity.activeWorkers>=c.capacity.maxWorkers)codes.add('CAPACITY');
+    if(!r&&!j&&retryEligible&&t.resources.some(r=>r.access==='write')&&c.capacity.writerSlots===0)codes.add('CAPACITY');
     if(!r&&!j&&initial.value.conflicts.some(pair=>(pair.left===tid&&occupied.has(pair.right))||(pair.right===tid&&occupied.has(pair.left))))codes.add('RESOURCE_BUSY');
     const s=codes.size?'blocked':'ready';state.set(tid,s);return s;
   }

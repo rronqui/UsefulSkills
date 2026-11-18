@@ -1,0 +1,60 @@
+Git for Windows wrapper fixture
+================================
+
+File: git.exe
+Release: Git for Windows v2.54.0.windows.1 (x64)
+Expected SHA-256: 81ef35ae005ca9318018d18e3327578ce939fb99feaad6b2d7c8ab15f3de8db5
+
+This is an unmodified byte-for-byte copy of the installed
+`C:\Program Files\Git\cmd\git.exe` from Git for Windows v2.54.0.windows.1.
+It is test data only; tests never execute this fixture.
+
+Upstream provenance and corresponding source:
+- Release page: https://github.com/git-for-windows/git/releases/tag/v2.54.0.windows.1
+- Signed source tag (commit 2b8a3ab140826ac423c2845ef81d4c6ac4f7bf3c):
+  https://github.com/git-for-windows/git/tree/v2.54.0.windows.1
+- Corresponding source archive (SHA-256 e1819cee60d09793dde322cdb1170e03663c41cd9265cf45246219fc5e6aeecd):
+  https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.tar.bz2
+- Git for Windows build/packaging sources:
+  https://github.com/git-for-windows/build-extra/tree/main
+The exact package recipe commit used for this release is
+`9fe4fe3f7453725675b689e924a41f28566b4c44`:
+https://github.com/git-for-windows/MINGW-packages/tree/9fe4fe3f7453725675b689e924a41f28566b4c44/mingw-w64-git
+The corresponding wrapper build inputs are preserved here without edits:
+
+| Fixture | Upstream role | SHA-256 |
+|---|---|---|
+| `git-wrapper.c` | wrapper source | `26b54e0d45fc172424d941fe7b8b87ec8b5b81f15a71954ca212f4fc9887c8fb` |
+| `git-wrapper.rc` | wrapper resource input | `db754d6fe6722ad54d43df15ee93b1d9cead406158ed84dcbf35e5b4225469ed` |
+| `git.rc.in` | Git resource template consumed by `git.res` | `d6892f6781e269e32a2d0d8045c77e024884516f32be607d7d9d9dd322ed7f6b` |
+| `git.manifest` | manifest included by `git.rc.in` | `8af071994d0fe7164c6681cc9ce5ec2225722228eb0cdfe665ec2e6cbe14d0ec` |
+| `GIT-VERSION-GEN` | Git version-resource generation script | `9b8cb5e5755db13878f6abc87577a5c116d0031b1dc4bb4ce2d26936fb57bb20` |
+| `GIT-VERSION-FILE.in` | Git version-file template | `87e32c2eaf0d3db510930ae9d678cf79be6b433288e271a0a22a9f81f6c11640` |
+| `mingw-w64-git.mak` | wrapper compile/link rules | `b79173d806af70f211ce7b67684d8f82f5a2661e186eabf831935cf0f360c86d` |
+| `PKGBUILD` | exact package recipe (`tag=2.54.0.windows.1`) | `430d2c73307f21b529eb3385b40b76c14b83892e9ae52a45d6a90547d1848983` |
+| `git-for-windows.ico` | wrapper icon resource input from the pinned MINGW-packages recipe | `a9dcba5aebc93ae7aacdee03275780fc6c0f15e88fda30c93041e75851e75090` |
+
+The icon is an unmodified byte-for-byte copy of
+`https://raw.githubusercontent.com/git-for-windows/MINGW-packages/9fe4fe3f7453725675b689e924a41f28566b4c44/mingw-w64-git/git-for-windows.ico`.
+The pinned contents metadata identifies the upstream Git blob as
+`a1ce7f6d25dacbb53ad272e09426ec791d25b19d` (89,745 bytes). The expected
+SHA-256 listed by the pinned `PKGBUILD` is
+`a9dcba5aebc93ae7aacdee03275780fc6c0f15e88fda30c93041e75851e75090`,
+which matches this fixture copy.
+
+These files are the small wrapper-specific source/build-input subset; the
+complete Git source is not vendored and remains available at the signed tag
+and source archive above.
+
+License and test-data scope:
+- The wrapper source/package recipe declare GPL-2.0 (`license=('GPL2')`);
+  the complete GPL-2.0 license text is included adjacent as `COPYING`.
+- The pinned package recipe records GPL-2.0 at package level; no standalone
+  icon license or notice is declared in that recipe or its file metadata, so
+  standalone icon-license completeness is unsupported here.
+- `MINGW-PACKAGES-LICENSE` preserves the BSD-3-Clause license for the
+  unmodified packaging-input files copied from MINGW-packages.
+- The executable and accompanying inputs are unmodified upstream test data
+  only. This repository does not execute, alter, or redistribute them as
+  product code; the notice and adjacent license texts travel with the
+  fixture to preserve attribution and corresponding-source information.

@@ -348,6 +348,27 @@ describe('AC-002: safe execution locks and filesystem roots',()=>{
   f.context.capacity.activeWorkers=1;
   return f;
  }
+ function conflictingReaderAttempt(){
+  const f=fixture(['T001','T002']);
+  resource(f,'T001','Reader','C:/fixture/shared',{access:'read'});
+  resource(f,'T002','Writer','C:/fixture/shared',{access:'write'});
+  terminal(f,'T001',{status:'RUNNING'});
+  f.context.capacity.activeWorkers=1;
+  return f;
+ }
+ function conflictingGlobalResourceObservation(){
+  const f=fixture(['T001','T002']);
+  const id='Shared';
+  f.plan.resources.push({id,path:'C:/fixture/shared',kind:'file'});
+  f.plan.tasks[0].resources.push({id,access:'write'});
+  f.plan.tasks[1].resources.push({id,access:'write'});
+  f.context.filesystem.resources.push(
+   {resourceId:id,taskId:'T001',realPath:'C:/fixture/shared',parentRealPath:'C:/fixture',exists:true,directory:false,symlink:false,device:'fixture-device-a',inode:'inode-a',linkCount:1,source:clone(proof)},
+   {resourceId:id,taskId:'T002',realPath:'C:/fixture/other',parentRealPath:'C:/fixture',exists:true,directory:false,symlink:false,device:'fixture-device-b',inode:'inode-b',linkCount:1,source:clone(proof)},
+  );
+  rebind(f);
+  return f;
+ }
  function rootResource({platform,caseSensitive,allowedRoot,path,parentRealPath}){
   const f=fixture(['T001']);
   Object.assign(f.context.filesystem,{platform,caseSensitive,allowedRoots:[allowedRoot]});
@@ -385,6 +406,76 @@ describe('AC-002: safe execution locks and filesystem roots',()=>{
   blocked(r,'T002','RESOURCE_BUSY');
   expect(r.value.complete).toBe(false);
   partition(r,['T001','T002']);
+ });
+ it.each([
+  ['missing job',f=>{f.context.jobs=[];}],
+  ['UNKNOWN job',f=>{f.context.jobs[0].state='UNKNOWN';}],
+ ])('retains a RUNNING reader lock when its job is %s',(_label,mutate)=>{
+  const f=conflictingReaderAttempt();
+  mutate(f);
+  const r=evaluate(f);
+  code(r,'E_JOB',{taskId:'T001'});
+  expect(r.value.ready).not.toContain('T002');
+  expect(r.value.running).not.toContain('T002');
+  expect(r.value.blocked).toContainEqual(expect.objectContaining({taskId:'T002',codes:expect.arrayContaining(['RESOURCE_BUSY'])}));
+  expect(r.value.complete).toBe(false);
+  partition(r,['T001','T002']);
+ });
+it('keeps a conflicting writer blocked when a terminal task job is UNKNOWN while an independent writer remains ready',()=>{
+ const f=fixture();
+ resource(f,'T001','WriterA','C:/fixture/shared');
+ resource(f,'T002','WriterB','C:/fixture/shared');
+ resource(f,'T003','WriterC','C:/fixture/independent');
+ terminal(f,'T001',{status:'PASS'});
+ f.context.jobs[0].state='UNKNOWN';
+ valid(validate(f));
+ const r=evaluate(f);
+ code(r,'E_JOB',{taskId:'T001'});
+ blocked(r,'T001','E_JOB');
+ expect(r.errors.some(e=>e.code==='E_SCHEMA')).toBe(false);
+ expect(r.value.ready).toEqual(['T003']);
+ blocked(r,'T002','RESOURCE_BUSY');
+ expect(r.value.complete).toBe(false);
+ partition(r,['T001','T002','T003']);
+});
+ it.each(['auth','configuration'])('does not retry or escalate after an ineligible terminal %s failure when current observations are cleared',failureClass=>{
+  const f=fixture(['T001','T002']);
+  terminal(f,'T001',{status:'FAIL'});
+  f.context.history.at(-1).failureClass=failureClass;
+  f.context.jobs=[];
+  const r=evaluate(f,[]);
+  expect(r.value.ready).not.toContain('T001');
+  expect(r.value.running).not.toContain('T001');
+  expect(r.value.completed).not.toContain('T001');
+  expect(r.value.blocked).toContainEqual(expect.objectContaining({taskId:'T001',codes:expect.any(Array)}));
+  expect(r.value.complete).toBe(false);
+  expect(r.value.ready).toContain('T002');
+  partition(r,['T001','T002']);
+ });
+ it.each(['solution','model-capability'])('blocks after three eligible terminal attempts when current job and return observations are absent (%s)',failureClass=>{
+  const f=fixture(['T001','T002']);
+  for(let attempt=1;attempt<=3;attempt++){
+   terminal(f,'T001',{status:'FAIL',attempt});
+   f.context.history.at(-1).failureClass=failureClass;
+  }
+  f.context.jobs=[];
+  const r=evaluate(f,[]);
+  expect(r.ok).toBe(true);
+  expect(r.errors).toEqual([]);
+  expect(r.value).not.toBeNull();
+  expect(r.value.ready).not.toContain('T001');
+  expect(r.value.running).not.toContain('T001');
+  expect(r.value.completed).not.toContain('T001');
+  expect(r.value.blocked).toContainEqual(expect.objectContaining({taskId:'T001',codes:expect.arrayContaining(['ATTEMPTS_EXHAUSTED'])}));
+  expect(r.value.ready).toEqual(['T002']);
+  expect(r.value.complete).toBe(false);
+  partition(r,['T001','T002']);
+ });
+ it('fails closed when one global resource ID has conflicting physical observations across writers',()=>{
+  const f=conflictingGlobalResourceObservation();
+  code(validate(f),'E_RESOURCE',{global:true});
+  const r=evaluate(f);
+  code(r,'E_RESOURCE',{global:true});
  });
 
  it('releases a shared writer resource after a trusted terminal PASS return',()=>{

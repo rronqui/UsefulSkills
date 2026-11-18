@@ -30,6 +30,8 @@ function materialize(existing, block) {
     throw new Error("pre-push generated Git trust markers are missing or malformed");
   }
   const end = finish + END.length;
+  const newline = existing.includes("\r\n") ? "\r\n" : "\n";
+  block = block.replace(/\r?\n/g, newline);
   return `${existing.slice(0, start)}${block}${existing.slice(end)}`;
 }
 

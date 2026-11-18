@@ -64,6 +64,22 @@ function preloadBoundary() {
     const r = path.relative(base, path.resolve(String(p)));
     return r !== ".." && !r.startsWith(`..${path.sep}`) && !path.isAbsolute(r);
   };
+  const physicalParentAndName = (candidate) => {
+    const absolute = path.resolve(String(candidate));
+    const physicalParent = original.realpathSync.native(path.dirname(absolute));
+    const stat = original.lstatSync(physicalParent, { bigint: true });
+    return { id: `${stat.dev}:${stat.ino}`, name: path.basename(absolute) };
+  };
+  const matchesFailureTarget = (candidate) => {
+    if (!cfg.failureTarget) return false;
+    try {
+      const expected = physicalParentAndName(cfg.failureTarget);
+      const physical = physicalParentAndName(candidate);
+      return physical.id === expected.id && physical.name === expected.name;
+    } catch {
+      return false;
+    }
+  };
   const live = (p) => cfg.liveRoots.some((base) => contained(base, p) || contained(path.resolve(String(p)), base));
   const save = () => original.writeFileSync(cfg.trace, JSON.stringify(state));
   let nested = 0;
@@ -106,17 +122,17 @@ function preloadBoundary() {
       error.code = "EIO";
       throw error;
     }
-    if (target == null || !live(target)) return;
+    const failureTargetMatch = matchesFailureTarget(targetPath);
+    if (target == null || (!live(target) && !failureTargetMatch)) return;
     state.mutations.push({ name, target: targetPath });
-    const matchesFailureTarget = cfg.failureTarget && path.resolve(targetPath) === path.resolve(cfg.failureTarget);
-    if (!state.injected && name === "linkSync" && matchesFailureTarget && cfg.mode === "link-failure") {
+    if (!state.injected && name === "linkSync" && failureTargetMatch && cfg.mode === "link-failure") {
       state.injected = true;
       save();
       const error = new Error(`injected publication failure for ${targetPath}`);
       error.code = "EIO";
       throw error;
     }
-    if (!state.injected && name === "linkSync" && matchesFailureTarget && cfg.mode === "link-collision") {
+    if (!state.injected && name === "linkSync" && failureTargetMatch && cfg.mode === "link-collision") {
       original.writeFileSync(targetPath, Buffer.from(cfg.foreignBase64, "base64"), { flag: "wx" });
       state.injected = true;
       save();
@@ -1074,6 +1090,12 @@ function exactIdentityBoundary() {
     const rel = path.relative(base, path.resolve(String(p)));
     return rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
   };
+  const physicalParentAndName = (candidate) => {
+    const absolute = path.resolve(String(candidate));
+    const physicalParent = orig.realpathSync.native(path.dirname(absolute));
+    const stat = orig.lstatSync(physicalParent, { bigint: true });
+    return { id: key(stat), name: path.basename(absolute), path: path.join(physicalParent, path.basename(absolute)) };
+  };
   function rememberFirst(real) {
     if (!state.firstActual) { state.firstActual = key(real); mappings.set(key(real), first); }
   }
@@ -1103,9 +1125,19 @@ function exactIdentityBoundary() {
     return modeled(orig.fstatSync(fd, options), orig.fstatSync(fd, { bigint: true }), options);
   };
   const failAfterPublication = (from, target) => {
-    const managed = cfg.liveRoots.some((r) => contained(r, target));
-    if (!managed || state.injected) return;
-    if (cfg.kind === "new-dir" && !contained(cfg.target, target)) return;
+    let physical;
+    try {
+      physical = physicalParentAndName(target);
+    } catch {
+      return;
+    }
+    let targetMatches = false;
+    try {
+      const expected = physicalParentAndName(cfg.target);
+      targetMatches = physical.id === expected.id && physical.name === expected.name;
+    } catch {}
+    if (!targetMatches && (cfg.kind !== "new-dir" || !contained(cfg.target, physical.path))) return;
+    if (state.injected) return;
     state.publications++;
     if (state.publications !== 1) return;
     state.injected = true;

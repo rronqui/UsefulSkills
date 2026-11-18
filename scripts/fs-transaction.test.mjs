@@ -250,15 +250,530 @@ function replaceQuarantineAtPublishedStage({
   });
   return { injection, restore: () => unlinkSpy.mockRestore() };
 }
+function singleFileTransactionFixture(prefix) {
+  const fixture = sandbox(prefix);
+  const targetsDir = path.join(fixture.home, "targets");
+  fs.mkdirSync(targetsDir);
+  const source = path.join(fixture.scope, "source.bin");
+  const target = path.join(targetsDir, "target.bin");
+  const oldBytes = Buffer.from("original target bytes\n");
+  const newBytes = Buffer.from("staged replacement bytes\n");
+  fs.writeFileSync(source, newBytes);
+  fs.writeFileSync(target, oldBytes);
+  return { fixture, source, target, oldBytes, newBytes };
+}
 
-const posixBoundaryIt = ["linux", "darwin"].includes(process.platform) ? it : it.skip;
+function replaceParentWithSymlinkAtPublication({ target, parent, outside, pivotAfterRename = false }) {
+  const originalRenameSync = nodeFs.renameSync;
+  const physicalParentAndName = candidate => {
+    const absolute = path.resolve(String(candidate));
+    const lexicalParent = path.dirname(absolute);
+    const physicalParent = fs.realpathSync.native(lexicalParent);
+    const stat = fs.lstatSync(physicalParent, { bigint: true });
+    return {
+      id: `${stat.dev}:${stat.ino}`,
+      name: path.basename(absolute),
+    };
+  };
+  const targetPhysical = physicalParentAndName(target);
+  const outsideTarget = path.join(outside, targetPhysical.name);
+  const injection = {
+    called: false,
+    preserved: null,
+    publicationSyscallReturned: false,
+    afterPublication: null,
+    outsideObservations: [],
+  };
+  const inspectOutsideTarget = () => {
+    try {
+      const stat = fs.lstatSync(outsideTarget, { bigint: true });
+      const observation = {
+        exists: true,
+        id: `${stat.dev}:${stat.ino}`,
+        bytes: fs.readFileSync(outsideTarget),
+        symbolicLink: stat.isSymbolicLink(),
+      };
+      injection.outsideObservations.push(observation);
+      return observation;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      const observation = { exists: false, id: null, bytes: null, symbolicLink: false };
+      injection.outsideObservations.push(observation);
+      return observation;
+    }
+  };
+  const pivot = () => {
+    injection.preserved = `${parent}.preserved`;
+    originalRenameSync(parent, injection.preserved);
+    nodeFs.symlinkSync(outside, parent);
+    injection.called = true;
+  };
+  const renameSpy = vi.spyOn(nodeFs, "renameSync").mockImplementation((from, to, ...args) => {
+    let candidate;
+    try {
+      candidate = physicalParentAndName(from);
+    } catch {
+      candidate = null;
+    }
+    const isPublication = !injection.called
+      && candidate
+      && candidate.id === targetPhysical.id
+      && candidate.name === targetPhysical.name
+      && path.basename(path.resolve(String(to))) === "0.backup.quarantine";
+    if (!isPublication) {
+      const result = originalRenameSync(from, to, ...args);
+      if (injection.called) inspectOutsideTarget();
+      return result;
+    }
+    if (!pivotAfterRename) pivot();
+    const result = originalRenameSync(from, to, ...args);
+    injection.publicationSyscallReturned = true;
+    if (pivotAfterRename) {
+      pivot();
+      injection.afterPublication = inspectOutsideTarget();
+    } else if (injection.called) {
+      inspectOutsideTarget();
+    }
+    return result;
+  });
+  return { injection, restore: () => renameSpy.mockRestore() };
+}
+
+function precreateForeignReservation({ mode, foreignBytes }) {
+  const originalCopyFileSync = nodeFs.copyFileSync;
+  const trigger = mode === "backup" ? "0.stage" : "0.backup";
+  const reservationName = mode === "backup" ? "0.backup" : "0.backup.quarantine";
+  const injection = { called: false, path: null, identity: null };
+  const copySpy = vi.spyOn(nodeFs, "copyFileSync").mockImplementation((from, to, ...args) => {
+    const result = originalCopyFileSync(from, to, ...args);
+    if (!injection.called && path.basename(String(to)) === trigger) {
+      injection.path = path.join(path.dirname(String(to)), reservationName);
+      nodeFs.writeFileSync(injection.path, foreignBytes, { flag: "wx" });
+      injection.identity = fs.lstatSync(injection.path, { bigint: true });
+      injection.called = true;
+    }
+    return result;
+  });
+  return { injection, restore: () => copySpy.mockRestore() };
+}
+
+function replaceBackupAtCleanup(foreignBytes) {
+  const originalUnlinkSync = nodeFs.unlinkSync;
+  const injection = { called: false, path: null, identity: null };
+  const unlinkSpy = vi.spyOn(nodeFs, "unlinkSync").mockImplementation((file, ...args) => {
+    const result = originalUnlinkSync(file, ...args);
+    if (!injection.called && path.basename(String(file)) === "0.backup.quarantine") {
+      injection.path = path.join(path.dirname(String(file)), "0.backup");
+      originalUnlinkSync(injection.path);
+      nodeFs.writeFileSync(injection.path, foreignBytes, { flag: "wx" });
+      injection.identity = fs.lstatSync(injection.path, { bigint: true });
+      injection.called = true;
+    }
+    return result;
+  });
+  return { injection, restore: () => unlinkSpy.mockRestore() };
+}
+
+function failSecondSourceAfterFirstPublication(secondSource) {
+  const originalUnlinkSync = nodeFs.unlinkSync;
+  const injection = { called: false };
+  const unlinkSpy = vi.spyOn(nodeFs, "unlinkSync").mockImplementation((file, ...args) => {
+    const result = originalUnlinkSync(file, ...args);
+    if (!injection.called && path.basename(String(file)) === "0.stage") {
+      nodeFs.writeFileSync(secondSource, Buffer.from("second source changed during rollback\n"));
+      injection.called = true;
+    }
+    return result;
+  });
+  return { injection, restore: () => unlinkSpy.mockRestore() };
+}
+
+function replaceRollbackTargetAfterHardlink({
+  target,
+  foreignBytes,
+  parent = null,
+  outside = null,
+  pivotBeforeHardlink = false,
+}) {
+  const originalLinkSync = nodeFs.linkSync;
+  const originalRenameSync = nodeFs.renameSync;
+  const physicalParentAndName = candidate => {
+    const absolute = path.resolve(String(candidate));
+    const lexicalParent = path.dirname(absolute);
+    const physicalParent = fs.realpathSync.native(lexicalParent);
+    const stat = fs.lstatSync(physicalParent, { bigint: true });
+    return {
+      id: `${stat.dev}:${stat.ino}`,
+      name: path.basename(absolute),
+    };
+  };
+  const targetPhysical = physicalParentAndName(target);
+  const injection = {
+    called: false,
+    identity: null,
+    orphan: null,
+    parentPivoted: false,
+    publicationSyscallReturned: false,
+    preserved: null,
+  };
+  const pivotParent = () => {
+    if (!parent || !outside) throw new Error("rollback parent-pivot fixture requires parent and outside");
+    injection.preserved = `${parent}.preserved`;
+    originalRenameSync(parent, injection.preserved);
+    nodeFs.symlinkSync(outside, parent);
+    injection.parentPivoted = true;
+  };
+  const linkSpy = vi.spyOn(nodeFs, "linkSync").mockImplementation((from, to, ...args) => {
+    let candidate;
+    try {
+      candidate = physicalParentAndName(from);
+    } catch {
+      candidate = null;
+    }
+    const isRollbackHardlink = !injection.called
+      && candidate
+      && candidate.id === targetPhysical.id
+      && candidate.name === targetPhysical.name
+      && path.basename(path.resolve(String(to))).endsWith(".foreign");
+    if (!isRollbackHardlink) return originalLinkSync(from, to, ...args);
+
+    injection.orphan = path.resolve(String(to));
+    if (pivotBeforeHardlink) pivotParent();
+    const result = originalLinkSync(from, to, ...args);
+    injection.publicationSyscallReturned = true;
+    if (!pivotBeforeHardlink) {
+      nodeFs.rmSync(target);
+      nodeFs.writeFileSync(target, foreignBytes, { flag: "wx" });
+      injection.identity = fs.lstatSync(target, { bigint: true });
+    }
+    injection.called = true;
+    return result;
+  });
+  return { injection, restore: () => linkSpy.mockRestore() };
+}
+
+// These races require real POSIX symlink/rename/link/unlink semantics and an
+// owned writable temp fixture. On Windows the parent runs them under WSL/Linux.
+const posixBoundaryIt = ["linux", "darwin"].includes(process.platform)
+  ? it
+  : (name, test) => it.skip(`${name} — requires POSIX real-FS interleavings (run under WSL/Linux)`, test);
 
 
 const supportedBoundary = ["linux", "darwin", "win32"].includes(process.platform)
   && (process.platform !== "win32" || process.arch === "x64");
 const boundaryIt = supportedBoundary ? it : it.skip;
+const linuxParentPivotIt = process.platform === "linux"
+  ? it
+  : (name, test) => it.skip(`${name} — requires Linux parent-pivot real-FS interleavings`, test);
+
 
 describe("AC-005 fs-transaction boundary", () => {
+  posixBoundaryIt("fails closed when the target parent becomes a symlink before pathname publication", () => {
+    const { fixture, source, target } = singleFileTransactionFixture("fs-transaction-parent-swap-");
+    const parent = path.dirname(target);
+    const outsideTarget = path.join(fixture.outside, "target.bin");
+    const outsideBytes = Buffer.from("foreign bytes outside HOME\n");
+    fs.writeFileSync(outsideTarget, outsideBytes);
+    const outsideIdentity = fs.lstatSync(outsideTarget, { bigint: true });
+    const parentBefore = fs.lstatSync(parent, { bigint: true });
+    const attack = replaceParentWithSymlinkAtPublication({
+      target,
+      parent,
+      outside: fixture.outside,
+    });
+    let error;
+    try {
+      try {
+        transact([{
+          source,
+          target,
+          expectedParent: { path: parent, id: `${parentBefore.dev}:${parentBefore.ino}` },
+          retainBackup: false,
+        }], { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(attack.injection.called, "the parent swap must occur after the final parent check").toBe(true);
+      expect(error, "publication through a replaced parent must be rejected").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.existsSync(outsideTarget), "the foreign outside target must not be moved").toBe(true);
+      expect(fs.readFileSync(outsideTarget)).toEqual(outsideBytes);
+      const outsideAfter = fs.lstatSync(outsideTarget, { bigint: true });
+      expect(`${outsideAfter.dev}:${outsideAfter.ino}`).toBe(`${outsideIdentity.dev}:${outsideIdentity.ino}`);
+      expect(fs.readdirSync(fixture.outside).sort()).toEqual(["target.bin"]);
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
+  linuxParentPivotIt("preserves a foreign outside target with the same basename when the parent pivots after the real quarantine rename", () => {
+    const { fixture, source, target, oldBytes } = singleFileTransactionFixture("fs-transaction-parent-pivot-foreign-");
+    const parent = path.dirname(target);
+    const outsideTarget = path.join(fixture.outside, path.basename(target));
+    const outsideBytes = Buffer.from("foreign outside target must remain untouched\n");
+    fs.writeFileSync(outsideTarget, outsideBytes);
+    const outsideIdentity = fs.lstatSync(outsideTarget, { bigint: true });
+    const targetIdentity = fs.lstatSync(target, { bigint: true });
+    expect(path.basename(outsideTarget)).toBe(path.basename(target));
+    expect(outsideBytes).not.toEqual(oldBytes);
+    expect(`${outsideIdentity.dev}:${outsideIdentity.ino}`).not.toBe(`${targetIdentity.dev}:${targetIdentity.ino}`);
+    const parentBefore = fs.lstatSync(parent, { bigint: true });
+    const attack = replaceParentWithSymlinkAtPublication({
+      target,
+      parent,
+      outside: fixture.outside,
+      pivotAfterRename: true,
+    });
+    let error;
+    try {
+      try {
+        transact([{
+          source,
+          target,
+          expectedParent: { path: parent, id: `${parentBefore.dev}:${parentBefore.ino}` },
+          retainBackup: false,
+        }], { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(attack.injection.called, "the parent pivot must follow a real publication syscall").toBe(true);
+      expect(attack.injection.publicationSyscallReturned, "the wrapper must return from the real publication syscall").toBe(true);
+      expect(attack.injection.afterPublication, "the outside target must be inspected before postcheck/recovery").toBeDefined();
+      expect(attack.injection.afterPublication.exists).toBe(true);
+      expect(attack.injection.afterPublication.bytes).toEqual(outsideBytes);
+      expect(attack.injection.afterPublication.id).toBe(`${outsideIdentity.dev}:${outsideIdentity.ino}`);
+      expect(error, "a parent pivot must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(outsideTarget), "the foreign outside target must not be clobbered").toEqual(outsideBytes);
+      const outsideAfter = fs.lstatSync(outsideTarget, { bigint: true });
+      expect(`${outsideAfter.dev}:${outsideAfter.ino}`).toBe(`${outsideIdentity.dev}:${outsideIdentity.ino}`);
+      for (const observation of attack.injection.outsideObservations) {
+        expect(observation.exists).toBe(true);
+        expect(observation.bytes).toEqual(outsideBytes);
+        expect(observation.id).toBe(`${outsideIdentity.dev}:${outsideIdentity.ino}`);
+      }
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
+
+  linuxParentPivotIt("does not transiently publish through the outside parent after the real quarantine rename", () => {
+    const { fixture, source, target } = singleFileTransactionFixture("fs-transaction-parent-pivot-absent-");
+    const parent = path.dirname(target);
+    const outsideTarget = path.join(fixture.outside, path.basename(target));
+    expect(fs.existsSync(outsideTarget)).toBe(false);
+    const parentBefore = fs.lstatSync(parent, { bigint: true });
+    const attack = replaceParentWithSymlinkAtPublication({
+      target,
+      parent,
+      outside: fixture.outside,
+      pivotAfterRename: true,
+    });
+    let error;
+    try {
+      try {
+        transact([{
+          source,
+          target,
+          expectedParent: { path: parent, id: `${parentBefore.dev}:${parentBefore.ino}` },
+          retainBackup: false,
+        }], { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(attack.injection.called, "the parent pivot must follow a real publication syscall").toBe(true);
+      expect(attack.injection.publicationSyscallReturned, "the wrapper must return from the real publication syscall").toBe(true);
+      expect(attack.injection.afterPublication, "the outside target must be inspected before postcheck/recovery").toBeDefined();
+      expect(attack.injection.afterPublication.exists, "no outside publication may occur before postcheck/recovery").toBe(false);
+      expect(attack.injection.outsideObservations.length).toBeGreaterThan(0);
+      expect(
+        attack.injection.outsideObservations.every(observation => !observation.exists),
+        "no observed real-FS interleaving may publish into the outside target",
+      ).toBe(true);
+      expect(error, "a parent pivot must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.existsSync(outsideTarget), "the outside target must remain absent after rejection").toBe(false);
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
+
+
+  for (const mode of ["quarantine", "backup"]) {
+    posixBoundaryIt(`preserves a foreign precreated ${mode} reservation`, () => {
+      const { fixture, source, target, oldBytes } = singleFileTransactionFixture(`fs-transaction-precreated-${mode}-`);
+      const foreignBytes = Buffer.from(`foreign ${mode} reservation\n`);
+      const attack = precreateForeignReservation({ mode, foreignBytes });
+      let error;
+      try {
+        try {
+          transact([{ source, target, retainBackup: false }], {
+            home: fixture.home,
+            sourceScopes: [fixture.scope],
+          });
+        } catch (caught) {
+          error = caught;
+        }
+        expect(attack.injection.called, "the foreign reservation must be created in the real transaction").toBe(true);
+        expect(error, "a precreated transaction entry must block publication").toBeDefined();
+        expect(error.code).toBe("E_INSTALL_DRIFT");
+        expect(fs.readFileSync(attack.injection.path)).toEqual(foreignBytes);
+        const foreignAfter = fs.lstatSync(attack.injection.path, { bigint: true });
+        expect(`${foreignAfter.dev}:${foreignAfter.ino}`).toBe(`${attack.injection.identity.dev}:${attack.injection.identity.ino}`);
+        expect(fs.readFileSync(target), "a rejected reservation must leave the target preimage intact").toEqual(oldBytes);
+      } finally {
+        attack.restore();
+        fixture.close();
+      }
+    });
+  }
+
+  posixBoundaryIt("preserves a foreign backup replacement during retainBackup:false cleanup", () => {
+    const { fixture, source, target, newBytes } = singleFileTransactionFixture("fs-transaction-backup-cleanup-");
+    const foreignBytes = Buffer.from("foreign bytes replaced at backup cleanup\n");
+    const attack = replaceBackupAtCleanup(foreignBytes);
+    let error;
+    try {
+      try {
+        transact([{ source, target, retainBackup: false }], {
+          home: fixture.home,
+          sourceScopes: [fixture.scope],
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(attack.injection.called, "the backup must be replaced after quarantine cleanup").toBe(true);
+      expect(error, "backup ownership drift must be surfaced").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(attack.injection.path)).toEqual(foreignBytes);
+      const foreignAfter = fs.lstatSync(attack.injection.path, { bigint: true });
+      expect(`${foreignAfter.dev}:${foreignAfter.ino}`).toBe(`${attack.injection.identity.dev}:${attack.injection.identity.ino}`);
+      expect(fs.readFileSync(target), "published bytes remain observable after cleanup drift").toEqual(newBytes);
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
+
+  posixBoundaryIt("does not delete a foreign rollback target replacement after hardlinking the owned publication", () => {
+    const {
+      fixture,
+      operations,
+      firstTarget,
+      firstNewBytes,
+      secondTarget,
+      secondOldBytes,
+      secondSource,
+      externalSentinel,
+      externalIdentity,
+      externalBytes,
+    } = quarantineRollbackFixture();
+    const foreignBytes = Buffer.from("foreign rollback replacement\n");
+    const failure = failSecondSourceAfterFirstPublication(secondSource);
+    const attack = replaceRollbackTargetAfterHardlink({ target: firstTarget, foreignBytes });
+    let error;
+    try {
+      try {
+        transact(operations, { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(failure.injection.called, "the later operation must force rollback").toBe(true);
+      expect(attack.injection.called, "the target must be replaced after the ownership link").toBe(true);
+      expect(error, "rollback ownership drift must be surfaced").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(firstTarget), "rollback must not unlink the foreign replacement").toEqual(foreignBytes);
+      const foreignAfter = fs.lstatSync(firstTarget, { bigint: true });
+      expect(`${foreignAfter.dev}:${foreignAfter.ino}`).toBe(`${attack.injection.identity.dev}:${attack.injection.identity.ino}`);
+      expect(fs.readFileSync(secondTarget)).toEqual(secondOldBytes);
+      expect(fs.readFileSync(externalSentinel)).toEqual(externalBytes);
+      const externalAfter = fs.lstatSync(externalSentinel, { bigint: true });
+      expect(`${externalAfter.dev}:${externalAfter.ino}`).toBe(`${externalIdentity.dev}:${externalIdentity.ino}`);
+      expect(firstNewBytes.equals(fs.readFileSync(firstTarget))).toBe(false);
+    } finally {
+      attack.restore();
+      failure.restore();
+      fixture.close();
+    }
+  });
+  linuxParentPivotIt("does not retain a foreign outside inode in the rollback orphan after a parent pivot", () => {
+    const {
+      fixture,
+      operations,
+      firstTarget,
+      firstOldBytes,
+      firstNewBytes,
+      secondTarget,
+      secondOldBytes,
+      secondSource,
+      externalSentinel,
+      externalIdentity,
+      externalBytes,
+    } = quarantineRollbackFixture();
+    const parent = path.dirname(firstTarget);
+    const outsideTarget = path.join(fixture.outside, path.basename(firstTarget));
+    const outsideBytes = Buffer.from("foreign outside rollback inode\n");
+    fs.writeFileSync(outsideTarget, outsideBytes);
+    const outsideBefore = fs.lstatSync(outsideTarget, { bigint: true });
+    const targetBefore = fs.lstatSync(firstTarget, { bigint: true });
+    expect(outsideBytes).not.toEqual(firstNewBytes);
+    expect(`${outsideBefore.dev}:${outsideBefore.ino}`).not.toBe(`${targetBefore.dev}:${targetBefore.ino}`);
+    const failure = failSecondSourceAfterFirstPublication(secondSource);
+    const attack = replaceRollbackTargetAfterHardlink({
+      target: firstTarget,
+      foreignBytes: outsideBytes,
+      parent,
+      outside: fixture.outside,
+      pivotBeforeHardlink: true,
+    });
+    let error;
+    try {
+      try {
+        transact(operations, { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(failure.injection.called, "the later operation must force rollback").toBe(true);
+      expect(attack.injection.parentPivoted, "the parent must pivot before the rollback hardlink").toBe(true);
+      expect(attack.injection.publicationSyscallReturned, "the real rollback hardlink must return").toBe(true);
+      expect(attack.injection.called, "the physical target must match the rollback hardlink").toBe(true);
+      expect(error, "rollback must report the forced later-operation drift").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+
+      const outsideAfter = fs.lstatSync(outsideTarget, { bigint: true });
+      expect(fs.readFileSync(outsideTarget), "the foreign same-basename bytes must remain unchanged").toEqual(outsideBytes);
+      expect(`${outsideAfter.dev}:${outsideAfter.ino}`).toBe(`${outsideBefore.dev}:${outsideBefore.ino}`);
+      expect(outsideAfter.nlink, "the foreign inode must not gain a private transaction alias").toBe(outsideBefore.nlink);
+
+      const preservedParent = attack.injection.preserved;
+      expect(preservedParent).toBe(`${parent}.preserved`);
+      const ownedFirstTarget = path.join(preservedParent, path.basename(firstTarget));
+      const ownedSecondTarget = path.join(preservedParent, path.basename(secondTarget));
+      expect(fs.readFileSync(ownedFirstTarget), "rollback must restore the owned first target").toEqual(firstOldBytes);
+      expect(fs.readFileSync(ownedSecondTarget), "rollback must preserve the owned second target").toEqual(secondOldBytes);
+      expect(fs.readFileSync(externalSentinel), "the external sentinel must remain intact").toEqual(externalBytes);
+      const externalAfter = fs.lstatSync(externalSentinel, { bigint: true });
+      expect(`${externalAfter.dev}:${externalAfter.ino}`).toBe(`${externalIdentity.dev}:${externalIdentity.ino}`);
+
+      const transaction = attack.injection.orphan && path.dirname(attack.injection.orphan);
+      const foreignAliases = transaction && fs.existsSync(transaction)
+        ? fs.readdirSync(transaction).filter(name => {
+          const candidate = path.join(transaction, name);
+          const stat = fs.lstatSync(candidate, { bigint: true });
+          return stat.isFile() && `${stat.dev}:${stat.ino}` === `${outsideBefore.dev}:${outsideBefore.ino}`;
+        })
+        : [];
+      expect(foreignAliases, "the private transaction must not retain an alias of the outside inode").toEqual([]);
+    } finally {
+      attack.restore();
+      failure.restore();
+      fixture.close();
+    }
+  });
+
   for (const variant of [
     {
       name: "foreign regular bytes",

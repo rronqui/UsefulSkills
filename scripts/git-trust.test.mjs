@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import * as nodeFs from "node:fs";
 import * as crypto from "node:crypto";
 import * as os from "node:os";
 import path from "node:path";
+import * as vm from "node:vm";
 import { createGitSession } from "./lib/git-trust-source.mjs";
 
 /*
@@ -28,7 +30,7 @@ import { createGitSession } from "./lib/git-trust-source.mjs";
  * dependency seam supplies it here.
  */
 
-// Parent identities are deterministic fixture values, not native observations.
+// Positive Windows metadata uses pinned bytes plus the modeled native adapter below.
 
 const OFFICIAL = Object.freeze({
   productVersion: "2.54.0.windows.1",
@@ -47,12 +49,64 @@ const DLL_HASHES = Object.freeze({
   "mingw64/bin/zlib1.dll": "93e9243a44c29200eeacaf9658efe2558581770e4b11ca4b500e18e424a6e3b5",
 });
 
+/*
+ * The Windows seam models the approved native-query boundary explicitly:
+ * `node` is the small numeric dev/ino tuple a Node stat adapter may expose,
+ * while `native` is the opaque, full-width volume64/fileId128 tuple emitted
+ * by Identity (the volume bytes are already in the helper's canonical order).
+ * The asymmetric high bits make accidental truncation or byte-order reuse
+ * visible without asserting how the backend obtains the tuple.
+ */
+const FIXTURE_NATIVE_IDENTITY = Object.freeze({
+  volume: "0xF1E2D3C4B5A69788",
+  fileId128: "0xE0D1C2B3A49586771122334455667788",
+});
+const FIXTURE_NODE_STAT = Object.freeze({
+  dev: 0x2Bn,
+  ino: 0x43A1n,
+});
+/*
+ * Physical replacement controls use real Node dev/ino only as source material.
+ * The tagged mapping below is a test-adapter tuple, not an OS-native claim;
+ * both metadata snapshots and live stat observations use it consistently.
+ */
+const MODELED_PHYSICAL_VOLUME_PREFIX = 0xA1B2C3D400000000n;
+const MODELED_PHYSICAL_FILE_ID_PREFIX = 0xE0D1C2B3A4958677n << 64n;
+const MODELED_VOLUME_NODE_BITS = (1n << 48n) - 1n;
+const MODELED_FILE_ID_NODE_BITS = (1n << 64n) - 1n;
+
 const WRAPPER_PATH = "C:\\Program Files\\Git\\cmd\\git.exe";
+const PINNED_WRAPPER_FIXTURE = new URL("./fixtures/git-trust/git.exe", import.meta.url);
 const CANDIDATE_DIR = "C:\\Program Files\\Git\\cmd";
 const FALLBACK_DIR = "C:\\Users\\attacker\\bin";
 const REPO_CWD = "C:\\work\\UsefulSkills";
 const WINDOWS_ROOT = "C:\\Windows";
 const POWERSHELL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+
+const GENERATED_GIT_TRUST_BEGIN = "// BEGIN GENERATED GIT TRUST (do not edit)";
+const GENERATED_GIT_TRUST_END = "// END GENERATED GIT TRUST";
+
+function loadGeneratedGitSessionFactory() {
+  const hook = nodeFs.readFileSync(new URL("./hooks/pre-push.mjs", import.meta.url), "utf8");
+  const start = hook.indexOf(GENERATED_GIT_TRUST_BEGIN);
+  const finish = hook.indexOf(GENERATED_GIT_TRUST_END);
+  if (start < 0 || finish < start) throw new Error("generated Git trust markers are missing or malformed");
+
+  const block = hook.slice(start, finish + GENERATED_GIT_TRUST_END.length);
+  const context = vm.createContext({ Buffer, Uint8Array });
+  new vm.Script(`${block}\nglobalThis.__generatedGitTrustFactory = __createGitSession;`, {
+    filename: "scripts/hooks/pre-push.generated-git-trust.mjs",
+  }).runInContext(context);
+  return context.__generatedGitTrustFactory;
+}
+
+function createGeneratedGitSession(dependencies) {
+  return loadGeneratedGitSessionFactory()(dependencies);
+}
+
+// The generator's generated block is loaded in isolation; the hook's push CLI is never executed.
+
+
 
 const ALLOWED_TUPLES = Object.freeze([
   ["config", "--local", "--null", "--get-all", "core.hooksPath"],
@@ -190,7 +244,7 @@ function knownDependency(name, basis) {
   };
 }
 
-function fileRow({ relative, absolutePath, sha256, nlink = 1, fileId128, signature = null, aliases = [] }) {
+function fileRow({ relative, absolutePath, sha256, nlink = 1, volume = "0x000000008CAB0001", fileId128, signature = null, aliases = [] }) {
   return {
     relative,
     path: absolutePath,
@@ -201,7 +255,7 @@ function fileRow({ relative, absolutePath, sha256, nlink = 1, fileId128, signatu
     nlink,
     sha256,
     identity: {
-      volume: "0x000000008CAB0001",
+      volume,
       fileId128: fileId128 ?? `0x${(relative.length + 100).toString(16).padStart(32, "0")}`,
     },
     aliases: aliases.length > 0 ? [...aliases] : [absolutePath],
@@ -212,13 +266,15 @@ function fileRow({ relative, absolutePath, sha256, nlink = 1, fileId128, signatu
 }
 
 function makeMetadata({ candidateName = "git.exe", candidateNlink = 2 } = {}) {
+  const pinned = readPinnedWrapperObservation();
   const candidatePath = path.win32.join(CANDIDATE_DIR, candidateName);
   const wrapper = fileRow({
     relative: `cmd/${candidateName}`,
     absolutePath: candidatePath,
-    sha256: OFFICIAL.wrapperSha256,
+    sha256: pinned.hash,
     nlink: candidateNlink,
-    fileId128: "0x0000000000000000000200000003E019",
+    volume: pinned.identity.volume,
+    fileId128: pinned.identity.fileId128,
     aliases: [
       "C:\\Program Files\\Git\\cmd\\git.exe",
       "C:\\Program Files\\Git\\cmd\\git-lfs.exe",
@@ -235,9 +291,10 @@ function makeMetadata({ candidateName = "git.exe", candidateNlink = 2 } = {}) {
   const lfs = fileRow({
     relative: "cmd/git-lfs.exe",
     absolutePath: "C:\\Program Files\\Git\\cmd\\git-lfs.exe",
-    sha256: OFFICIAL.wrapperSha256,
+    sha256: pinned.hash,
     nlink: 2,
-    fileId128: wrapper.identity.fileId128,
+    volume: pinned.identity.volume,
+    fileId128: pinned.identity.fileId128,
     aliases: [...wrapper.aliases],
     signature: { ...wrapper.signature },
   });
@@ -405,17 +462,39 @@ function allRows(metadata) {
 
 function fakeFs({ candidateName = "git.exe", candidateNlink = 2, includeFallback = false } = {}) {
   const candidate = path.win32.join(CANDIDATE_DIR, candidateName);
-  const entries = new Map([[candidate, { nlink: candidateNlink, type: "file", symlink: false }]]);
+  const pinned = readPinnedWrapperObservation();
+  const entries = new Map([[
+    candidate,
+    {
+      nlink: candidateNlink,
+      type: "file",
+      symlink: false,
+      bytes: Buffer.from(pinned.bytes),
+      node: { dev: FIXTURE_NODE_STAT.dev, ino: FIXTURE_NODE_STAT.ino },
+      native: { volume: pinned.identity.volume, fileId128: pinned.identity.fileId128 },
+    },
+  ]]);
   if (includeFallback) {
-    entries.set(path.win32.join(FALLBACK_DIR, "git.exe"), { nlink: 1, type: "file", symlink: false });
+    entries.set(path.win32.join(FALLBACK_DIR, "git.exe"), {
+      nlink: 1,
+      type: "file",
+      symlink: false,
+      bytes: Buffer.from("untrusted fallback candidate"),
+      node: { dev: 0xdeadn, ino: 0xbeefn },
+      native: { volume: "0x0102030405060708", fileId128: "0x887766554433221100FFEEDDCCBBAA99" },
+    });
   }
-  const lstatSync = vi.fn((target) => {
+  const find = (target) => {
     const row = entries.get(String(target));
     if (!row) {
       const error = new Error(`ENOENT: ${target}`);
       error.code = "ENOENT";
       throw error;
     }
+    return row;
+  };
+  const lstatSync = vi.fn((target) => {
+    const row = find(target);
     return {
       isFile: () => row.type === "file",
       isDirectory: () => row.type === "directory",
@@ -423,14 +502,31 @@ function fakeFs({ candidateName = "git.exe", candidateNlink = 2, includeFallback
       nlink: row.nlink,
     };
   });
+  const statSync = vi.fn((target, options) => {
+    const row = find(target);
+    const native = options?.bigint === true;
+    return {
+      isFile: () => row.type === "file",
+      isDirectory: () => row.type === "directory",
+      isSymbolicLink: () => row.symlink,
+      nlink: native ? BigInt(row.nlink) : row.nlink,
+      ...(native ? {
+        dev: row.node.dev,
+        ino: row.node.ino,
+        volume: row.native.volume,
+        fileId128: row.native.fileId128,
+      } : {}),
+    };
+  });
+  const readFileSync = vi.fn((target) => Buffer.from(find(target).bytes));
   return {
     lstatSync,
-    statSync: lstatSync,
+    statSync,
+    readFileSync,
     existsSync: (target) => entries.has(String(target)),
     realpathSync: { native: vi.fn((target) => String(target)) },
   };
 }
-
 function makeDependencies({
   metadata = makeMetadata(),
   candidateName = "git.exe",
@@ -471,6 +567,233 @@ function makeDependencies({
   return { dependencies, spawnSync, query, metadata };
 }
 
+/*
+ * These regressions copy the pinned executable read-only into a fresh owned
+ * directory, then replace only that owned path. The race is not predicated on
+ * a privileged writer defeating the installed Git ACL; it verifies that a
+ * session cannot rely on pathname retention even when the candidate path is
+ * replaced by an authorized concurrent filesystem actor.
+ */
+function sha256Bytes(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+let pinnedWrapperObservation;
+function readPinnedWrapperObservation() {
+  if (pinnedWrapperObservation) return pinnedWrapperObservation;
+  const bytes = nodeFs.readFileSync(PINNED_WRAPPER_FIXTURE);
+  const stat = nodeFs.statSync(PINNED_WRAPPER_FIXTURE, { bigint: true });
+  if (!Buffer.isBuffer(bytes) || !stat?.isFile?.() || stat?.isSymbolicLink?.()) {
+    throw new Error("pinned Git wrapper fixture is incomplete");
+  }
+  const hash = sha256Bytes(bytes);
+  if (hash !== OFFICIAL.wrapperSha256) {
+    throw new Error(`pinned Git wrapper hash mismatch: expected ${OFFICIAL.wrapperSha256}, got ${hash}`);
+  }
+  pinnedWrapperObservation = Object.freeze({
+    bytes: Buffer.from(bytes),
+    hash,
+    identity: FIXTURE_NATIVE_IDENTITY,
+  });
+  return pinnedWrapperObservation;
+}
+
+
+function modeledPhysicalNativeIdentity(stat) {
+  const volume = MODELED_PHYSICAL_VOLUME_PREFIX | (BigInt(stat.dev) & MODELED_VOLUME_NODE_BITS);
+  const fileId128 = MODELED_PHYSICAL_FILE_ID_PREFIX | (BigInt(stat.ino) & MODELED_FILE_ID_NODE_BITS);
+  return {
+    volume: `0x${volume.toString(16).padStart(16, "0")}`,
+    fileId128: `0x${fileId128.toString(16).padStart(32, "0")}`,
+  };
+}
+
+function actualFileObservation(file) {
+  const bytes = nodeFs.readFileSync(file);
+  const stat = nodeFs.statSync(file, { bigint: true });
+  return {
+    bytes,
+    hash: sha256Bytes(bytes),
+    nlink: Number(stat.nlink),
+    identity: modeledPhysicalNativeIdentity(stat),
+  };
+}
+
+function createOwnedBinaryReplacement() {
+  const root = nodeFs.mkdtempSync(path.join(os.tmpdir(), "git-trust-owned-"));
+  const candidate = path.join(root, "git.exe");
+  const candidateAlias = path.join(root, "git-lfs.exe");
+  const replacementSource = path.join(root, "replacement.exe");
+  const replacementAlias = path.join(root, "replacement-lfs.exe");
+  const displaced = path.join(root, "displaced.exe");
+
+  try {
+    nodeFs.copyFileSync(WRAPPER_PATH, candidate);
+    nodeFs.linkSync(candidate, candidateAlias);
+    const initialBytes = nodeFs.readFileSync(candidate);
+    const replacementBytes = Buffer.from(initialBytes);
+    replacementBytes[replacementBytes.length - 1] ^= 0xff;
+    nodeFs.writeFileSync(replacementSource, replacementBytes);
+    nodeFs.linkSync(replacementSource, replacementAlias);
+
+    const initial = actualFileObservation(candidate);
+    const replacement = actualFileObservation(replacementSource);
+    let replaceCount = 0;
+    return {
+      root,
+      candidate,
+      initial,
+      replacement,
+      replace() {
+        if (replaceCount > 0) return;
+        nodeFs.renameSync(candidate, displaced);
+        nodeFs.renameSync(replacementSource, candidate);
+        replaceCount += 1;
+      },
+      get replaceCount() {
+        return replaceCount;
+      },
+      cleanup() {
+        nodeFs.rmSync(root, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    nodeFs.rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function bindActualWrapperObservation(metadata, observation) {
+  const rows = [
+    metadata.candidate,
+    metadata.objects.wrapper,
+    ...metadata.objects.wrapperAliases,
+  ];
+  for (const row of rows) {
+    row.sha256 = observation.hash;
+    row.nlink = observation.nlink;
+    row.identity = deepClone(observation.identity);
+  }
+  return metadata;
+}
+
+function makeOwnedBinaryDependencies({ owned, metadata = makeMetadata(), replaceOnProbe = false } = {}) {
+  const observations = [];
+  const query = vi.fn(({ nonce, ...selection }) => {
+    if (!nonce) throw new Error("metadata nonce missing");
+    if (!selection || typeof selection !== "object") throw new Error("metadata selection missing");
+    const observation = actualFileObservation(owned.candidate);
+    observations.push(observation);
+    const observed = bindActualWrapperObservation(deepClone(metadata), observation);
+    if (observed.context) {
+      observed.context.challengeNonce = nonce;
+      observed.context.cwd = selection.cwd;
+      observed.context.env = deepClone(selection.env);
+    }
+    if (replaceOnProbe && owned.replaceCount === 0) owned.replace();
+    return deepFreeze(observed);
+  });
+  const fixture = makeDependencies({ metadata, queryWindowsMetadata: query });
+  const baseLstat = fixture.dependencies.fs.lstatSync;
+  const baseStat = fixture.dependencies.fs.statSync;
+  const baseReadFileSync = fixture.dependencies.fs.readFileSync;
+  const lstatSync = vi.fn((target) => {
+    if (String(target).toLowerCase() === WRAPPER_PATH.toLowerCase()) {
+      return nodeFs.lstatSync(owned.candidate);
+    }
+    return baseLstat(target);
+  });
+  const statSync = vi.fn((target, options) => {
+    if (String(target).toLowerCase() === WRAPPER_PATH.toLowerCase()) {
+      const stat = nodeFs.statSync(owned.candidate, options);
+      if (options?.bigint === true) {
+        Object.assign(stat, modeledPhysicalNativeIdentity(stat));
+      }
+      return stat;
+    }
+    return baseStat(target, options);
+  });
+  const readFileSync = vi.fn((target, options) => {
+    if (String(target).toLowerCase() === WRAPPER_PATH.toLowerCase()) {
+      return nodeFs.readFileSync(owned.candidate, options);
+    }
+    return baseReadFileSync(target, options);
+  });
+  fixture.dependencies.fs = {
+    ...fixture.dependencies.fs,
+    lstatSync,
+    statSync,
+    readFileSync,
+  };
+  const spawned = [];
+  fixture.spawnSync.mockImplementation((executable, args, options) => {
+    spawned.push({
+      executable,
+      args: [...args],
+      options,
+      bytes: nodeFs.readFileSync(owned.candidate),
+    });
+    return { status: 0, stdout: "", stderr: "" };
+  });
+  return { ...fixture, query, observations, spawned };
+}
+const POSIX_GIT_FACTORIES = Object.freeze([
+  ["source factory", createGitSession],
+  ["materialized pre-push factory (existingVMloader)", createGeneratedGitSession],
+]);
+
+function createPosixGitFixture({ hardlink = false } = {}) {
+  const root = nodeFs.mkdtempSync(path.join(os.tmpdir(), "git-trust-posix-"));
+  const candidate = path.join(root, "git");
+  const alias = path.join(root, "git-hardlink");
+  const bytes = Buffer.from("#!/bin/sh\nexit 0\n", "utf8");
+  try {
+    nodeFs.writeFileSync(candidate, bytes, { mode: 0o755 });
+    nodeFs.chmodSync(candidate, 0o755);
+    const addHardlink = () => nodeFs.linkSync(candidate, alias);
+    if (hardlink) addHardlink();
+
+    const spawnSync = vi.fn(() => ({ status: 0, stdout: "", stderr: "" }));
+    const queryWindowsMetadata = vi.fn(() => {
+      throw new Error("POSIX Git admission must not query Windows metadata");
+    });
+    const windowsHostPath = vi.fn(() => {
+      throw new Error("POSIX Git admission must not bootstrap Windows PowerShell");
+    });
+    return {
+      root,
+      candidate,
+      alias,
+      addHardlink,
+      spawnSync,
+      queryWindowsMetadata,
+      windowsHostPath,
+      dependencies: {
+        fs: nodeFs,
+        path: path.posix,
+        crypto,
+        os,
+        spawnSync,
+        platform: process.platform,
+        env: { PATH: root },
+        windowsHostPath,
+        queryWindowsMetadata,
+      },
+      cleanup() {
+        nodeFs.rmSync(root, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    nodeFs.rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function posixRun(session, fixture, args = ALLOWED_TUPLES[0]) {
+  return session.run(args, { cwd: fixture.root });
+}
+
+
 function run(session, args = ALLOWED_TUPLES[0], options = {}) {
   return session.run(args, { cwd: REPO_CWD, ...options });
 }
@@ -483,6 +806,119 @@ function expectUnsafe(result) {
 function mutateEveryObject(metadata, mutate) {
   for (const row of allRows(metadata)) mutate(row);
 }
+function removeNativeIdentity(stat) {
+  for (const field of ["dev", "ino", "volume", "fileId", "fileId128", "identity"]) delete stat[field];
+}
+describe.each(POSIX_GIT_FACTORIES)("AC-008 Git admission session %s", (factoryName, createFactory) => {
+  it.skipIf(process.platform === "win32")(
+    "rejects an actual POSIX hardlinked Git candidate before the first Git spawn",
+    (context) => {
+      let fixture;
+      try {
+        fixture = createPosixGitFixture({ hardlink: true });
+      } catch (error) {
+        context.skip(`POSIX hardlink fixture unavailable: ${error?.code ?? error?.message ?? error}`);
+        return;
+      }
+      try {
+        const candidateStat = nodeFs.lstatSync(fixture.candidate, { bigint: true });
+        const aliasStat = nodeFs.lstatSync(fixture.alias, { bigint: true });
+        expect(candidateStat.nlink).toBe(2n);
+        expect(aliasStat.nlink).toBe(2n);
+        expect(aliasStat.dev).toBe(candidateStat.dev);
+        expect(aliasStat.ino).toBe(candidateStat.ino);
+
+        const session = createFactory(fixture.dependencies);
+        const result = posixRun(session, fixture);
+
+        expectUnsafe(result);
+        expect(fixture.spawnSync).not.toHaveBeenCalled();
+        expect(fixture.queryWindowsMetadata).not.toHaveBeenCalled();
+        expect(fixture.windowsHostPath).not.toHaveBeenCalled();
+      } finally {
+        fixture.cleanup();
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "admits a single-link POSIX Git candidate and the first valid spawn proves the fixture legitimate",
+    (context) => {
+      let fixture;
+      try {
+        fixture = createPosixGitFixture();
+      } catch (error) {
+        context.skip(`POSIX single-link fixture unavailable: ${error?.code ?? error?.message ?? error}`);
+        return;
+      }
+      try {
+        const candidateStat = nodeFs.lstatSync(fixture.candidate, { bigint: true });
+        expect(candidateStat.nlink).toBe(1n);
+
+        const session = createFactory(fixture.dependencies);
+        const result = posixRun(session, fixture);
+
+        expect(result.error?.code).not.toBe("E_UNSAFE_GIT_EXECUTABLE");
+        expect(result.status).toBe(0);
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.spawnSync).toHaveBeenCalledWith(
+          fixture.candidate,
+          ALLOWED_TUPLES[0],
+          expect.objectContaining({ cwd: fixture.root, shell: false }),
+        );
+      } finally {
+        fixture.cleanup();
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a hardlinked POSIX Git candidate on the second invocation after legitimate admission",
+    (context) => {
+      let fixture;
+      try {
+        fixture = createPosixGitFixture();
+      } catch (error) {
+        context.skip(`POSIX single-link fixture unavailable: ${error?.code ?? error?.message ?? error}`);
+        return;
+      }
+      try {
+        expect(nodeFs.lstatSync(fixture.candidate, { bigint: true }).nlink).toBe(1n);
+
+        const session = createFactory(fixture.dependencies);
+        const first = posixRun(session, fixture);
+        expect(first.error?.code).not.toBe("E_UNSAFE_GIT_EXECUTABLE");
+        expect(first.status).toBe(0);
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+
+        try {
+          fixture.addHardlink();
+        } catch (error) {
+          context.skip(`POSIX hardlink fixture unavailable: ${error?.code ?? error?.message ?? error}`);
+          return;
+        }
+        const candidateStat = nodeFs.lstatSync(fixture.candidate, { bigint: true });
+        const aliasStat = nodeFs.lstatSync(fixture.alias, { bigint: true });
+        expect(candidateStat.nlink).toBe(2n);
+        expect(aliasStat.nlink).toBe(2n);
+        expect(aliasStat.dev).toBe(candidateStat.dev);
+        expect(aliasStat.ino).toBe(candidateStat.ino);
+
+        const later = posixRun(session, fixture, ALLOWED_TUPLES[1]);
+
+        expectUnsafe(later);
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.queryWindowsMetadata).not.toHaveBeenCalled();
+        expect(fixture.windowsHostPath).not.toHaveBeenCalled();
+      } finally {
+        fixture.cleanup();
+      }
+    },
+  );
+});
+
+
+
 
 describe("AC-008 Git admission session", () => {
 
@@ -518,6 +954,100 @@ describe("AC-008 Git admission session", () => {
     expectUnsafe(changedEnvironment);
     expect(fixture.spawnSync).toHaveBeenCalledTimes(afterFirst);
   });
+
+  it.skipIf(process.platform !== "win32")(
+    "rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+    (context) => {
+      if (!nodeFs.existsSync(WRAPPER_PATH)) {
+        context.skip(`requires the pinned Windows Git executable at ${WRAPPER_PATH}`);
+        return;
+      }
+      let owned;
+      try {
+        owned = createOwnedBinaryReplacement();
+      } catch (error) {
+        context.skip(`owned Windows binary fixture requires copy and hardlink support: ${error?.code ?? error?.message}`);
+        return;
+      }
+      try {
+        if (owned.initial.hash !== OFFICIAL.wrapperSha256) {
+          context.skip(`requires Git for Windows ${OFFICIAL.productVersion} bytes at ${WRAPPER_PATH}`);
+          return;
+        }
+        expect(owned.initial.nlink).toBe(2);
+        expect(owned.replacement.nlink).toBe(2);
+        expect(owned.replacement.hash).not.toBe(owned.initial.hash);
+        expect(owned.replacement.identity).not.toEqual(owned.initial.identity);
+
+        const fixture = makeOwnedBinaryDependencies({ owned, replaceOnProbe: true });
+        const session = createGitSession(fixture.dependencies);
+        const result = run(session);
+
+        expectUnsafe(result);
+        expect(fixture.query).toHaveBeenCalled();
+        expect(fixture.observations[0]).toEqual(expect.objectContaining({
+          hash: owned.initial.hash,
+          identity: owned.initial.identity,
+          bytes: owned.initial.bytes,
+        }));
+        expect(owned.replaceCount).toBe(1);
+        expect(fixture.spawnSync).not.toHaveBeenCalled();
+        expect(fixture.spawned).toHaveLength(0);
+      } finally {
+        owned.cleanup();
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+    (context) => {
+      if (!nodeFs.existsSync(WRAPPER_PATH)) {
+        context.skip(`requires the pinned Windows Git executable at ${WRAPPER_PATH}`);
+        return;
+      }
+      let owned;
+      try {
+        owned = createOwnedBinaryReplacement();
+      } catch (error) {
+        context.skip(`owned Windows binary fixture requires copy and hardlink support: ${error?.code ?? error?.message}`);
+        return;
+      }
+      try {
+        if (owned.initial.hash !== OFFICIAL.wrapperSha256) {
+          context.skip(`requires Git for Windows ${OFFICIAL.productVersion} bytes at ${WRAPPER_PATH}`);
+          return;
+        }
+        expect(owned.initial.nlink).toBe(2);
+        expect(owned.replacement.nlink).toBe(2);
+        expect(owned.replacement.hash).not.toBe(owned.initial.hash);
+        expect(owned.replacement.identity).not.toEqual(owned.initial.identity);
+
+        const fixture = makeOwnedBinaryDependencies({ owned });
+        const session = createGitSession(fixture.dependencies);
+        const first = run(session);
+
+        expect(fixture.observations[0]).toEqual(expect.objectContaining({
+          hash: owned.initial.hash,
+          identity: owned.initial.identity,
+          bytes: owned.initial.bytes,
+        }));
+        expect(first.error?.code).not.toBe("E_UNSAFE_GIT_EXECUTABLE");
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.spawned[0].bytes).toEqual(owned.initial.bytes);
+
+        expect(sha256Bytes(fixture.spawned[0].bytes)).toBe(owned.initial.hash);
+        owned.replace();
+        const later = run(session, ALLOWED_TUPLES[1]);
+
+        expectUnsafe(later);
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.spawned).toHaveLength(1);
+      } finally {
+        owned.cleanup();
+      }
+    },
+  );
 
   it("rejects every missing or indeterminate mandatory predicate before Git spawn", () => {
     const cases = [
@@ -565,6 +1095,139 @@ describe("AC-008 Git admission session", () => {
       expect(fixture.spawnSync, label).not.toHaveBeenCalled();
     }
   });
+  it.each([
+    ["candidate bytes", (fs) => { fs.readFileSync = undefined; }],
+    ["native candidate identity", (fs) => {
+      const baseStat = fs.statSync;
+      fs.statSync = vi.fn((target, options) => {
+        const stat = baseStat(target, options);
+        removeNativeIdentity(stat);
+        return stat;
+      });
+    }],
+  ])("fails closed when the strong executable binding observation is missing: %s", (_label, removeObservation) => {
+    const fixture = makeDependencies();
+    removeObservation(fixture.dependencies.fs);
+    const session = createGitSession(fixture.dependencies);
+
+    expectUnsafe(run(session));
+    expect(fixture.spawnSync).not.toHaveBeenCalled();
+  });
+
+  it.skipIf(process.platform !== "win32")(
+    "generated hook consumer rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+    (context) => {
+      if (!nodeFs.existsSync(WRAPPER_PATH)) {
+        context.skip(`requires the pinned Windows Git executable at ${WRAPPER_PATH}`);
+        return;
+      }
+      let owned;
+      try {
+        owned = createOwnedBinaryReplacement();
+      } catch (error) {
+        context.skip(`owned Windows binary fixture requires copy and hardlink support: ${error?.code ?? error?.message}`);
+        return;
+      }
+      try {
+        if (owned.initial.hash !== OFFICIAL.wrapperSha256) {
+          context.skip(`requires Git for Windows ${OFFICIAL.productVersion} bytes at ${WRAPPER_PATH}`);
+          return;
+        }
+        expect(owned.initial.nlink).toBe(2);
+        expect(owned.replacement.nlink).toBe(2);
+        expect(owned.replacement.hash).not.toBe(owned.initial.hash);
+        expect(owned.replacement.identity).not.toEqual(owned.initial.identity);
+
+        const fixture = makeOwnedBinaryDependencies({ owned, replaceOnProbe: true });
+        const session = createGeneratedGitSession(fixture.dependencies);
+        const result = run(session);
+
+        expectUnsafe(result);
+        expect(fixture.query).toHaveBeenCalled();
+        expect(fixture.observations[0]).toEqual(expect.objectContaining({
+          hash: owned.initial.hash,
+          identity: owned.initial.identity,
+          bytes: owned.initial.bytes,
+        }));
+        expect(owned.replaceCount).toBe(1);
+        expect(fixture.spawnSync).not.toHaveBeenCalled();
+        expect(fixture.spawned).toHaveLength(0);
+      } finally {
+        owned.cleanup();
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "generated hook consumer rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+    (context) => {
+      if (!nodeFs.existsSync(WRAPPER_PATH)) {
+        context.skip(`requires the pinned Windows Git executable at ${WRAPPER_PATH}`);
+        return;
+      }
+      let owned;
+      try {
+        owned = createOwnedBinaryReplacement();
+      } catch (error) {
+        context.skip(`owned Windows binary fixture requires copy and hardlink support: ${error?.code ?? error?.message}`);
+        return;
+      }
+      try {
+        if (owned.initial.hash !== OFFICIAL.wrapperSha256) {
+          context.skip(`requires Git for Windows ${OFFICIAL.productVersion} bytes at ${WRAPPER_PATH}`);
+          return;
+        }
+        expect(owned.initial.nlink).toBe(2);
+        expect(owned.replacement.nlink).toBe(2);
+        expect(owned.replacement.hash).not.toBe(owned.initial.hash);
+        expect(owned.replacement.identity).not.toEqual(owned.initial.identity);
+
+        const fixture = makeOwnedBinaryDependencies({ owned });
+        const session = createGeneratedGitSession(fixture.dependencies);
+        const first = run(session);
+
+        expect(fixture.observations[0]).toEqual(expect.objectContaining({
+          hash: owned.initial.hash,
+          identity: owned.initial.identity,
+          bytes: owned.initial.bytes,
+        }));
+        expect(first.error?.code).not.toBe("E_UNSAFE_GIT_EXECUTABLE");
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.spawned[0].bytes).toEqual(owned.initial.bytes);
+        expect(sha256Bytes(fixture.spawned[0].bytes)).toBe(owned.initial.hash);
+
+        owned.replace();
+        const later = run(session, ALLOWED_TUPLES[1]);
+
+        expectUnsafe(later);
+        expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+        expect(fixture.spawned).toHaveLength(1);
+      } finally {
+        owned.cleanup();
+      }
+    },
+  );
+
+  it.each([
+    ["candidate bytes", (fs) => { fs.readFileSync = undefined; }],
+    ["native candidate identity", (fs) => {
+      const baseStat = fs.statSync;
+      fs.statSync = vi.fn((target, options) => {
+        const stat = baseStat(target, options);
+        removeNativeIdentity(stat);
+        return stat;
+      });
+    }],
+  ])("generated hook consumer fails closed when the strong executable binding observation is missing: %s", (_label, removeObservation) => {
+    const fixture = makeDependencies();
+    removeObservation(fixture.dependencies.fs);
+    const session = createGeneratedGitSession(fixture.dependencies);
+
+    expectUnsafe(run(session));
+    expect(fixture.spawnSync).not.toHaveBeenCalled();
+  });
+
+
 
   it.each([
     ["unknown release", (metadata) => { metadata.release.productVersion = "2.53.0.windows.1"; }],

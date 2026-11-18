@@ -268,12 +268,12 @@ export function createGitSession(dependencies = {}) {
     return null;
   };
 
-  const nativeQuery = (selection) => {
+  const nativeQuery = (selection, { bindingOnly = false } = {}) => {
     if (!isWindows || !selection || typeof selection.cwd !== "string" || typeof selection.candidate !== "string" || typeof selection.nonce !== "string" || !selection.nonce) throw new Error("E_UNSAFE_GIT_EXECUTABLE: invalid probe selection");
     const hostBinding = windowsHostPath();
     const host = hostBinding?.executable;
     const helperRoot = hostBinding?.root;
-    if (!hostBinding || typeof hostBinding !== "object" || typeof host !== "string" || typeof helperRoot !== "string" || !/^[A-Za-z]:\\Windows\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe$/i.test(host)) throw new Error("E_UNSAFE_GIT_EXECUTABLE: Windows PowerShell host is not OS anchored");
+    if (!hostBinding || typeof hostBinding !== "object" || typeof host !== "string" || typeof helperRoot !== "string" || !/^[A-Za-z]:\\Windows\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe$/i.test(host) || (selection.host !== undefined && selection.host !== host)) throw new Error("E_UNSAFE_GIT_EXECUTABLE: Windows PowerShell host is not OS anchored");
     const systemRoot = helperRoot;
     const modules = path.win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "Modules");
     const scrubbedEnv = {
@@ -305,7 +305,8 @@ $modulePath = [IO.Path]::Combine($root, 'System32', 'WindowsPowerShell', 'v1.0',
 $env:PSModulePath = $modulePath
 if ([IntPtr]::Size -ne 8 -or $PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1 -or $PSEdition -ne 'Desktop' -or $ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage' -or (Get-Location).Path -ne $root -or $env:PATH -ne '' -or $env:USERPROFILE -ne $hostPath -or $env:APPDATA -ne $hostPath -or $env:LOCALAPPDATA -ne $hostPath -or $env:HOME -ne $hostPath -or $env:PSModulePath -ne $modulePath) { exit 31 }
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
-if (-not $payload -or [string]$payload.candidate -notmatch '^[A-Za-z]:\\Program Files\\Git\\(?:cmd|mingw64\\bin)\\git\.exe$') { exit 32 }
+if (-not $payload -or [string]$payload.candidate -notmatch '^[A-Za-z]:\\Program Files\\Git\\(?:cmd|mingw64\\bin)\\git\.exe$' -or [string]$payload.nonce -notmatch '^[0-9A-Fa-f-]{16,}$' -or [string]$payload.host -ne $hostPath) { exit 32 }
+if ([string]$payload.mode -ne 'metadata' -and [string]$payload.mode -ne 'binding-only') { exit 32 }
 $asmName = [Reflection.AssemblyName]::new('UsefulSkillsGitTrustProbe')
 $asm = [AppDomain]::CurrentDomain.DefineDynamicAssembly($asmName, [Reflection.Emit.AssemblyBuilderAccess]::Run)
 $mod = $asm.DefineDynamicModule('UsefulSkillsGitTrustProbe')
@@ -450,6 +451,33 @@ function Imports($h) {
   $b = Bytes $h; if ($b.Length -lt 0x100 -or $b[0] -ne 0x4d -or $b[1] -ne 0x5a) { Fail 'not PE' }; $pe = [int](U32 $b 0x3c); if ([Text.Encoding]::ASCII.GetString($b,$pe,4) -cne 'PE' + [char]0 + [char]0) { Fail 'bad PE signature' }; $machine = U16 $b ($pe + 4); if ($machine -ne 0x8664) { Fail 'non x64 PE' }; $sections = U16 $b ($pe + 6); $opt = $pe + 24; $magic = U16 $b $opt; $dir = $opt + $(if ($magic -eq 0x20b) { 112 } else { 96 }); $impRva = U32 $b ($dir + 8); if ($impRva -eq 0) { return @() }; $sec = $opt + (U16 $b ($pe + 20)); function Rva($r) { for ($i=0; $i -lt $sections; $i++) { $sh = $sec + $i * 40; $va = U32 $b ($sh + 12); $sz = [Math]::Max((U32 $b ($sh + 8)),(U32 $b ($sh + 16))); if ($r -ge $va -and $r -lt ($va + $sz)) { return (U32 $b ($sh + 20)) + ($r - $va) } }; Fail 'unmapped import RVA' }; $off = Rva $impRva; $out = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase); for ($i=0; ; $i++) { $d = $off + 20 * $i; if ((U32 $b $d) -eq 0 -and (U32 $b ($d+12)) -eq 0 -and (U32 $b ($d+16)) -eq 0) { break }; $nameOff = Rva (U32 $b ($d+12)); $end = $nameOff; while ($b[$end] -ne 0) { $end++ }; [void]$out.Add(([Text.Encoding]::ASCII.GetString($b,$nameOff,$end-$nameOff)).ToLowerInvariant()) }; return @($out)
 }
 function CloseAll() { $failure = $null; foreach ($h in @($handles)) { try { if ([int]$native::NtClose($h) -lt 0 -and $null -eq $failure) { $failure = 'handle close failed' } } catch { if ($null -eq $failure) { $failure = 'handle close failed' } } }; if ($failure) { Fail $failure } }
+if ([string]$payload.mode -eq 'binding-only') {
+  try {
+    $candidate = Norm ([string]$payload.candidate)
+    $rootGit = 'C:\Program Files\Git'
+    if (-not ($candidate.Equals((Join-Path $rootGit 'cmd\git.exe'),[StringComparison]::OrdinalIgnoreCase) -or $candidate.Equals((Join-Path $rootGit 'mingw64\bin\git.exe'),[StringComparison]::OrdinalIgnoreCase))) { Fail 'candidate outside pinned image roles' }
+    $h = OpenChain $candidate $false
+    $a = Attr $h $false
+    if ($a.Reparse -or $a.Device -or $a.Nlink -lt 1) { Fail 'invalid candidate attributes' }
+    $id = Identity $h
+    $digest = Hash $h
+    if ([string]$digest -notmatch '^[0-9a-f]{64}$') { Fail 'invalid candidate hash' }
+    $row = [ordered]@{
+      schema = 'git-binding.windows.v1'
+      candidate = [ordered]@{ path = $candidate; nlink = $a.Nlink; sha256 = $digest; identity = $id }
+      context = [ordered]@{ platform = 'win32'; architecture = 'x64'; protectedHost = $hostPath; challengeNonce = [string]$payload.nonce }
+    }
+    CloseAll
+    [Console]::Out.WriteLine(($row | ConvertTo-Json -Depth 20 -Compress))
+  } catch {
+    $reason = ([string]$_.Exception.Message) -replace '[\r\n]+', ' '
+    if ($reason.Length -gt 1024) { $reason = $reason.Substring(0,1024) }
+    [Console]::Error.WriteLine('E_UNSAFE_GIT_EXECUTABLE: binding collector refused: ' + $reason)
+    try { CloseAll } catch {}
+    exit 33
+  }
+  exit 0
+}
 try {
   $candidate = Norm ([string]$payload.candidate); $rootGit = 'C:\Program Files\Git'; $selectedRelative = if ($candidate.Equals((Join-Path $rootGit 'cmd\git.exe'),[StringComparison]::OrdinalIgnoreCase)) { 'cmd/git.exe' } elseif ($candidate.Equals((Join-Path $rootGit 'mingw64\bin\git.exe'),[StringComparison]::OrdinalIgnoreCase)) { 'mingw64/bin/git.exe' } else { Fail 'candidate outside pinned image roles' }; $expected = [ordered]@{ wrapper = @('cmd/git.exe','cmd/git-lfs.exe'); git = @('mingw64/bin/git.exe','mingw64/bin/git-upload-pack.exe','mingw64/bin/git-receive-pack.exe','mingw64/bin/git-upload-archive.exe') }; $dllExpected = [ordered]@{ 'mingw64/bin/libiconv-2.dll' = '7a282a854e01be726c6cccfe46f548c716aa45b3014818468253aaa4efbcd067'; 'mingw64/bin/libintl-8.dll' = '0537c3dd2378218508ebe3cc416d72a99ee2d24ae1c5525e23458f32544ef861'; 'mingw64/bin/libpcre2-8-0.dll' = 'c135a87ed0f11eae8ffc4cb469671ff0b3f5d71fab5fb024e9b1e7241ca25b52'; 'mingw64/bin/libwinpthread-1.dll' = '851f61482ad5b6aac7c6abc54bbe31d24f89e0ca683a75fcec2d47f86b2d2242'; 'mingw64/bin/zlib1.dll' = '93e9243a44c29200eeacaf9658efe2558581770e4b11ca4b500e18e424a6e3b5' }
   $ancestor = [Collections.Generic.List[object]]::new(); foreach ($p in @('C:\','C:\Program Files','C:\Program Files\Git','C:\Program Files\Git\cmd','C:\Program Files\Git\mingw64','C:\Program Files\Git\mingw64\bin','C:\Program Files\Git\mingw64\libexec','C:\Program Files\Git\mingw64\libexec\git-core')) { $ancestor.Add((Row $p $null $true)) }; $objects = @{}; function AddLinks($relative,$hash,$links) { $primary = Norm ([IO.Path]::Combine($rootGit,($relative -replace '/','\'))); $r = Row $primary $relative $false; if ($r.sha256 -ne $hash) { Fail 'hash mismatch' }; $enum = @(Hardlinks $primary); $expectedPaths = @($links | ForEach-Object { Norm ([IO.Path]::Combine($rootGit,($_ -replace '/','\'))) }); $actualKey = (@($enum | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object) -join '|'); $expectedKey = (@($expectedPaths | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object) -join '|'); if ($actualKey -cne $expectedKey) { Fail 'hardlink set mismatch' }; $rows = [Collections.Generic.List[object]]::new(); foreach ($p in $expectedPaths) { $x = Row $p $null $false; if ($x.identity.fileId128 -ne $r.identity.fileId128 -or $x.identity.volume -ne $r.identity.volume -or $x.sha256 -ne $r.sha256) { Fail 'hardlink identity mismatch' }; $x.aliases = $expectedPaths; $x.ancestors = @($ancestor); [void]$rows.Add($x) }; $r.aliases = $expectedPaths; $r.ancestors = @($ancestor); $r.nlink = $rows.Count; $objects[$relative] = [pscustomobject]@{ primary = $r; aliases = @($rows | Select-Object -Skip 1); rows = @($rows) } }
@@ -477,7 +505,7 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
   exit 33
 }
 `;
-    const payload = JSON.stringify({ nonce: selection.nonce, candidate: selection.candidate });
+    const payload = JSON.stringify({ nonce: selection.nonce, candidate: selection.candidate, host: selection.host ?? host, mode: bindingOnly ? "binding-only" : "metadata" });
     const result = spawnSync(host, ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-OutputFormat", "Text", "-Command", script], {
       cwd: systemRoot,
       input: payload,
@@ -496,8 +524,97 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
     return metadata;
   };
 
+  const nativeHex = (value, width) => {
+    if (typeof value === "bigint") return value >= 0n && value < (1n << BigInt(width * 4)) ? `0x${value.toString(16).padStart(width, "0")}` : null;
+    if (typeof value === "string" && /^0x[0-9a-f]+$/i.test(value)) {
+      try { return nativeHex(BigInt(value), width); } catch { return null; }
+    }
+    return null;
+  };
+  const executableBinding = (file) => {
+    const listing = lstat(file);
+    if (!regular(listing) || typeof fs.statSync !== "function" || typeof fs.readFileSync !== "function") return null;
+    let stat;
+    try { stat = fs.statSync(file, { bigint: true }); } catch { return null; }
+    if (!stat || typeof stat !== "object" || typeof stat.isFile !== "function" || !stat.isFile() || (typeof stat.isSymbolicLink === "function" && stat.isSymbolicLink())) return null;
+    const volume = nativeHex(stat.volume ?? stat.identity?.volume, 16);
+    const fileId128 = nativeHex(stat.fileId128 ?? stat.identity?.fileId128, 32);
+    const nlink = nlinkNumber(stat.nlink ?? listing.nlink);
+    if (!volume || !fileId128 || nlink === null) return null;
+    let digest;
+    try {
+      const bytes = fs.readFileSync(file);
+      if (!(typeof Buffer !== "undefined" && Buffer.isBuffer(bytes)) && !(bytes instanceof Uint8Array)) return null;
+      digest = crypto.createHash("sha256").update(bytes).digest("hex");
+    } catch { return null; }
+    if (!hash(digest)) return null;
+    return {
+      nlink,
+      identity: { volume, fileId128 },
+      sha256: digest,
+    };
+  };
+  const sameBinding = (left, right, requireComplete = false) => {
+    if (!left || !right) return false;
+    if (requireComplete && (left.nlink === null || right.nlink === null || !left.identity || !right.identity || left.sha256 === null || right.sha256 === null)) return false;
+    if (left.nlink === null || right.nlink === null || left.nlink !== right.nlink) return false;
+    if (!left.identity || !right.identity || left.identity.volume !== right.identity.volume || left.identity.fileId128 !== right.identity.fileId128) return false;
+    if (!hash(left.sha256) || !hash(right.sha256) || left.sha256 !== right.sha256) return false;
+    return true;
+  };
+  const metadataBinding = (metadata) => {
+    const row = metadata?.candidate;
+    if (!row) return null;
+    return {
+      nlink: nlinkNumber(row.nlink),
+      identity: row.identity && typeof row.identity === "object" ? {
+        volume: nativeHex(row.identity.volume, 16),
+        fileId128: nativeHex(row.identity.fileId128, 32),
+      } : null,
+      sha256: typeof row.sha256 === "string" ? row.sha256 : null,
+    };
+  };
+
+  const bindingMatchesMetadata = (observed, metadata) => {
+    const expected = metadataBinding(metadata);
+    if (!observed || !expected || !sameBinding(observed, expected)) return false;
+    if (expected.identity && observed.identity && (observed.identity.volume !== expected.identity.volume || observed.identity.fileId128 !== expected.identity.fileId128)) return false;
+    if (expected.sha256 && observed.sha256 !== null && observed.sha256 !== expected.sha256) return false;
+    return true;
+  };
+  const nativeRowBinding = (response, selection) => {
+    if (!response || typeof response !== "object" || response.schema !== "git-binding.windows.v1") return null;
+    const row = response.candidate;
+    const context = response.context;
+    if (!row || typeof row !== "object" || !context || context.platform !== "win32" || context.architecture !== "x64" || context.protectedHost !== selection.host || context.challengeNonce !== selection.nonce || typeof row.path !== "string" || !equalPath(row.path, selection.candidate)) return null;
+    const volume = nativeHex(row.identity?.volume, 16);
+    const fileId128 = nativeHex(row.identity?.fileId128, 32);
+    const nlink = nlinkNumber(row.nlink);
+    const sha256 = typeof row.sha256 === "string" && hash(row.sha256) ? row.sha256.toLowerCase() : null;
+    if (!volume || !fileId128 || nlink === null || !sha256) return null;
+    return { nlink, identity: { volume, fileId128 }, sha256 };
+  };
+
+  const freshNonce = () => typeof crypto.randomUUID === "function" ? crypto.randomUUID() : crypto.randomBytes(32).toString("hex");
+  const independentBinding = (candidate, cwd, currentEnv, host) => {
+    const local = executableBinding(candidate.executable);
+    if (local) return local;
+    if (typeof injectedQuery === "function" || typeof windowsHostPath !== "function") return null;
+    let hostBinding;
+    try { hostBinding = windowsHostPath(); } catch { return null; }
+    const nativeHost = hostBinding?.executable;
+    if (!hostBinding || typeof hostBinding !== "object" || typeof nativeHost !== "string" || typeof hostBinding.root !== "string" || nativeHost !== host) return null;
+    const selection = { cwd, env: cloneEnv(currentEnv), nonce: freshNonce(), candidate: candidate.executable, host: nativeHost };
+    try {
+      return nativeRowBinding(nativeQuery(selection, { bindingOnly: true }), selection);
+    } catch { return null; }
+  };
+
+  let approvedBinding;
+  let approvedHost;
+
   const probe = (candidate, cwd, currentEnv) => {
-    if (!isWindows || candidate.nlink === 1) return null;
+    if (!isWindows || candidate.nlink === 1) return { binding: null };
     if (!candidate.executable.toLowerCase().endsWith(".exe") || (!equalPath(candidate.executable, `${expectedRoot}\\cmd\\git.exe`) && !equalPath(candidate.executable, `${expectedRoot}\\mingw64\\bin\\git.exe`))) return fail("PROVENANCE", "selected Git is not a pinned image entrypoint");
     if (typeof windowsHostPath !== "function") return fail("BOOTSTRAP", "Windows host path helper unavailable");
     let host;
@@ -506,15 +623,16 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
       host = hostBinding?.executable;
       if (!hostBinding || typeof hostBinding !== "object" || typeof host !== "string" || typeof hostBinding.root !== "string") return fail("BOOTSTRAP", "Windows PowerShell host binding invalid");
     } catch { return fail("BOOTSTRAP", "Windows host path helper failed"); }
-    const nonce = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : crypto.randomBytes(32).toString("hex");
+    const nonce = freshNonce();
     const selection = { cwd, env: cloneEnv(currentEnv), nonce, candidate: candidate.executable, host };
     try {
       const metadata = typeof injectedQuery === "function" ? injectedQuery(selection) : nativeQuery(selection);
       const reason = validateMetadata(metadata, selection, candidate);
-      return reason ? fail("PROVENANCE", reason) : null;
-    } catch {
-      return fail("PROBE", "Windows metadata validation failed");
-    }
+      if (reason) return fail("PROVENANCE", reason);
+      const observed = independentBinding(candidate, cwd, currentEnv, host);
+      if (!observed || !bindingMatchesMetadata(observed, metadata)) return fail("PROVENANCE", "Git executable changed during metadata admission");
+      return { binding: observed, host };
+    } catch { return fail("PROBE", "Windows metadata validation failed"); }
   };
 
   const sameInvocationContext = (cwd) => {
@@ -548,17 +666,24 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
     const currentEnv = cloneEnv(env);
     const redirectKey = Object.keys(currentEnv).find((key) => key.toLowerCase() === "git_redirect_stdout");
     if (redirectKey && currentEnv[redirectKey]) return fail("CONTEXT_CHANGED", "GIT_REDIRECT_STDOUT must be empty");
-    let candidate = findCandidate();
+    const candidate = findCandidate();
     if (!candidate || !candidate.nlink) return fail("PROVENANCE", "no regular Git executable was found");
+    if (!isWindows && candidate.nlink !== 1) return fail("PROVENANCE", "POSIX Git executable must have exactly one link");
     if (isWindows && /\.(?:cmd|bat)$/i.test(candidate.executable)) return fail("PROVENANCE", "batch Git wrappers are not admitted");
     if (isWindows && !candidate.executable.toLowerCase().endsWith(".exe")) return fail("PROVENANCE", "unknown Windows Git extension");
     if (!admitted) {
       const probeResult = probe(candidate, options.cwd, currentEnv);
-      if (probeResult) return probeResult;
+      if (probeResult?.error) return probeResult;
       approvedExecutable = candidate.executable;
+      approvedBinding = probeResult.binding;
+      approvedHost = probeResult.binding ? probeResult.host : undefined;
       admitted = true;
-    } else if (!equalPath(approvedExecutable, candidate.executable)) {
-      return fail("CONTEXT_CHANGED", "Git executable changed within session");
+    } else {
+      if (!equalPath(approvedExecutable, candidate.executable)) return fail("CONTEXT_CHANGED", "Git executable changed within session");
+      if (approvedBinding) {
+        const observed = independentBinding(candidate, options.cwd, currentEnv, approvedHost);
+        if (!sameBinding(observed, approvedBinding, true)) return fail("CONTEXT_CHANGED", "Git executable identity or bytes changed within session");
+      }
     }
     const spawnOptions = { cwd: options.cwd, env: firstEnv, shell: false, windowsHide: true, encoding: "utf8" };
     if (Object.prototype.hasOwnProperty.call(options, "input")) spawnOptions.input = options.input;

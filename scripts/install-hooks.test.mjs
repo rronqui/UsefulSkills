@@ -5,8 +5,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { tmpdir } from "node:os";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
 
@@ -127,22 +127,45 @@ function assertManagedHooksAbsent(directory) {
     expect(existsSync(join(directory, name))).toBe(false);
   }
 }
+// POSIX transactions publish through /proc/self/fd/<parent>/<name>; match the
+// pinned physical parent and basename instead of the lexical pathname.
+function physicalParentAndName(candidate) {
+  const absolute = resolve(String(candidate));
+  const physicalParent = realpathSync.native(dirname(absolute));
+  const stat = statSync(physicalParent, { bigint: true });
+  return { id: `${stat.dev}:${stat.ino}`, name: basename(absolute) };
+}
 function installWithFsFault(dir, destination, operation) {
   if (!["link", "unlink"].includes(operation)) throw new Error(`falha desconhecida: ${operation}`);
   const token = `.usefulskills-hooks-fault-${operation}-${Math.random().toString(36).slice(2)}`;
   const preload = join(dir, `${token}.cjs`);
   const marker = join(dir, `${token}.marker`);
+  const expectedTarget = physicalParentAndName(destination);
   writeFileSync(
     preload,
     [
       "const fs = require('node:fs');",
       "const path = require('node:path');",
       "const { syncBuiltinESMExports } = require('node:module');",
-      "const target = path.resolve(process.env.USEFULSKILLS_FAULT_DEST);",
       "const marker = path.resolve(process.env.USEFULSKILLS_FAULT_MARKER);",
+      `const expectedTarget = ${JSON.stringify(expectedTarget)};`,
       `const operation = ${JSON.stringify(operation)};`,
       "let injected = false;",
       "let published = false;",
+      "const physicalParentAndName = candidate => {",
+      "  const absolute = path.resolve(String(candidate));",
+      "  const physicalParent = fs.realpathSync.native(path.dirname(absolute));",
+      "  const stat = fs.lstatSync(physicalParent, { bigint: true });",
+      "  return { id: `${stat.dev}:${stat.ino}`, name: path.basename(absolute) };",
+      "};",
+      "const matchesTarget = candidate => {",
+      "  try {",
+      "    const physical = physicalParentAndName(candidate);",
+      "    return physical.id === expectedTarget.id && physical.name === expectedTarget.name;",
+      "  } catch {",
+      "    return false;",
+      "  }",
+      "};",
       "function inject(kind) {",
       "  injected = true;",
       "  fs.writeFileSync(marker, `${kind}\\n`);",
@@ -154,9 +177,9 @@ function installWithFsFault(dir, destination, operation) {
       "fs.linkSync = function linkSync(...args) {",
       "  const source = path.resolve(String(args[0]));",
       "  const destination = path.resolve(String(args[1]));",
-      "  if (!injected && operation === 'link' && destination === target && source.includes('.stage')) inject('link');",
+      "  if (!injected && operation === 'link' && matchesTarget(destination) && source.includes('.stage')) inject('link');",
       "  const result = realLinkSync.apply(this, args);",
-      "  if (destination === target && source.includes('.stage')) published = true;",
+      "  if (matchesTarget(destination) && source.includes('.stage')) published = true;",
       "  return result;",
       "};",
       "const realUnlinkSync = fs.unlinkSync;",
@@ -175,7 +198,6 @@ function installWithFsFault(dir, destination, operation) {
       encoding: "utf8",
       env: {
         ...process.env,
-        USEFULSKILLS_FAULT_DEST: destination,
         USEFULSKILLS_FAULT_MARKER: marker,
       },
     });
@@ -188,27 +210,42 @@ function installWithRollbackFault(dir, destination) {
   const token = `.usefulskills-hooks-fault-rollback-${Math.random().toString(36).slice(2)}`;
   const preload = join(dir, `${token}.cjs`);
   const marker = join(dir, `${token}.marker`);
+  const expectedTarget = physicalParentAndName(destination);
   writeFileSync(
     preload,
     [
       "const fs = require('node:fs');",
       "const path = require('node:path');",
       "const { syncBuiltinESMExports } = require('node:module');",
-      "const target = path.resolve(process.env.USEFULSKILLS_FAULT_DEST);",
       "const marker = path.resolve(process.env.USEFULSKILLS_FAULT_MARKER);",
+      `const expectedTarget = ${JSON.stringify(expectedTarget)};`,
+      "const physicalParentAndName = candidate => {",
+      "  const absolute = path.resolve(String(candidate));",
+      "  const physicalParent = fs.realpathSync.native(path.dirname(absolute));",
+      "  const stat = fs.lstatSync(physicalParent, { bigint: true });",
+      "  return { id: `${stat.dev}:${stat.ino}`, name: path.basename(absolute) };",
+      "};",
+      "const matchesTarget = candidate => {",
+      "  try {",
+      "    const physical = physicalParentAndName(candidate);",
+      "    return physical.id === expectedTarget.id && physical.name === expectedTarget.name;",
+      "  } catch {",
+      "    return false;",
+      "  }",
+      "};",
       "let commitFailed = false;",
       "const realLinkSync = fs.linkSync;",
       "fs.linkSync = function linkSync(...args) {",
       "  const source = path.resolve(String(args[0]));",
       "  const destination = path.resolve(String(args[1]));",
-      "  if (!commitFailed && destination === target && source.includes('.stage')) {",
+      "  if (!commitFailed && matchesTarget(destination) && source.includes('.stage')) {",
       "    commitFailed = true;",
       "    fs.writeFileSync(marker, 'commit\\n');",
       "    const error = new Error('injected commit failure');",
       "    error.code = 'EIO';",
       "    throw error;",
       "  }",
-      "  if (commitFailed && destination === target && source.includes('.quarantine')) {",
+      "  if (commitFailed && matchesTarget(destination) && source.includes('.quarantine')) {",
       "    fs.writeFileSync(marker, 'commit\\nrollback\\n');",
       "    const error = new Error('injected rollback failure');",
       "    error.code = 'EIO';",
@@ -225,7 +262,6 @@ function installWithRollbackFault(dir, destination) {
       encoding: "utf8",
       env: {
         ...process.env,
-        USEFULSKILLS_FAULT_DEST: destination,
         USEFULSKILLS_FAULT_MARKER: marker,
       },
     });
@@ -356,6 +392,7 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
   const marker = join(fixture, `${token}.marker`);
   const attacker = join(fixture, `${token}.attacker.cjs`);
   const preload = join(fixture, `${token}.preload.cjs`);
+  const expectedTarget = physicalParentAndName(target);
   writeFileSync(payload, consumerBytes);
   writeFileSync(before, readFileSync(target));
   writeFileSync(
@@ -415,7 +452,22 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       "const childProcess = require('node:child_process');",
       "const { syncBuiltinESMExports } = require('node:module');",
       `const target = path.resolve(${JSON.stringify(target)});`,
+      `const expectedTarget = ${JSON.stringify(expectedTarget)};`,
       `const attacker = path.resolve(${JSON.stringify(attacker)});`,
+      "const physicalParentAndName = candidate => {",
+      "  const absolute = path.resolve(String(candidate));",
+      "  const physicalParent = fs.realpathSync.native(path.dirname(absolute));",
+      "  const stat = fs.lstatSync(physicalParent, { bigint: true });",
+      "  return { id: `${stat.dev}:${stat.ino}`, name: path.basename(absolute) };",
+      "};",
+      "const matchesTarget = candidate => {",
+      "  try {",
+      "    const physical = physicalParentAndName(candidate);",
+      "    return physical.id === expectedTarget.id && physical.name === expectedTarget.name;",
+      "  } catch {",
+      "    return false;",
+      "  }",
+      "};",
       "const childEnvironment = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'node_options'));",
       "const realSpawnSync = childProcess.spawnSync;",
       "const realSpawn = childProcess.spawn;",
@@ -452,7 +504,7 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       "      const result = Reflect.apply(real, this, arguments);",
       "      const source = path.resolve(String(arguments[0]));",
       "      const destination = path.resolve(String(arguments[1]));",
-      "      if (!triggered && destination === target && source.includes('.stage')) {",
+      "      if (!triggered && matchesTarget(destination) && source.includes('.stage')) {",
       "        triggered = true;",
       "        runDirectAttacker();",
       "      }",

@@ -81,38 +81,40 @@ function stateWithLinkCount(file, links) {
 
 function restoreQuarantine(operation, checkTransaction) {
   if (!operation.previous || !operation.quarantine) return;
+  const targetPath = operation.parentHandle?.target ?? operation.target;
   checkTransaction();
   assertState(operation.quarantine, operation.previous);
-  const target = safeLstat(operation.target);
+  const target = safeLstat(targetPath);
   if (target.error) throw target.error;
   if (target.stat) throw failure(`destino estrangeiro preservado: ${operation.target}`);
-  fs.linkSync(operation.quarantine, operation.target);
+  fs.linkSync(operation.quarantine, targetPath);
   checkTransaction();
   const quarantine = stateWithLinkCount(operation.quarantine, 2n);
-  const restored = stateWithLinkCount(operation.target, 2n);
+  const restored = stateWithLinkCount(targetPath, 2n);
   if (
     quarantine.id !== operation.previous.id || quarantine.hash !== operation.previous.hash ||
     restored.id !== operation.previous.id || restored.hash !== operation.previous.hash
   ) throw failure(`quarentena alterada: ${operation.quarantine}`);
   fs.unlinkSync(operation.quarantine);
-  assertState(operation.target, operation.previous);
+  assertState(targetPath, operation.previous);
 }
 function removeOwnedPublication(operation, index, transaction) {
   const expected = operation.installed ?? operation.staged;
+  const targetPath = operation.parentHandle?.target ?? operation.target;
   const stage = safeLstat(operation.stage);
-  const target = safeLstat(operation.target);
+  const target = safeLstat(targetPath);
   if (stage.error) throw stage.error;
   if (target.error) throw target.error;
   if (stage.stat && target.stat) {
-    const targetAlias = stateWithLinkCount(operation.target, 2n);
+    const targetAlias = stateWithLinkCount(targetPath, 2n);
     const stageAlias = stateWithLinkCount(operation.stage, 2n);
     if (
-      targetAlias.id !== stageAlias.id ||
-      targetAlias.id !== expected.id ||
-      targetAlias.hash !== expected.hash ||
-      stageAlias.hash !== expected.hash
+      targetAlias.id !== stageAlias.id
+      || targetAlias.id !== expected.id
+      || targetAlias.hash !== expected.hash
+      || stageAlias.hash !== expected.hash
     ) throw failure(`alias próprio não comprovado: ${operation.target}`);
-    fs.unlinkSync(operation.target);
+    fs.unlinkSync(targetPath);
     fs.unlinkSync(operation.stage);
     return;
   }
@@ -123,11 +125,20 @@ function removeOwnedPublication(operation, index, transaction) {
     return;
   }
   if (!target.stat) return;
-  const targetState = state(operation.target);
+  const targetState = state(targetPath);
   if (targetState.hash !== expected.hash || targetState.id !== expected.id) throw failure(`destino estrangeiro preservado: ${operation.target}`);
   const orphan = path.join(transaction, `${index}-${path.basename(operation.target)}.foreign`);
-  fs.linkSync(operation.target, orphan);
-  fs.unlinkSync(operation.target);
+  fs.linkSync(targetPath, orphan);
+  try {
+    const linked = stateWithLinkCount(targetPath, 2n);
+    const retained = stateWithLinkCount(orphan, 2n);
+    if (linked.id !== expected.id || linked.hash !== expected.hash || retained.id !== expected.id || retained.hash !== expected.hash) {
+      throw failure(`alias de rollback alterado: ${operation.target}`);
+    }
+  } catch (error) {
+    throw failure(`${error.message}; destino estrangeiro preservado: ${operation.target}`);
+  }
+  fs.unlinkSync(targetPath);
 }
 
 function confined(home, target) {
@@ -259,6 +270,120 @@ function assertExpectedParent(operation, created = []) {
     throw failure(`ancestral alterado: ${operation.target}`);
   }
 }
+function parentAnchor(operation, created = []) {
+  const parent = nearestExisting(path.dirname(operation.target));
+  if (
+    parent.error
+    || !parent.stat?.isDirectory()
+    || parent.stat.isSymbolicLink()
+  ) throw failure(`ancestral alterado: ${operation.target}`);
+  assertExpectedParent(operation, created);
+  return { path: parent.path, id: identity(parent.stat) };
+}
+
+function assertParentAnchor(operation, anchor) {
+  const parent = nearestExisting(path.dirname(operation.target));
+  if (
+    parent.error
+    || !parent.stat?.isDirectory()
+    || parent.stat.isSymbolicLink()
+    || parent.path !== anchor.path
+    || identity(parent.stat) !== anchor.id
+  ) throw failure(`ancestral alterado: ${operation.target}`);
+}
+function openParentHandle(operation, anchor, owned) {
+  const descriptorRoot = process.platform === "linux"
+    ? "/proc/self/fd"
+    : process.platform === "darwin"
+      ? "/dev/fd"
+      : null;
+  if (!descriptorRoot || !constants.O_DIRECTORY || !constants.O_NOFOLLOW) {
+    throw failure(`primitiva descriptor-relativa indisponível: ${operation.target}`);
+  }
+  let fd;
+  try {
+    fd = fs.openSync(anchor.path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    const opened = fs.fstatSync(fd, { bigint: true });
+    if (!opened.isDirectory() || opened.isSymbolicLink() || identity(opened) !== anchor.id) {
+      throw failure(`ancestral alterado: ${operation.target}`);
+    }
+    const descriptorPath = path.join(descriptorRoot, String(fd));
+    const resolved = fs.realpathSync.native(descriptorPath);
+    const resolvedStat = fs.lstatSync(resolved, { bigint: true });
+    if (
+      !resolvedStat.isDirectory()
+      || resolvedStat.isSymbolicLink()
+      || identity(resolvedStat) !== anchor.id
+    ) throw failure(`ancestral descriptor divergente: ${operation.target}`);
+    const name = path.basename(path.resolve(operation.target));
+    if (!name || name === "." || name === ".." || name.includes(path.sep)) {
+      throw failure(`destino inválido: ${operation.target}`);
+    }
+    const handle = { fd, path: descriptorPath, target: path.join(descriptorPath, name) };
+    owned.add(fd);
+    return handle;
+  } catch (error) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    throw error;
+  }
+}
+
+function closeParentHandles(owned) {
+  const errors = [];
+  for (const fd of owned) {
+    try { fs.closeSync(fd); } catch (error) { errors.push(error); }
+  }
+  owned.clear();
+  if (errors.length) throw failure(`fechamento de descriptor falhou: ${errors[0].message}`);
+}
+
+
+function assertMissing(file, label = file) {
+  const result = safeLstat(file);
+  if (result.error) throw result.error;
+  if (result.stat) throw failure(`reserva estrangeira: ${label}`);
+}
+
+function recoverRenamedTarget(operation, anchor, handle) {
+  if (!operation.quarantine || !operation.previous) return false;
+  if (handle) {
+    const opened = fs.fstatSync(handle.fd, { bigint: true });
+    if (!opened.isDirectory() || opened.isSymbolicLink() || identity(opened) !== anchor.id) {
+      throw failure(`ancestral descriptor alterado: ${operation.target}`);
+    }
+  } else {
+    assertParentAnchor(operation, anchor);
+  }
+  const targetPath = handle?.target ?? operation.target;
+  const moved = safeLstat(operation.quarantine);
+  const target = safeLstat(targetPath);
+  if (moved.error) throw moved.error;
+  if (target.error) throw target.error;
+  if (!moved.stat || target.stat || !regular(moved.stat)) return false;
+  const movedState = state(operation.quarantine);
+  if (movedState.id !== operation.previous.id || movedState.hash !== operation.previous.hash) {
+    throw failure(`quarentena estrangeira preservada: ${operation.quarantine}`);
+  }
+  fs.linkSync(operation.quarantine, targetPath);
+  const linkedTarget = stateWithLinkCount(targetPath, 2n);
+  const linkedQuarantine = stateWithLinkCount(operation.quarantine, 2n);
+  if (
+    linkedTarget.id !== movedState.id
+    || linkedTarget.hash !== movedState.hash
+    || linkedQuarantine.id !== movedState.id
+    || linkedQuarantine.hash !== movedState.hash
+  ) throw failure(`restauração insegura: ${operation.target}`);
+  fs.unlinkSync(operation.quarantine);
+  const restored = state(targetPath);
+  if (restored.id !== movedState.id || restored.hash !== movedState.hash) {
+    throw failure(`restauração divergente: ${operation.target}`);
+  }
+  return true;
+}
+
+
 function assertExpectedTarget(operation) {
   if (!Object.hasOwn(operation, "expectedTarget")) return;
   const expected = operation.expectedTarget;
@@ -363,6 +488,7 @@ function removeEmptyDirectories(created) {
 function applyPosix(operations, home, sourceScopes = []) {
   const created = [];
   const applied = [];
+  const ownedParentFds = new Set();
   let transaction;
   let retainedBackup = false;
   let committed = false;
@@ -429,8 +555,18 @@ function applyPosix(operations, home, sourceScopes = []) {
       index += 1;
     }
     for (const operation of operations) {
-      if (operation.verify) { assertExpectedParent(operation, created); assertSource(operation, sourceScopes); assertState(operation.target, operation.previous); continue; }
-      if (operation.directory) { assertExpectedTarget(operation); assertExpectedParent(operation, created); ensureDirectory(operation.target); continue; }
+      if (operation.verify) {
+        assertExpectedParent(operation, created);
+        assertSource(operation, sourceScopes);
+        assertState(operation.target, operation.previous);
+        continue;
+      }
+      if (operation.directory) {
+        assertExpectedTarget(operation);
+        assertExpectedParent(operation, created);
+        ensureDirectory(operation.target);
+        continue;
+      }
       checkTransaction();
       assertSource(operation, sourceScopes);
       assertState(operation.stage, operation.staged);
@@ -438,23 +574,46 @@ function applyPosix(operations, home, sourceScopes = []) {
       assertExpectedParent(operation, created);
       assertState(operation.target, operation.previous);
       if (operation.previous) {
+        const parent = parentAnchor(operation, created);
+        const handle = openParentHandle(operation, parent, ownedParentFds);
+        operation.parentHandle = handle;
         operation.quarantine = `${operation.backup}.quarantine`;
-        fs.renameSync(operation.target, operation.quarantine);
+        assertMissing(operation.quarantine, operation.quarantine);
+        try {
+          fs.renameSync(handle.target, operation.quarantine);
+          assertParentAnchor(operation, parent);
+        } catch (error) {
+          try { recoverRenamedTarget(operation, parent, handle); } catch (recoveryError) {
+            throw failure(`${error.message}; restauração recusada: ${recoveryError.message}`);
+          }
+          throw error;
+        }
         operation.quarantined = true;
       }
+      if (!operation.parentHandle) {
+        const parent = parentAnchor(operation, created);
+        operation.parentHandle = openParentHandle(operation, parent, ownedParentFds);
+      }
+      const targetPath = operation.parentHandle.target;
       operation.installed = operation.staged;
       applied.push(operation);
-      fs.linkSync(operation.stage, operation.target);
+      fs.linkSync(operation.stage, targetPath);
       operation.published = true;
       fs.unlinkSync(operation.stage);
-      assertState(operation.target, operation.installed);
+      assertState(targetPath, operation.installed);
       if (operation.installed.hash !== desiredHash(operation)) throw failure(`destino divergente: ${operation.target}`);
     }
     committed = true;
     for (const operation of operations) {
       if (operation.directory || operation.retainBackup !== false) continue;
-      if (operation.quarantine) fs.unlinkSync(operation.quarantine);
-      if (operation.backup) fs.unlinkSync(operation.backup);
+      if (operation.quarantine) {
+        assertState(operation.quarantine, operation.previous);
+        fs.unlinkSync(operation.quarantine);
+      }
+      if (operation.backup) {
+        assertState(operation.backup, operation.backedUp);
+        fs.unlinkSync(operation.backup);
+      }
     }
     if (!retainedBackup) fs.rmdirSync(transaction);
     return { ok: true, event: "commit-complete" };
@@ -475,9 +634,11 @@ function applyPosix(operations, home, sourceScopes = []) {
     }
     rollback.push(...removeEmptyDirectories(created));
     throw failure(`${error.message}; rollback ${rollback.length && rollback.every(item => item.endsWith("restored")) ? "concluído (backup retido)" : `parcial — conflitos preservados: ${rollback.join("; ")}`}`);
+  } finally {
+    closeParentHandles(ownedParentFds);
   }
-}
 
+}
 function windowsPowerShellPath() {
   const report = typeof process.report?.getReport === "function" ? process.report.getReport() : null;
   const modules = Array.isArray(report?.sharedObjects) ? report.sharedObjects : [];
