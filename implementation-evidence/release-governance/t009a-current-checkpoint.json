@@ -1,0 +1,141 @@
+{
+  "kind": "AUTHORIZED_CURRENT_PROFILE_COMPATIBILITY_CHECKPOINT",
+  "checkpoint_payload_sha256": "c36421c0ffaa38417ee25605dfddd638b6df581a2125bf30367c4389251edbee",
+  "created_at": "2026-11-14T18:23:18.989Z",
+  "replaced_unreviewed_metadata": {
+    "checkpoint": "0d40181a9690b0f9ae1a49696c735624c066667c400dc6eba2d35f75e2d98326",
+    "reason": "ExactcapturedUUIDsreplacenonauthoritativeincorrectprefix; no originaltask/source/nativeproofchanged."
+  },
+  "payload": {
+    "acceptance_criterion": "AC-012",
+    "authorization": "local://ship-t009a-current-checkpoint-approval.json",
+    "original_task": {
+      "archive": "implementation-evidence/release-governance/t009a-original-pending-history.json",
+      "sha256": "e27278247001173508adc7013ffc5c7fcbbe3b6098fd39643443129f21d73998",
+      "phase": "PENDING",
+      "red_status": "PENDING"
+    },
+    "classification": "NEW_CURRENT_EXISTING_CODE_VERIFICATION_NOT_ORIGINAL_TDD",
+    "source_equivalence": {
+      "packet": "local://ship-t009a-current-source-equivalence.json",
+      "sha256": "12745f632d7d5043841cf0c8d7453a2fa03b1957830d7a1a517ed579215505ce",
+      "scope": "exact12installerprofiles+deep-review/lib/protocol.mjs",
+      "all_equal": true,
+      "files": [
+        {
+          "path": "deep-review/lib/protocol.mjs",
+          "captured_sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+          "current_sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+          "equal": true,
+          "bytes": 35699
+        },
+        {
+          "path": "tdd-orchestrator/agents/backend-developer.md",
+          "captured_sha256": "45ca86ea6644de2e8e000ad775d49e72769b5f9e55b840c8400e9ebcf0607c43",
+          "current_sha256": "45ca86ea6644de2e8e000ad775d49e72769b5f9e55b840c8400e9ebcf0607c43",
+          "equal": true,
+          "bytes": 4762
+        },
+        {
+          "path": "tdd-orchestrator/agents/frontend-developer.md",
+          "captured_sha256": "7045e040dcb05df1ede9afc754f293e86332063bf982bf830cb67e74d054a82b",
+          "current_sha256": "7045e040dcb05df1ede9afc754f293e86332063bf982bf830cb67e74d054a82b",
+          "equal": true,
+          "bytes": 4606
+        },
+        {
+          "path": "tdd-orchestrator/agents/integrator.md",
+          "captured_sha256": "f94b4b050b33c18c4e592988394361d63e0f45bf78de2915a674f015c1c72cc1",
+          "current_sha256": "f94b4b050b33c18c4e592988394361d63e0f45bf78de2915a674f015c1c72cc1",
+          "equal": true,
+          "bytes": 3931
+        },
+        {
+          "path": "tdd-orchestrator/agents/peer-reviewer.md",
+          "captured_sha256": "537a91f1b940ec58258f2b4b7f519e758be294639b037bb8ef6dc6a36cbd7d1d",
+          "current_sha256": "537a91f1b940ec58258f2b4b7f519e758be294639b037bb8ef6dc6a36cbd7d1d",
+          "equal": true,
+          "bytes": 10619
+        },
+        {
+          "path": "tdd-orchestrator/agents/refactorer.md",
+          "captured_sha256": "d41ad8311c2f0f16ef49665cf02301a02d13b3ff9eb3771c1d2fb1edcbfdc50c",
+          "current_sha256": "d41ad8311c2f0f16ef49665cf02301a02d13b3ff9eb3771c1d2fb1edcbfdc50c",
+          "equal": true,
+          "bytes": 3354
+        },
+        {
+          "path": "tdd-orchestrator/agents/spec-kit-author.md",
+          "captured_sha256": "a2f01d4b24d3f4c7738c9590e65abd6f0cac131f30dd22a3836951b0e683db16",
+          "current_sha256": "a2f01d4b24d3f4c7738c9590e65abd6f0cac131f30dd22a3836951b0e683db16",
+          "equal": true,
+          "bytes": 6750
+        },
+        {
+          "path": "tdd-orchestrator/agents/test-author.md",
+          "captured_sha256": "874fefdd154c8574f38a1b91c5380d40cacd81cbb206182a9ea08811129a9e0d",
+          "current_sha256": "874fefdd154c8574f38a1b91c5380d40cacd81cbb206182a9ea08811129a9e0d",
+          "equal": true,
+          "bytes": 4568
+        },
+        {
+          "path": "tdd-orchestrator/agents/validator.md",
+          "captured_sha256": "8eb21cb6a3a9bf8e32a51f56e8d5fac996760530dd9c1ad87b87c6f101273115",
+          "current_sha256": "8eb21cb6a3a9bf8e32a51f56e8d5fac996760530dd9c1ad87b87c6f101273115",
+          "equal": true,
+          "bytes": 7360
+        },
+        {
+          "path": "deep-review/agents/deep-reviewer.md",
+          "captured_sha256": "9bb1841572935b38cac5ad9881e6c01b45bc48f61d40a11bb3523b80bc934aef",
+          "current_sha256": "9bb1841572935b38cac5ad9881e6c01b45bc48f61d40a11bb3523b80bc934aef",
+          "equal": true,
+          "bytes": 12433
+        },
+        {
+          "path": "alignment/agents/requirements-reader.md",
+          "captured_sha256": "4c59206dcdb8d4043d26621de713bb440e87221b1c6a5b3ad833c0831b3a6a82",
+          "current_sha256": "4c59206dcdb8d4043d26621de713bb440e87221b1c6a5b3ad833c0831b3a6a82",
+          "equal": true,
+          "bytes": 3156
+        },
+        {
+          "path": "architecture/agents/architect.md",
+          "captured_sha256": "993048c8477b72732a55606163c68b6fadab1f49e603cc9b5e02141e0a94eb7b",
+          "current_sha256": "993048c8477b72732a55606163c68b6fadab1f49e603cc9b5e02141e0a94eb7b",
+          "equal": true,
+          "bytes": 3246
+        },
+        {
+          "path": "secure-linux-web-hosting/agents/host-operator.md",
+          "captured_sha256": "582de2d88b581f8434a0bd8db3541c27327c55392f047c039c655b2eb87492b3",
+          "current_sha256": "582de2d88b581f8434a0bd8db3541c27327c55392f047c039c655b2eb87492b3",
+          "equal": true,
+          "bytes": 3099
+        }
+      ]
+    },
+    "genuine_evidence": {
+      "index": "implementation-evidence/native-release/proof-index.json",
+      "primary_native_runs": [
+        "5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d",
+        "14b1c89c-ee9c-438c-a7c8-9ec9e095173a"
+      ],
+      "bounded_offline_replay": "9cf3a564-85c0-4fd5-8bfd-633107baaae9; notfreshinference",
+      "profile_witness": "Eleven namedprofileterminals plus separate genuine PeerPositive; aborted redundant peer NOTrenamed",
+      "native_capture_roles": {
+        "peer_positive": "5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d",
+        "profile_batch": "14b1c89c-ee9c-438c-a7c8-9ec9e095173a"
+      }
+    },
+    "limits": [
+      "Same AC012, no profile/model/effort/structured/default changes",
+      "No originalRED found/reconstructed or earlierTDDsuccess claimed",
+      "Original PENDING/REDPENDINGtask preserved; no statusesbackfilled",
+      "Physicalserving/providerfallbackNOTOBSERVED explicitly accepted; no PASS",
+      "Source scope13 only, notwholepackagecurrentnativeacceptance",
+      "No extra native attempt authorized; currentwindow2used/oneleft",
+      "Independentcheckpointreview and final native/validator/release gates stillpending"
+    ]
+  }
+}

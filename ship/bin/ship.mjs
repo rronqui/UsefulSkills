@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // ship.mjs — motor determinístico do fluxo de releases (skill "ship").
-// Subcomandos: setup | new | ship | deploy. Requer: git, gh autenticado, Node >= 20.
+// Subcomandos: setup | new | plan | ship | deploy. Requer: Node; exceto plan, git e gh autenticado.
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify } from "./lib.mjs";
+import { extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify, validateShipQuality } from "./lib.mjs";
+import { validateQualityReportFile } from "../../tdd-orchestrator/lib/quality.mjs";
 
-const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+const [cmd, ...rest] = process.argv.slice(2);
+const root = cmd === "plan" ? process.cwd() : execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const CONFIG = path.join(root, "ship.config.json");
 function readConfig() {
   const value = JSON.parse(readFileSync(CONFIG, "utf8"));
@@ -383,6 +385,26 @@ function repoSlug() {
 function defaultBranch(repository = repoSlug()) {
   return gh(["api", `repos/${repository}`, "-q", ".default_branch"]);
 }
+function validatedDefaultBranch(raw) {
+  const value = String(raw ?? "").trim();
+  if (
+    !value ||
+    value.startsWith("-") ||
+    !/^[A-Za-z0-9._/-]+$/.test(value) ||
+    value.includes("..") ||
+    value.includes("//") ||
+    value.endsWith(".") ||
+    value.includes("@{")
+  ) {
+    throw new Error(`branch default inválida: '${value}'`);
+  }
+  try {
+    git(["check-ref-format", "--branch", value]);
+  } catch {
+    throw new Error(`branch default inválida: '${value}'`);
+  }
+  return value;
+}
 function redactUrlForMessage(raw) {
   const value = String(raw ?? "").trim();
   try {
@@ -436,9 +458,49 @@ function usage() {
   console.log(`Uso:
   ship.mjs setup
   ship.mjs new (--bug <título> | --feat <título>) [--desc <texto>]
-  ship.mjs ship <descrição> [--body-file <arquivo>]
+  ship.mjs plan --target <branch> [--root <diretório>] [--report <arquivo relativo>] [--context <arquivo relativo>]
+  ship.mjs ship <descrição> [--body-file <arquivo>] [--quality-report <arquivo relativo>] [--quality-context <arquivo relativo>]
   ship.mjs deploy`);
   process.exit(1);
+}
+
+// ---------- readonly external plan ----------
+function parsePlanInput(argv) {
+  const allowed = new Set(["--root", "--target", "--report", "--context"]);
+  const values = Object.create(null);
+  for (let index = 0; index < argv.length; index += 2) {
+    const name = argv[index];
+    if (!allowed.has(name)) throw new Error(`Opção inesperada de plan: ${name}`);
+    if (Object.hasOwn(values, name)) throw new Error(`${name} não pode ser informado mais de uma vez`);
+    const value = flagValue(argv, name);
+    if (value === null || !value.trim()) throw new Error(`${name} exige um valor não vazio que não seja outra opção`);
+    values[name] = value;
+  }
+  if (!Object.hasOwn(values, "--target")) throw new Error("plan exige --target <branch>");
+  return values;
+}
+
+function cmdPlan(argv) {
+  const values = parsePlanInput(argv);
+  const workspace = path.resolve(values["--root"] ?? process.cwd());
+  const quality = validateShipQuality(workspace, {
+    required: true,
+    reportPath: values["--report"] ?? ".omp/state/quality.json",
+    contextPath: values["--context"] ?? ".omp/state/quality-context.json",
+  });
+  if (!quality.ok || quality.legacy !== false) {
+    throw new Error(`Qualidade bloqueou o plano: ${quality.errors.join("; ") || "relatório corrente e contexto independente obrigatórios"}`);
+  }
+  console.log(JSON.stringify({
+    schema_version: 1,
+    mode: "external",
+    dry_run: true,
+    status: "PLANNED",
+    merge_target: values["--target"],
+    quality: { status: "PASS", legacy: false },
+    steps: ["issue", "branch", "commit", "push", "pull_request", "ci", "release"]
+      .map((step) => ({ step, status: "NOT_EXECUTED" })),
+  }));
 }
 
 // ---------- setup ----------
@@ -466,7 +528,7 @@ function setup() {
   writeFileSync(
     CONFIG,
     JSON.stringify(
-      { dbPath: null, buildCommand: null, stopCommand: null, startCommand: null, versionCheckUrl: null },
+      { dbPath: null, buildCommand: null, stopCommand: null, startCommand: null, versionCheckUrl: null, qualityPolicyVersion: 1, qualityReport: ".omp/state/quality.json", qualityContext: ".omp/state/quality-context.json" },
       null,
       2,
     ) + "\n",
@@ -475,16 +537,59 @@ function setup() {
 }
 
 // ---------- new ----------
-function cmdNew(argv) {
-  const bug = flagValue(argv, "--bug");
-  const feat = flagValue(argv, "--feat");
+function parseNewFlag(argv, name) {
+  if (!argv.includes(name)) return null;
+  const value = flagValue(argv, name);
+  if (value === null) {
+    throw new Error(`${name} exige um valor não vazio que não seja outra opção`);
+  }
+  return value;
+}
+
+function parseNewInput(argv) {
+  for (const name of ["--bug", "--feat", "--desc"]) {
+    if (argv.filter((item) => item === name).length > 1) {
+      throw new Error(`${name} não pode ser informado mais de uma vez`);
+    }
+  }
   if (argv.includes("--bug") && argv.includes("--feat")) {
-    console.error("--bug e --feat não podem ser usados simultaneamente; escolha exatamente um.");
+    throw new Error("--bug e --feat não podem ser usados simultaneamente; escolha exatamente um.");
+  }
+  const bug = parseNewFlag(argv, "--bug");
+  const feat = parseNewFlag(argv, "--feat");
+  const desc = parseNewFlag(argv, "--desc");
+  if (bug === null && feat === null) {
+    throw new Error("new exige exatamente um título em --bug ou --feat");
+  }
+  return { bug, feat, desc };
+}
+function validatePlanningQuality(qualityConfig) {
+  const reportPath = qualityConfig.qualityReport === undefined ? ".omp/state/quality.json" : qualityConfig.qualityReport;
+  const contextPath = qualityConfig.qualityContext === undefined ? ".omp/state/quality-context.json" : qualityConfig.qualityContext;
+  if (qualityConfig.qualityPolicyVersion === undefined && qualityConfig.qualityReport === undefined && qualityConfig.qualityContext === undefined) {
+    try {
+      lstatSync(path.resolve(root, reportPath));
+    } catch (error) {
+      if (error?.code === "ENOENT") return { ok: true, errors: [], report: null, legacy: true };
+      throw error;
+    }
+  }
+  const checked = validateQualityReportFile(root, reportPath, contextPath, "planning");
+  if (!checked.ok) throw new Error(checked.errors.join("; "));
+  return { ...checked, legacy: false };
+}
+
+function cmdNew(argv) {
+  let parsed;
+  try {
+    parsed = parseNewInput(argv);
+  } catch (err) {
+    console.error(`Título/descrição inválido: ${err.message}`);
     process.exit(1);
   }
-  const desc = flagValue(argv, "--desc");
-  const type = bug ? "fix" : "feat";
-  const title = bug || feat;
+  const { bug, feat, desc } = parsed;
+  const type = bug !== null ? "fix" : "feat";
+  const title = bug ?? feat;
   try {
     requireReleaseDescription(title);
   } catch (err) {
@@ -496,9 +601,25 @@ function cmdNew(argv) {
     process.exit(1);
   }
   requireVersionSources();
+  const qualityConfig = existsSync(CONFIG) ? readConfig() : {};
+  if (qualityConfig.qualityPolicyVersion !== undefined && qualityConfig.qualityPolicyVersion !== 1) fail("E_QUALITY: qualityPolicyVersion não suportada");
+  let planningQuality;
+  try {
+    planningQuality = validatePlanningQuality(qualityConfig);
+  } catch (err) {
+    fail(`E_QUALITY: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (planningQuality.legacy) console.warn("E_QUALITY_LEGACY: gate de qualidade automático inativo; migre qualityPolicyVersion=1 antes de usar o fluxo atualizado.");
   requireGhAuth();
   requirePushRemote();
   requireLabel(type);
+  const repository = repoSlug();
+  let def;
+  try {
+    def = validatedDefaultBranch(defaultBranch(repository));
+  } catch (err) {
+    fail(`Não consegui validar a branch default '${err instanceof Error ? err.message : String(err)}'. Nenhuma issue foi criada.`);
+  }
   const originalBranch = git(["branch", "--show-current"]);
   let originalHead = "";
   try {
@@ -506,8 +627,6 @@ function cmdNew(argv) {
   } catch {
     // orphan branches have no HEAD to restore
   }
-  const repository = repoSlug();
-  const def = defaultBranch(repository);
   const restoreBranch = () => {
     try {
       if (originalBranch && originalBranch !== def) {
@@ -535,12 +654,41 @@ function cmdNew(argv) {
   };
   try {
     git(["switch", def]);
-    git(["pull", "--ff-only"]);
+    git(["pull", "--ff-only", "origin", def]);
+  } catch {
+    restoreBranch();
+    console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
+    process.exit(1);
+  }
+  try {
     validateVersionSources();
   } catch {
     restoreBranch();
     console.error(`Não consegui atualizar a branch default '${def}' antes de criar a issue. Nenhuma issue foi criada.`);
     process.exit(1);
+  }
+  try {
+    const currentQualityConfig = existsSync(CONFIG) ? readConfig() : {};
+    if (currentQualityConfig.qualityPolicyVersion !== undefined && currentQualityConfig.qualityPolicyVersion !== 1) {
+      throw new Error("qualityPolicyVersion não suportada");
+    }
+    if (!planningQuality.legacy && (
+      currentQualityConfig.qualityPolicyVersion !== qualityConfig.qualityPolicyVersion ||
+      currentQualityConfig.qualityReport !== qualityConfig.qualityReport ||
+      currentQualityConfig.qualityContext !== qualityConfig.qualityContext
+    )) {
+      throw new Error("A política ou os caminhos de qualidade mudaram após atualizar a branch default");
+    }
+    const currentPlanningQuality = validatePlanningQuality(currentQualityConfig);
+    if (!planningQuality.legacy && (
+      currentPlanningQuality.legacy ||
+      currentPlanningQuality.proofDigest !== planningQuality.proofDigest
+    )) {
+      throw new Error("O planejamento de qualidade mudou após atualizar a branch default");
+    }
+  } catch (err) {
+    restoreBranch();
+    fail(`E_QUALITY: ${err instanceof Error ? err.message : String(err)}`);
   }
   const label = type === "fix" ? "bug" : "enhancement";
   let url;
@@ -587,6 +735,20 @@ function cmdNew(argv) {
 
 // ---------- ship ----------
 function cmdShip(argv) {
+  const contextIndex = argv.indexOf("--quality-context");
+  let contextOverride;
+  if (contextIndex !== -1) {
+    contextOverride = argv[contextIndex + 1];
+    if (!contextOverride || contextOverride.startsWith("--") || argv.indexOf("--quality-context", contextIndex + 1) !== -1) fail("E_QUALITY: --quality-context exige um único arquivo relativo");
+    argv = argv.filter((_, i) => i !== contextIndex && i !== contextIndex + 1);
+  }
+  const qualityIndex = argv.indexOf("--quality-report");
+  let qualityOverride;
+  if (qualityIndex !== -1) {
+    qualityOverride = argv[qualityIndex + 1];
+    if (!qualityOverride || qualityOverride.startsWith("--") || argv.indexOf("--quality-report", qualityIndex + 1) !== -1) fail("E_QUALITY: --quality-report exige um único arquivo relativo");
+    argv = argv.filter((_, i) => i !== qualityIndex && i !== qualityIndex + 1);
+  }
   const bodyFile = flagValue(argv, "--body-file");
   const flagIndex = argv.indexOf("--body-file");
   if (flagIndex !== -1) {
@@ -626,6 +788,25 @@ function cmdShip(argv) {
   }
 
   requireVersionSources();
+  const qualityConfig = existsSync(CONFIG) ? readConfig() : {};
+  if (qualityConfig.qualityPolicyVersion !== undefined && qualityConfig.qualityPolicyVersion !== 1) fail("E_QUALITY: qualityPolicyVersion não suportada");
+  const qualityPath = qualityOverride ?? qualityConfig.qualityReport;
+  const qualityContext = contextOverride ?? qualityConfig.qualityContext;
+  let approvedContext;
+  let approvedProof;
+  const checkQuality = () => {
+    const checked = validateShipQuality(root, { reportPath: qualityPath, contextPath: qualityContext, required: qualityConfig.qualityPolicyVersion === 1 });
+    if (!checked.ok) fail(`E_QUALITY: ${checked.errors.join("; ")}`);
+    const currentContext = checked.legacy ? null : checked.report.review.context_digest;
+    if (approvedContext !== undefined && approvedContext !== currentContext) fail("E_QUALITY: contexto aprovado mudou durante a operação");
+    const currentProof = checked.legacy ? null : checked.proofDigest;
+    if (approvedProof !== undefined && approvedProof !== currentProof) fail("E_QUALITY: provas aprovadas mudaram durante a operação");
+    approvedContext = currentContext;
+    approvedProof = currentProof;
+    return checked;
+  };
+  const quality = checkQuality();
+  if (quality.legacy) console.warn("E_QUALITY_LEGACY: gate de qualidade automático inativo; migre qualityPolicyVersion=1 antes de usar o fluxo atualizado.");
   requireGhAuth();
   requirePushRemote();
   const repository = repoSlug();
@@ -645,15 +826,17 @@ function cmdShip(argv) {
   if (prUrl && !validateResourceUrl(prUrl, repository, "pull")) {
     fail(`PR existente retornou URL inválida: ${redactUrlForMessage(prUrl)}`);
   }
-  if (!prUrl) requireLabel(type);
+  if (!prUrl) { checkQuality(); requireLabel(type); }
   // Retry body-only is deliberately independent of the local commit state.
   if (bodyFile && prUrl) {
+    checkQuality();
     const existingBodyJson = gh(["pr", "view", prUrl, "--json", "body"]);
     const existingBody = JSON.parse(existingBodyJson).body ?? "";
     const payloadHasCloseMarker = String(rawPayload).split(/\r?\n/).some((line) => /^\s*Closes\s+#\d+\s*$/i.test(line));
     const mergePayload = payloadHasCloseMarker ? rawPayload : `${rawPayload}\nCloses #${n}`;
     const mergedBody = rawPayload.trim() ? mergePrBody(existingBody, mergePayload, n) : existingBody;
-    if (mergedBody !== existingBody) gh(["pr", "edit", prUrl, "--body", mergedBody]);
+    if (mergedBody !== existingBody) { checkQuality(); gh(["pr", "edit", prUrl, "--body", mergedBody]); }
+    checkQuality();
     enableAutoMerge(prUrl);
     return;
   }
@@ -663,11 +846,13 @@ function cmdShip(argv) {
   const bodyExtra = rawPayload.trim() ? `\n\n${rawPayload}` : "";
 
   const commitTitle = releaseTitle(type, rawDescription, n);
+  checkQuality();
   git(["add", "-A"]);
   if (spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root }).status === 0) {
     const unpublished = Number(git(["rev-list", "--count", "HEAD", "--not", "--remotes"]));
     if (!unpublished) {
       try {
+        checkQuality();
         git(["fetch", "origin", def]);
         const branchCommits = Number(git(["rev-list", "--count", `origin/${def}..HEAD`]));
         if (!branchCommits) {
@@ -681,14 +866,18 @@ function cmdShip(argv) {
       console.log(`Árvore limpa — publicando ${unpublished} commit(s) local(is) não publicado(s).`);
     }
   } else {
+    checkQuality();
     git(["commit", "-m", commitTitle]);
   }
+  // A commit hook may have changed product files: never publish a stale approval.
+  checkQuality();
   try {
     git(["push", "-u", "origin", branch]);
   } catch {
     fail("Falha no remote de push; commit local preservado, mas PR não foi criado.");
   }
   if (!prUrl) {
+    checkQuality();
     prUrl = gh([
       "pr", "create",
       "--base", def,
@@ -701,6 +890,7 @@ function cmdShip(argv) {
     fail(`PR create retornou URL vazia ou inválida: ${redactUrlForMessage(prUrl)}`);
   }
   console.log(`PR ${prUrl}`);
+  checkQuality();
   enableAutoMerge(prUrl);
 }
 let rollbackAlreadyAttempted = false;
@@ -1009,11 +1199,11 @@ async function deploy() {
 }
 
 // ---------- dispatch ----------
-const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === "setup") setup();
   else if (cmd === "new") cmdNew(rest);
   else if (cmd === "ship") cmdShip(rest);
+  else if (cmd === "plan") cmdPlan(rest);
   else if (cmd === "deploy") await deploy();
   else usage();
 } catch (err) {

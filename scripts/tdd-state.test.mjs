@@ -137,7 +137,7 @@ function makeTask(overrides = {}) {
 function makeProgress(overrides = {}) {
   const task = makeTask();
   const progress = {
-    schema_version: "2.2",
+    schema_version: "2.3",
     run_id: "2026-08-10T00:00:00.000Z",
     task_source: "TASKS.md",
     updated_at: "2026-08-10T00:00:00.000Z",
@@ -299,7 +299,7 @@ describe("T-003 — state migration and validation seams", () => {
     const original = structuredClone(legacy);
     const migrated = expectAccepted(api.migrateProgress(legacy));
 
-    expect(migrated.schema_version).toBe("2.2");
+    expect(migrated.schema_version).toBe("2.3");
     expect(migrated.repo.branch_work).toBe("fix/36-corrigir-integracao-robusta-das-skills");
     expect(migrated.repo.branch).toBeUndefined();
     expect(migrated.waves[0].tasks[0].reviewed_by).toBe("peer-reviewer");
@@ -597,11 +597,11 @@ describe("T-003 — state migration and validation seams", () => {
         },
       },
     });
-    expect(api.validateCriteriaMatrix(normative)).toMatchObject({ ok: true, errors: [] });
+    expect(api.validateCriteriaMatrix(normative, { acceptanceCriteria: [{ id: 'AC-019', type: 'normative' }] })).toMatchObject({ ok: true, errors: [] });
 
     const extraNaField = structuredClone(normative);
     extraNaField.red.criteria_to_tests["AC-019"].extra = "forbidden";
-    expectRejected(api.validateCriteriaMatrix(extraNaField), /exact|extra|chave/i);
+    expectRejected(api.validateCriteriaMatrix(extraNaField, { acceptanceCriteria: [{ id: 'AC-019', type: 'normative' }] }), /exact|extra|chave/i);
     const redReady = fullyValidTask({
       phase: "GREEN",
       red: {
@@ -694,6 +694,7 @@ describe("T-003 — state migration and validation seams", () => {
     const baselineRef = "scripts/tdd-state.test.mjs::previous revision assertion";
     const staleRef = "scripts/tdd-state.test.mjs::stale revision assertion";
     const progress = makeProgress();
+    progress.schema_version = "2.2";
     const task = progress.waves[0].tasks[0];
     task.phase = "RED_REVISION";
     task.review = approvedTaskReview();
@@ -745,10 +746,10 @@ describe("T-003 — state migration and validation seams", () => {
     });
     const legacy = structuredClone(canonical);
     legacy.red.criteria_to_tests["AC-019"].validator = "validator";
-    expectRejected(api.validateCriteriaMatrix(legacy), /validator|literal|canonical/i);
-    expect(api.validateCriteriaMatrix(canonical)).toMatchObject({ ok: true, errors: [] });
+    expectRejected(api.validateCriteriaMatrix(legacy, { acceptanceCriteria: [{ id: 'AC-019', type: 'normative' }] }), /validator|literal|canonical/i);
+    expect(api.validateCriteriaMatrix(canonical, { acceptanceCriteria: [{ id: 'AC-019', type: 'normative' }] })).toMatchObject({ ok: true, errors: [] });
   });
-  it("AC-008 regression — completa a ponte 2.1→2.2, converte READY/textual matrix e inicializa campos novos", async () => {
+  it("AC-008 regression — completa a ponte 2.1→2.3, converte READY/textual matrix e inicializa campos novos", async () => {
     const loaded = await loadStateApi();
     const api = assertStateApiLoaded(loaded);
     if (!api) return;
@@ -774,7 +775,7 @@ describe("T-003 — state migration and validation seams", () => {
 
     const migrated = expectAccepted(api.migrateProgress(legacy));
     const migratedTask = migrated.waves[0].tasks[0];
-    expect(migrated.schema_version).toBe("2.2");
+    expect(migrated.schema_version).toBe("2.3");
     expect(migratedTask.phase).toBe("REVIEW");
     expect(migratedTask.review).toEqual(pendingReview());
     expect(migratedTask.red.criteria_to_tests).toEqual({
@@ -949,6 +950,7 @@ describe("T-003 — state migration and validation seams", () => {
     if (!api) return;
 
     const capped = makeProgress({
+      schema_version: "2.2",
       waves: [{
         wave: 1,
         status: "in_progress",
@@ -1254,6 +1256,7 @@ describe("T-003 — state migration and validation seams", () => {
     const progress = makeProgress({
       acceptance_criteria: [{
         id: "AC-019",
+        type: "normative",
         desc: "artefatos Spec Kit coerentes",
         source: "./specs/specs003-convivencia-robusta-skills/spec.md#AC-019",
         tasks: ["T-019"],
@@ -1557,6 +1560,7 @@ describe("T-003 — state migration and validation seams", () => {
     if (!api) return;
 
     const progress = makeProgress({
+      schema_version: "2.2",
       baseline: {
         status: "PASS",
         tests: "PASS",
@@ -1587,6 +1591,7 @@ describe("T-003 — state migration and validation seams", () => {
     if (!api) return;
 
     const progress = makeProgress();
+    progress.schema_version = "2.2";
     progress.baseline.known_failures.push({
       gate: "coverage",
       reason: "legacy coverage diagnostic",
@@ -1641,6 +1646,7 @@ describe("T-003 — state migration and validation seams", () => {
       evidence: "RED assertion evidence; done task evidence",
     });
     const progress = makeProgress({
+      schema_version: "2.2",
       waves: [{
         wave: 1,
         status: "completed",
@@ -1662,6 +1668,7 @@ describe("T-003 — state migration and validation seams", () => {
     if (!api) return;
 
     const task = makeTask({ phase: "RED_REVISION", review: pendingReview() });
+    task.red.revision_baseline_tests = criteriaMatrix();
     const migrated = expectAccepted(api.migrateProgress(makeProgress({
       waves: [{
         wave: 1,
@@ -1689,7 +1696,9 @@ describe("T-003 — state migration and validation seams", () => {
         evidence: "partial reviewer proof",
       },
     });
+    task.red.revision_baseline_tests = criteriaMatrix();
     const migrated = expectAccepted(api.migrateProgress(makeProgress({
+      schema_version: "2.2",
       waves: [{
         wave: 1,
         status: "in_progress",
@@ -1767,6 +1776,71 @@ describe("T-003 — state migration and validation seams", () => {
       .join(" ");
     expect(retainedProof).toContain(reviewProof);
   });
+
+  it("AC-003 — rejeita IDs de tarefa globalmente duplicados e ondas duplicadas com IDs distintos", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const wave = (number, task) => ({
+      wave: number,
+      status: "in_progress",
+      integration: { status: "pending", attempt: 0, evidence: "" },
+      tasks: [task],
+    });
+    const validNeighbor = makeProgress({
+      waves: [
+        wave(1, fullyValidTask()),
+        wave(2, makeTask({ id: "T-004", title: "ID distinto em onda seguinte", phase: "RED" })),
+      ],
+    });
+    expect(api.validateProgress(validNeighbor)).toMatchObject({ ok: true, errors: [] });
+
+    const duplicateTaskId = structuredClone(validNeighbor);
+    duplicateTaskId.waves[1].tasks[0].id = duplicateTaskId.waves[0].tasks[0].id;
+    expectRejected(
+      api.validateProgress(duplicateTaskId),
+      /duplicate|duplicat|unique|unic|task|tarefa|ID/i,
+    );
+
+    const duplicateWave = structuredClone(validNeighbor);
+    duplicateWave.waves[1].wave = duplicateWave.waves[0].wave;
+    expectRejected(
+      api.validateProgress(duplicateWave),
+      /duplicate|duplicat|unique|unic|wave|onda/i,
+    );
+  });
+
+  it("AC-003 — rejeita TEST_REF absoluto ou traversal sem cortar título literal", async () => {
+    const loaded = await loadStateApi();
+    const api = assertStateApiLoaded(loaded);
+    if (!api) return;
+
+    const literalTitle = "scripts/tdd-state.test.mjs::caso  com espaços : separador literal   ";
+    const validTask = fullyValidTask({ phase: "GREEN" });
+    validTask.red.criteria_to_tests["AC-008"] = [literalTitle];
+    const accepted = api.validateCriteriaMatrix(validTask);
+    expect(accepted).toMatchObject({ ok: true, errors: [] });
+    expect(accepted.value.red.criteria_to_tests["AC-008"]).toEqual([literalTitle]);
+
+    for (const reference of [
+      "/outside.test.mjs::case",
+      "../outside.test.mjs::case",
+      "..\\outside.test.mjs::case",
+      "C:/outside.test.mjs::case",
+      "C:\\outside.test.mjs::case",
+      "\\\\server\\share\\outside.test.mjs::case",
+      "scripts/../outside.test.mjs::case",
+    ]) {
+      const candidate = structuredClone(validTask);
+      candidate.red.criteria_to_tests["AC-008"] = [reference];
+      expectRejected(
+        api.validateCriteriaMatrix(candidate),
+        /invalid|safe|relative|absolute|travers|path|refer[eê]ncia/i,
+      );
+    }
+  });
+
 
 });
 

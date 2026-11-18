@@ -7,6 +7,11 @@ const protocolModule = await import("../deep-review/lib/protocol.mjs").catch(() 
 
 const LOCAL_MODES = ["BRANCH_BASE", "COMMIT", "CUSTOM", "UNCOMMITTED"];
 const REVISION = "sha-review-36";
+const NATIVE_PEER_EXPECTED = Object.freeze({
+  agent: "peer-reviewer",
+  protocol_mode: "TDD_PEER_REVIEW",
+  reviewed_revision: REVISION,
+});
 
 function protocolApi() {
   expect(
@@ -17,6 +22,7 @@ function protocolApi() {
     "validateRequest",
     "validateReviewerResult",
     "aggregateReview",
+    "aggregateReviewInstances",
     "resolveReviewer",
   ]) {
     expect(protocolModule?.[symbol], `${symbol} deve ser exportado`).toBeTypeOf("function");
@@ -112,6 +118,19 @@ function reviewerResult(agent = "deep-reviewer", overrides = {}) {
     explanation: "The review found an actionable defect.",
     confidence: 0.92,
     findings: [finding(0), finding(1), finding(2), finding(3)],
+    ...overrides,
+  };
+}
+function nativePeerResult(status = "APROVADO", overrides = {}) {
+  return {
+    agent: "peer-reviewer",
+    protocol_mode: "TDD_PEER_REVIEW",
+    status,
+    reviewed_revision: REVISION,
+    overall_correctness: status === "APROVADO" ? "correct" : "incorrect",
+    explanation: status === "APROVADO" ? "The consumer satisfies the supplied contract." : "The consumer has a blocking defect.",
+    confidence: 0.92,
+    findings: [],
     ...overrides,
   };
 }
@@ -588,6 +607,127 @@ describe("deep-review — costura executável T-002", () => {
       expect(invalid.status).toBe("BLOCKED");
       expect(invalid).not.toMatchObject({ status: "VALID", overall_correctness: "correct" });
     }
+  });
+  describe("AC-013 — peer-reviewer native structured TDD wire", () => {
+    it.each(["APROVADO", "BLOQUEADO"])("aceita status nativo %s com o expected TDD padrão e preserva o status real", (status) => {
+      const { validateReviewerResult } = protocolApi();
+      const checked = validateReviewerResult(nativePeerResult(status), NATIVE_PEER_EXPECTED);
+
+      expect(checked).toMatchObject({
+        ok: true,
+        status,
+        value: {
+          agent: "peer-reviewer",
+          protocol_mode: "TDD_PEER_REVIEW",
+          status,
+          reviewed_revision: REVISION,
+        },
+      });
+      expect(checked.status).not.toBe("VALID");
+      expect(checked.value.status).not.toBe("VALID");
+    });
+    it("exige expected independente e não deriva identidade/revisão do payload", () => {
+      const { validateReviewerResult } = protocolApi();
+      const checked = validateReviewerResult(nativePeerResult("APROVADO"));
+
+      expect(checked.ok).toBe(false);
+      expect(checked.status).toBe("BLOCKED");
+      expect(checked.errors.join(" ")).toMatch(/expected.*reviewer|expected.*identity/i);
+    });
+
+    it("mantém deep-review VALID inalterado", () => {
+      const { validateReviewerResult } = protocolApi();
+      const checked = validateReviewerResult(reviewerResult("deep-reviewer", { findings: [] }), {
+        agent: "deep-reviewer",
+        protocol_mode: "DEEP_REVIEW",
+        reviewed_revision: REVISION,
+      });
+
+      expect(checked).toMatchObject({
+        ok: true,
+        status: "VALID",
+        value: {
+          agent: "deep-reviewer",
+          protocol_mode: "DEEP_REVIEW",
+          status: "VALID",
+          reviewed_revision: REVISION,
+        },
+      });
+    });
+
+    it("rejeita texto legado, VALID no modo TDD e formas incompletas ou incompatíveis", () => {
+      const { validateReviewerResult } = protocolApi();
+      const missingField = nativePeerResult("APROVADO");
+      delete missingField.explanation;
+      const unknownKey = { ...nativePeerResult("APROVADO"), unrecognized: true };
+      const cases = [
+        ["legacy text", "APROVADO — texto legado"],
+        ["normal VALID", nativePeerResult("VALID")],
+        ["missing required field", missingField],
+        ["unknown key", unknownKey],
+        ["stale revision", nativePeerResult("APROVADO", { reviewed_revision: "stale-revision" })],
+        ["wrong agent", nativePeerResult("APROVADO", { agent: "deep-reviewer" })],
+        ["wrong mode", nativePeerResult("APROVADO", { protocol_mode: "DEEP_REVIEW_FALLBACK" })],
+      ];
+
+      for (const [label, result] of cases) {
+        const checked = validateReviewerResult(result, NATIVE_PEER_EXPECTED);
+        expect(checked.ok, label).toBe(false);
+        expect(checked.status, label).toBe("BLOCKED");
+        expect(checked.errors.length, label).toBeGreaterThan(0);
+        expect(checked).not.toMatchObject({ status: "VALID", value: { status: "APROVADO" } });
+      }
+    });
+
+    it("mantém validação comum de findings e limites numéricos no wire nativo", () => {
+      const { validateReviewerResult } = protocolApi();
+      const checked = validateReviewerResult(nativePeerResult("BLOQUEADO", {
+        findings: [finding(4)],
+      }), NATIVE_PEER_EXPECTED);
+
+      expect(checked.ok).toBe(false);
+      expect(checked.status).toBe("BLOCKED");
+    });
+
+    it("aggregateReview nunca conta aprovação TDD direta nem envelope TDD", () => {
+      const { aggregateReview } = protocolApi();
+      const results = [
+        nativePeerResult("APROVADO"),
+        { ok: true, errors: [], value: nativePeerResult("APROVADO") },
+      ];
+
+      for (const result of results) {
+        const aggregate = aggregateReview([result], REVISION, ["peer-reviewer"]);
+        expect(aggregate.ok).toBe(false);
+        expect(aggregate.status).toBe("BLOCKED");
+        expect(aggregate).not.toMatchObject({ status: "APPROVED" });
+        expect(aggregate.errors.join(" ")).toMatch(/protocol|TDD|DEEP_REVIEW_FALLBACK|VALID/i);
+      }
+    });
+
+    it("aggregateReviewInstances rejeita resultado/envelope TDD sem contar APROVADO", () => {
+      const { aggregateReviewInstances } = protocolApi();
+      const assignments = [{
+        id: "PeerOne",
+        agent: "peer-reviewer",
+        files: ["src/consumer.mjs"],
+      }];
+      const results = [
+        nativePeerResult("APROVADO"),
+        { ok: true, errors: [], value: nativePeerResult("APROVADO") },
+      ];
+      for (const result of results) {
+        const aggregate = aggregateReviewInstances(
+          [{ id: "PeerOne", result }],
+          REVISION,
+          assignments,
+        );
+        expect(aggregate.ok).toBe(false);
+        expect(aggregate.status).toBe("BLOCKED");
+        expect(aggregate).not.toMatchObject({ status: "APPROVED" });
+        expect(aggregate.errors.join(" ")).toMatch(/protocol|TDD|DEEP_REVIEW_FALLBACK|VALID/i);
+      }
+    });
   });
 
   it("AC-007: resolve projeto > usuário > fallback peer-reviewer nomeado, com protocolo e revisão exatos", () => {

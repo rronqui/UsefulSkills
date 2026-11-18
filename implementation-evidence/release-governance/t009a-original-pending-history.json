@@ -1,0 +1,105 @@
+{
+  "id": "T-009A",
+  "title": "Integrar política de runtime/perfis sem wire inventado: discovery project dos 12, precedência, `agentSource`, modelos/effort/terminal expostos, structured opt-in, batch/flat condicional e `solutionSpace`.",
+  "phase": "PENDING",
+  "attempt": 0,
+  "allowed_write_globs": [
+    "alignment/agents/requirements-reader.md",
+    "architecture/SKILL.md",
+    "architecture/agents/architect.md",
+    "secure-linux-web-hosting/SKILL.md",
+    "secure-linux-web-hosting/agents/host-operator.md",
+    "tdd-orchestrator/SKILL.md",
+    "tdd-orchestrator/agents/*.md",
+    "tdd-orchestrator/references/model-policy.md"
+  ],
+  "acceptance_criteria": [
+    "AC-012"
+  ],
+  "implemented_by": "",
+  "reviewed_by": "",
+  "review": {
+    "status": "PENDING",
+    "agent": "",
+    "independent": false,
+    "revision": "",
+    "evidence": ""
+  },
+  "red": {
+    "status": "PENDING",
+    "failing_tests": [],
+    "failure_reason_expected": false,
+    "criteria_to_tests": {
+      "AC-012": [
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileRequirementsReader",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileArchitect",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileHostOperator",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileDeepReviewer",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileSpecKitAuthor",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileTestAuthor",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileBackendDeveloper",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileFrontendDeveloper",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileRefactorer",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileValidator",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileIntegrator",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertPeerCase/PeerPositive"
+      ]
+    },
+    "revision_delta": {
+      "ac": "",
+      "test": "",
+      "evidence": ""
+    },
+    "revision_baseline_tests": {}
+  },
+  "green": {
+    "status": "PENDING",
+    "reason_if_skipped": "",
+    "changed_files": [],
+    "tooling_evidence": "",
+    "tooling_suite_evidence": ""
+  },
+  "refactor": {
+    "status": "PENDING",
+    "reason_if_skipped": ""
+  },
+  "doc_impact": "none",
+  "gates": {
+    "tests": "pending",
+    "traceability": "pending",
+    "spec_kit": "pending",
+    "coverage": "pending",
+    "lint": "pending",
+    "type_check": "pending",
+    "build": "pending",
+    "security": "pending",
+    "contract": "pending",
+    "git_sanity": "pending"
+  },
+  "gate_origins": {
+    "tests": "",
+    "traceability": "",
+    "spec_kit": "",
+    "coverage": "",
+    "lint": "",
+    "type_check": "",
+    "build": "",
+    "security": "",
+    "contract": "",
+    "git_sanity": ""
+  },
+  "gate_evidence": {
+    "tests": "",
+    "traceability": "",
+    "spec_kit": "",
+    "coverage": "",
+    "lint": "",
+    "type_check": "",
+    "build": "",
+    "security": "",
+    "contract": "",
+    "git_sanity": ""
+  },
+  "blockers": [],
+  "evidence": "\nTwelve-role witness uses eleven named profile captures plus separate genuine PeerPositive, never renaming abortedProfilePeerReviewer. Serving/fallback remain unverified; proof-index preserves capture bindings."
+}

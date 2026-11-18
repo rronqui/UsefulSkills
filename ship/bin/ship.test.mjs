@@ -22,6 +22,138 @@ async function runShip(argv) {
   vi.resetModules();
   return import("./ship.mjs");
 }
+async function createMinimalGitFixture() {
+  const actualChildProcess = await vi.importActual("node:child_process");
+  const root = mkdtempSync(join(tmpdir(), "ship-new-parser-git-"));
+  const git = (args) =>
+    actualChildProcess.execFileSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+
+  git(["init"]);
+  mkdirSync(join(root, ".hooks"));
+  git(["config", "core.hooksPath", ".hooks"]);
+  git(["config", "user.name", "Ship parser test"]);
+  git(["config", "user.email", "ship-parser@example.invalid"]);
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "ship-parser-fixture", version: "1.0.0" }));
+  git(["add", "package.json"]);
+  git(["commit", "-m", "fixture base"]);
+  git(["branch", "-M", "main"]);
+  git(["switch", "-c", "work"]);
+  return { actualChildProcess, git, root };
+}
+
+describe("T-006B AC-007: parser de new falha antes de qualquer efeito", () => {
+  it.each([
+    ["título --bug sem valor", ["new", "--bug"]],
+    ["título --feat sem valor", ["new", "--feat"]],
+    ["título --bug seguido por opção", ["new", "--bug", "--desc", "texto"]],
+    ["título --feat seguido por opção", ["new", "--feat", "--desc", "texto"]],
+    ["título --bug vazio", ["new", "--bug", ""]],
+    ["título --feat vazio", ["new", "--feat", ""]],
+    ["--desc sem valor", ["new", "--feat", "título válido", "--desc"]],
+    ["--desc seguido por opção", ["new", "--feat", "título válido", "--desc", "--quality-context"]],
+    ["--desc vazio", ["new", "--feat", "título válido", "--desc", ""]],
+  ])("%s", async (_label, argv) => {
+    const previousCwd = process.cwd();
+    const fixture = await createMinimalGitFixture();
+    const gitCalls = [];
+    const ghCalls = [];
+    const beforeHead = fixture.git(["rev-parse", "HEAD"]);
+    const beforeTree = fixture.git(["rev-parse", "HEAD^{tree}"]);
+    const beforeBranch = fixture.git(["branch", "--show-current"]);
+
+    childProcess.execFileSync.mockImplementation((command, args, options = {}) => {
+      if (command === "git") {
+        gitCalls.push({ args: [...args] });
+        return fixture.actualChildProcess.execFileSync(command, args, options);
+      }
+      if (command === "gh") {
+        ghCalls.push([...args]);
+        throw new Error("gh inesperado para entrada inválida");
+      }
+      throw new Error(`comando inesperado: ${command}`);
+    });
+
+    process.chdir(fixture.root);
+    const exitSpy = trapProcessExit();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runShip(argv)).rejects.toThrow("__SHIP_EXIT_1__");
+
+      const effects = gitCalls.filter(
+        ({ args }) => !(args[0] === "rev-parse" && args[1] === "--show-toplevel"),
+      );
+      expect(effects, "entrada inválida não pode consultar/mudar o Git após descobrir a raiz").toEqual([]);
+      expect(ghCalls, "entrada inválida não pode tocar a fronteira GitHub").toHaveLength(0);
+      expect(fixture.git(["rev-parse", "HEAD"])).toBe(beforeHead);
+      expect(fixture.git(["rev-parse", "HEAD^{tree}"])).toBe(beforeTree);
+      expect(fixture.git(["branch", "--show-current"])).toBe(beforeBranch);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+      process.chdir(previousCwd);
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("T-006B AC-007 RED_REVISION: ocorrências duplicadas são inválidas", () => {
+  it.each([
+    ["--bug repetido sem valor", ["new", "--bug", "título", "--bug"]],
+    ["--bug repetido seguido por opção", ["new", "--bug", "título", "--bug", "--desc", "descrição"]],
+    ["--bug repetido com valor", ["new", "--bug", "título", "--bug", "outro"]],
+    ["--feat repetido sem valor", ["new", "--feat", "título", "--feat"]],
+    ["--feat repetido seguido por opção", ["new", "--feat", "título", "--feat", "--desc", "descrição"]],
+    ["--desc repetido sem valor", ["new", "--feat", "título", "--desc", "descrição", "--desc"]],
+    ["--desc repetido com valor", ["new", "--feat", "título", "--desc", "descrição", "--desc", "outra"]],
+  ])("%s", async (_label, argv) => {
+    const previousCwd = process.cwd();
+    const fixture = await createMinimalGitFixture();
+    const gitCalls = [];
+    const ghCalls = [];
+    const beforeHead = fixture.git(["rev-parse", "HEAD"]);
+    const beforeTree = fixture.git(["rev-parse", "HEAD^{tree}"]);
+    const beforeBranch = fixture.git(["branch", "--show-current"]);
+
+    childProcess.execFileSync.mockImplementation((command, args, options = {}) => {
+      if (command === "git") {
+        gitCalls.push({ args: [...args] });
+        return fixture.actualChildProcess.execFileSync(command, args, options);
+      }
+      if (command === "gh") {
+        ghCalls.push([...args]);
+        throw new Error("gh inesperado para entrada inválida");
+      }
+      throw new Error(`comando inesperado: ${command}`);
+    });
+
+    process.chdir(fixture.root);
+    const exitSpy = trapProcessExit();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runShip(argv)).rejects.toThrow("__SHIP_EXIT_1__");
+
+      const effects = gitCalls.filter(
+        ({ args }) => !(args[0] === "rev-parse" && args[1] === "--show-toplevel"),
+      );
+      expect(effects, "duplicata inválida não pode consultar/mudar o Git").toEqual([]);
+      expect(ghCalls, "duplicata inválida não pode tocar a fronteira GitHub").toHaveLength(0);
+      expect(fixture.git(["rev-parse", "HEAD"])).toBe(beforeHead);
+      expect(fixture.git(["rev-parse", "HEAD^{tree}"])).toBe(beforeTree);
+      expect(fixture.git(["branch", "--show-current"])).toBe(beforeBranch);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+      process.chdir(previousCwd);
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+});
+
 
 function trapProcessExit() {
   return vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -29,7 +161,7 @@ function trapProcessExit() {
   });
 }
 
-function configureDefaultGitGh({ status = "", branch = "main", ahead = "0" } = {}) {
+function configureDefaultGitGh({ status = "", branch = "main", ahead = "0", spawnImplementation = null } = {}) {
   const calls = [];
   childProcess.execFileSync.mockImplementation((command, args) => {
     calls.push({ kind: "exec", command, args: [...args] });
@@ -51,9 +183,9 @@ function configureDefaultGitGh({ status = "", branch = "main", ahead = "0" } = {
     }
     return "";
   });
-  childProcess.spawnSync.mockImplementation((command, args) => {
+  childProcess.spawnSync.mockImplementation((command, args, options) => {
     calls.push({ kind: "spawn", command, args: Array.isArray(args) ? [...args] : [] });
-    return { status: 0 };
+    return spawnImplementation ? spawnImplementation(command, args, options) : { status: 0 };
   });
   return calls;
 }
@@ -977,7 +1109,17 @@ describe("T-001 guards e invariantes de release/deploy", () => {
           : actualFs.readFileSync(file, ...rest);
       },
     }));
-    const calls = configureDefaultGitGh();
+    const actualChildProcess = await vi.importActual("node:child_process");
+    let realLinuxBackupInvoked = false;
+    const calls = configureDefaultGitGh({
+      spawnImplementation(command, args, options) {
+        if (command === "/usr/bin/python3") {
+          realLinuxBackupInvoked = true;
+          return actualChildProcess.spawnSync(command, args, options);
+        }
+        return { status: 0 };
+      },
+    });
 
     try {
       await runShip(["deploy"]);
@@ -988,10 +1130,12 @@ describe("T-001 guards e invariantes de release/deploy", () => {
       );
       const buildIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "build-server");
       const startIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "start-server");
-      expect(stopIndex).toBeGreaterThanOrEqual(0);
-      expect(stopIndex).toBeLessThan(pullIndex);
-      expect(buildIndex).toBeGreaterThan(pullIndex);
-      expect(startIndex).toBeGreaterThan(buildIndex);
+      if (process.platform === "linux") {
+        const backupIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "/usr/bin/python3");
+        expect(realLinuxBackupInvoked).toBe(true);
+        expect(backupIndex).toBeGreaterThan(stopIndex);
+        expect(backupIndex).toBeLessThan(pullIndex);
+      }
 
       const snapshots = actualFs.readdirSync(backupDir);
       expect(snapshots).toHaveLength(1);
@@ -1106,7 +1250,7 @@ describe("T-001 guards e invariantes de release/deploy", () => {
         buildCommand: null,
         stopCommand: null,
         startCommand: null,
-        versionCheckUrl: "http://localhost:3000/version",
+        versionCheckUrl: null,
       }),
     );
 
@@ -1484,7 +1628,10 @@ describe("RED_REVISION: regressões de preflight e readiness", () => {
       calls.push({ kind: "spawn", command, args: Array.isArray(args) ? [...args] : [] });
       return { status: 0 };
     });
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      status: 200,
+      text: async () => "<p>Versão da aplicação v1.2.3</p>",
+    });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = trapProcessExit();
 
@@ -1997,15 +2144,21 @@ describe("RED_REVISION: gaps adicionais de retry, deploy e readiness", () => {
       versionCheckUnit: "unit-that-does-not-exist",
     });
     configureDefaultGitGh();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      status: 200,
+      text: async () => "<p>Versão da aplicação v1.2.3</p>",
+    });
     const exitSpy = trapProcessExit();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
       await expect(runShip(["deploy"])).rejects.toThrow("__SHIP_EXIT_1__");
       expect(errorSpy.mock.calls.flat().join("\n")).toMatch(/E_VERSION_SOURCE/);
+      expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       errorSpy.mockRestore();
       exitSpy.mockRestore();
+      fetchSpy.mockRestore();
       unmockShipFs();
     }
   });

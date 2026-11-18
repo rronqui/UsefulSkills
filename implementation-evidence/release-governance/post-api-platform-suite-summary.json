@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "classification": "POST_API_COMPLETE_PLATFORM_SUITE_EVIDENCE_NOT_NATIVE_APPROVAL",
+  "source_snapshot": "sha256:fbe111c8dc9b9667371dbd7b433e5d2178948987771588df6ea290e060ac9c4c",
+  "source_files": 209,
+  "windows": {
+    "report": "validator-windows-post-api.json",
+    "sha256": "5f252fee2f5e520b5d670871fa284ea05f75f85beef151a64a1c4720e8fb632a",
+    "files": 27,
+    "suites": 79,
+    "total": 1237,
+    "passed": 1203,
+    "failed": 0,
+    "skipped": 34,
+    "exit": 0
+  },
+  "linux": {
+    "report": "validator-linux-post-api-vitest.json",
+    "sha256": "98392cd4c3a2f9ed8e63cd7a0fae6f29887d0a2291e4b80312f0bb9df338a5cd",
+    "files": 27,
+    "suites": 79,
+    "total": 1237,
+    "passed": 1223,
+    "failed": 0,
+    "skipped": 14,
+    "exit": 0
+  },
+  "unique_executed_test_refs": 1312,
+  "skips": [
+    {
+      "platform": "Windows",
+      "file": "scripts/fs-transaction.test.mjs",
+      "title": "AC-005 fs-transaction boundary fails closed when foreign regular bytes replaces a published operation quarantine",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/fs-transaction.test.mjs",
+      "title": "AC-005 fs-transaction boundary fails closed when symlink to an external sentinel replaces a published operation quarantine",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/hitl-loop.test.mjs",
+      "title": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa substituir TRACE_FILE symlink existente — skip: symlink indisponível (EPERM)",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/hitl-loop.test.mjs",
+      "title": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck — skip: symlink indisponível (EPERM)",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "install-hooks + wrappers gerados restaura todos os destinos após falha de link em destino posterior",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "install-hooks + wrappers gerados restaura todos os destinos após falha de unlink em destino posterior",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "install-hooks + wrappers gerados reporta estado inseguro quando a restauração do rollback falha",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 restores an existing preimage when first POSIX publication fails before link — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 restores an earlier preimage while preserving a foreign later destination on link EEXIST — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 restores an existing preimage when unlinking the published stage fails — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 rejects a real parent replacement after the first stage without publishing into the replacement — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 rejects a destination hash changed after preflight without overwriting the user edit — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 rejects a source hash changed after preflight without distributing unverified bytes — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs transaction contract AC-013 rejects destination hardlink swaps without touching the linked target — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 real identities preserve a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high inode permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high device permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preserva NOTICE symlink — skip: file symlink unsupported: EPERM",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs symlink em arquivo gerenciado — skip: file symlink unsupported: EPERM",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs --check preserva extras quando a raiz de agentes não é legível — skip: permissões POSIX não são portáveis no Windows",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs --check trata destino FIFO como drift sem bloquear ou fazer hash — skip: FIFO não é portável neste Windows; cenário gated",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs modo normal preserva destino FIFO conflitante e não aplica operações pendentes — skip: FIFO não é portável neste Windows; cenário gated",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preflight detecta socket Unix no destino sem bloquear a instalação",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preflight detecta device no destino sem substituí-lo — skip: device POSIX não é portável neste Windows; cenário gated",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: block device POSIX não é portável neste Windows; cenário gated",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/quality.test.mjs",
+      "title": "AC-002 inventory refuses symlink alias or escape",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "scripts/retro.test.mjs",
+      "title": "AC-009 safe reads refuse real symlink evidence",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Windows",
+      "file": "ship/bin/lib.test.mjs",
+      "title": "Linux native backup consumer verifica identidade bigint, cópia exata, colisão, staging nomeado ausente e alvo indisponível fail-closed",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.cmd com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.bat com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 aceita Conventional válido pelo fallback .cmd em cwd e mensagem com Unicode, espaços e metacaracteres",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-hooks.test.mjs",
+      "title": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 rejeita Conventional inválido pelo fallback .cmd sem executar comando extra",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 preserves every external sentinel byte when a real worker races an ancestor after native staging — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 converts a real exclusive destination handle into native sharing drift without writes — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 revalidates an equal file after a real worker attempts a post-preflight write — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 restores multiple same-basename preimages when a later destination collides — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 restores the first publication while preserving a foreign second destination and its handle — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install-transaction.test.mjs",
+      "title": "install.mjs filesystem boundary AC-005 preserves a foreign NOTICE created after planning before native preflight — requires Windows x64 native filesystem primitives",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-installer-47-hlmr69y4/project/.test-temp/install-device-hSAf9Z/device: Operation not permitted\n)",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "scripts/install.test.mjs",
+      "title": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-installer-47-hlmr69y4/project/.test-temp/install-block-device-WgHrGL/device: Operation not permitted\n)",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "ship/bin/lib.test.mjs",
+      "title": "performBackup propaga E_BACKUP_CLOSE sem retentar após colisão de destino",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    },
+    {
+      "platform": "Linux",
+      "file": "ship/bin/lib.test.mjs",
+      "title": "performBackup falha fechada quando uma tentativa de troca do staging é bloqueada",
+      "status": "SKIPPED_PLATFORM_OR_CAPABILITY"
+    }
+  ],
+  "limits": [
+    "No parentcascade",
+    "Skipsnotexecutions",
+    "Rawskipdisplaytitlespreserved, newline/path-bearingmknodlabelsnotconvertedtofakematrixrefs",
+    "Existingrunnerverificationonly; nooriginalproductionREDfabricated",
+    "NoNative/security/releaseapproval"
+  ]
+}

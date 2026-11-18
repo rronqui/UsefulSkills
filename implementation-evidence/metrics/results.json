@@ -1,0 +1,811 @@
+{
+  "status": "PASS",
+  "task": "T-015",
+  "acceptance_criteria": [
+    "AC-020"
+  ],
+  "command": "node implementation-evidence/metrics/guard-startup.mjs",
+  "started_at": "2026-11-14T16:02:57.137Z",
+  "finished_at": "2026-11-14T16:03:11.950Z",
+  "sample_design": {
+    "session_count": 5,
+    "sessions_independent": true,
+    "execution_order": "serial; one fresh createGitSession per session",
+    "query": [
+      "rev-parse",
+      "--git-dir"
+    ],
+    "query_kind": "read-only rev-parse --git-dir",
+    "worktree_scope": "known private linked worktree only; no fixture writes or new branch",
+    "worktree_binding": {
+      "linked": true,
+      "pointer_sha256": "8b74585ee27c408ab1055087206160d0dedd60603b826ead20535cda74009808"
+    }
+  },
+  "measurements": {
+    "node_startup": {
+      "sample_count": 5,
+      "command": [
+        "--input-type=module",
+        "-e",
+        "process.stdout.write('guard-startup-ready')"
+      ],
+      "environment_policy": "empty child environment; no inherited secrets exported",
+      "parent_scope": "the measuring Node process only; child CPU/memory are not measured",
+      "samples": [
+        {
+          "sample": 1,
+          "wall_ns": "61508200",
+          "parent_resource_delta": {
+            "cpu_user_us": 0,
+            "cpu_system_us": 0,
+            "resource_max_rss_kib": 368,
+            "rss_bytes": 376832,
+            "heap_used_bytes": 32384,
+            "external_bytes": 59
+          },
+          "child_status": 0,
+          "child_stdout_sha256": "66ff15f4bd6d0389c78df930b5b0f2d4ca1bc202f18dbd3bde1b49166a324b2a",
+          "child_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "sample": 2,
+          "wall_ns": "59281500",
+          "parent_resource_delta": {
+            "cpu_user_us": 0,
+            "cpu_system_us": 0,
+            "resource_max_rss_kib": 8,
+            "rss_bytes": 8192,
+            "heap_used_bytes": 8584,
+            "external_bytes": 19
+          },
+          "child_status": 0,
+          "child_stdout_sha256": "66ff15f4bd6d0389c78df930b5b0f2d4ca1bc202f18dbd3bde1b49166a324b2a",
+          "child_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "sample": 3,
+          "wall_ns": "70612200",
+          "parent_resource_delta": {
+            "cpu_user_us": 0,
+            "cpu_system_us": 0,
+            "resource_max_rss_kib": 28,
+            "rss_bytes": 32768,
+            "heap_used_bytes": 23408,
+            "external_bytes": 19
+          },
+          "child_status": 0,
+          "child_stdout_sha256": "66ff15f4bd6d0389c78df930b5b0f2d4ca1bc202f18dbd3bde1b49166a324b2a",
+          "child_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "sample": 4,
+          "wall_ns": "60820900",
+          "parent_resource_delta": {
+            "cpu_user_us": 0,
+            "cpu_system_us": 16000,
+            "resource_max_rss_kib": 16,
+            "rss_bytes": 12288,
+            "heap_used_bytes": 14840,
+            "external_bytes": 19
+          },
+          "child_status": 0,
+          "child_stdout_sha256": "66ff15f4bd6d0389c78df930b5b0f2d4ca1bc202f18dbd3bde1b49166a324b2a",
+          "child_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "sample": 5,
+          "wall_ns": "58540100",
+          "parent_resource_delta": {
+            "cpu_user_us": 0,
+            "cpu_system_us": 0,
+            "resource_max_rss_kib": 20,
+            "rss_bytes": 16384,
+            "heap_used_bytes": 16112,
+            "external_bytes": 19
+          },
+          "child_status": 0,
+          "child_stdout_sha256": "66ff15f4bd6d0389c78df930b5b0f2d4ca1bc202f18dbd3bde1b49166a324b2a",
+          "child_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "guarded_git": {
+      "sessions": [
+        {
+          "session": 1,
+          "query": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "cold": {
+            "wall_ns": "2807024800",
+            "parent_resource_delta": {
+              "cpu_user_us": 125000,
+              "cpu_system_us": 15000,
+              "resource_max_rss_kib": 27680,
+              "rss_bytes": 7471104,
+              "heap_used_bytes": 1177272,
+              "external_bytes": -53388
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "warm": {
+            "wall_ns": "63082500",
+            "parent_resource_delta": {
+              "cpu_user_us": 16000,
+              "cpu_system_us": 0,
+              "resource_max_rss_kib": 0,
+              "rss_bytes": 172032,
+              "heap_used_bytes": 183216,
+              "external_bytes": 165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "admission_child_count": 1,
+          "git_spawn_count": 2,
+          "warm_admission_child_count": 0,
+          "outputs_identical": true,
+          "admission_amortization_wall_delta_ns": "2743942300"
+        },
+        {
+          "session": 2,
+          "query": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "cold": {
+            "wall_ns": "2796357300",
+            "parent_resource_delta": {
+              "cpu_user_us": 63000,
+              "cpu_system_us": 63000,
+              "resource_max_rss_kib": 1320,
+              "rss_bytes": 1208320,
+              "heap_used_bytes": -536856,
+              "external_bytes": -165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "warm": {
+            "wall_ns": "45331900",
+            "parent_resource_delta": {
+              "cpu_user_us": 0,
+              "cpu_system_us": 0,
+              "resource_max_rss_kib": 0,
+              "rss_bytes": 4096,
+              "heap_used_bytes": 173600,
+              "external_bytes": 165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "admission_child_count": 1,
+          "git_spawn_count": 2,
+          "warm_admission_child_count": 0,
+          "outputs_identical": true,
+          "admission_amortization_wall_delta_ns": "2751025400"
+        },
+        {
+          "session": 3,
+          "query": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "cold": {
+            "wall_ns": "2813013600",
+            "parent_resource_delta": {
+              "cpu_user_us": 31000,
+              "cpu_system_us": 16000,
+              "resource_max_rss_kib": 916,
+              "rss_bytes": 499712,
+              "heap_used_bytes": 475920,
+              "external_bytes": -165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "warm": {
+            "wall_ns": "67569300",
+            "parent_resource_delta": {
+              "cpu_user_us": 0,
+              "cpu_system_us": 15000,
+              "resource_max_rss_kib": 0,
+              "rss_bytes": 0,
+              "heap_used_bytes": 175048,
+              "external_bytes": 165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "admission_child_count": 1,
+          "git_spawn_count": 2,
+          "warm_admission_child_count": 0,
+          "outputs_identical": true,
+          "admission_amortization_wall_delta_ns": "2745444300"
+        },
+        {
+          "session": 4,
+          "query": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "cold": {
+            "wall_ns": "2909892500",
+            "parent_resource_delta": {
+              "cpu_user_us": 47000,
+              "cpu_system_us": 63000,
+              "resource_max_rss_kib": 488,
+              "rss_bytes": 184320,
+              "heap_used_bytes": 16712,
+              "external_bytes": -165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "warm": {
+            "wall_ns": "43157300",
+            "parent_resource_delta": {
+              "cpu_user_us": 15000,
+              "cpu_system_us": 0,
+              "resource_max_rss_kib": 0,
+              "rss_bytes": 69632,
+              "heap_used_bytes": 171088,
+              "external_bytes": 165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "admission_child_count": 1,
+          "git_spawn_count": 2,
+          "warm_admission_child_count": 0,
+          "outputs_identical": true,
+          "admission_amortization_wall_delta_ns": "2866735200"
+        },
+        {
+          "session": 5,
+          "query": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "cold": {
+            "wall_ns": "2800195300",
+            "parent_resource_delta": {
+              "cpu_user_us": 78000,
+              "cpu_system_us": 47000,
+              "resource_max_rss_kib": 252,
+              "rss_bytes": 8192,
+              "heap_used_bytes": -254080,
+              "external_bytes": -165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "warm": {
+            "wall_ns": "48586400",
+            "parent_resource_delta": {
+              "cpu_user_us": 0,
+              "cpu_system_us": 31000,
+              "resource_max_rss_kib": 0,
+              "rss_bytes": 229376,
+              "heap_used_bytes": 181112,
+              "external_bytes": 165
+            },
+            "output": {
+              "status": 0,
+              "stdout": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/repository/.git/worktrees/review\n",
+              "stderr": "",
+              "error_code": null
+            }
+          },
+          "admission_child_count": 1,
+          "git_spawn_count": 2,
+          "warm_admission_child_count": 0,
+          "outputs_identical": true,
+          "admission_amortization_wall_delta_ns": "2751608900"
+        }
+      ],
+      "spawn_events": [
+        {
+          "sequence": 1,
+          "session": 1,
+          "phase": "cold",
+          "role": "native_admission",
+          "executable_basename": "powershell.exe",
+          "args": null,
+          "argument_count": 8,
+          "argument_code_units": [
+            10,
+            15,
+            12,
+            4,
+            13,
+            4,
+            8,
+            27736
+          ],
+          "script_sha256": "4a30500d0d1871c5857ac1e426583d7ef2f57cd2aa2e5e536b742695a3ce389e",
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 2,
+          "session": 1,
+          "phase": "cold",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 3,
+          "session": 1,
+          "phase": "warm",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 4,
+          "session": 2,
+          "phase": "cold",
+          "role": "native_admission",
+          "executable_basename": "powershell.exe",
+          "args": null,
+          "argument_count": 8,
+          "argument_code_units": [
+            10,
+            15,
+            12,
+            4,
+            13,
+            4,
+            8,
+            27736
+          ],
+          "script_sha256": "4a30500d0d1871c5857ac1e426583d7ef2f57cd2aa2e5e536b742695a3ce389e",
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 5,
+          "session": 2,
+          "phase": "cold",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 6,
+          "session": 2,
+          "phase": "warm",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 7,
+          "session": 3,
+          "phase": "cold",
+          "role": "native_admission",
+          "executable_basename": "powershell.exe",
+          "args": null,
+          "argument_count": 8,
+          "argument_code_units": [
+            10,
+            15,
+            12,
+            4,
+            13,
+            4,
+            8,
+            27736
+          ],
+          "script_sha256": "4a30500d0d1871c5857ac1e426583d7ef2f57cd2aa2e5e536b742695a3ce389e",
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 8,
+          "session": 3,
+          "phase": "cold",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 9,
+          "session": 3,
+          "phase": "warm",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 10,
+          "session": 4,
+          "phase": "cold",
+          "role": "native_admission",
+          "executable_basename": "powershell.exe",
+          "args": null,
+          "argument_count": 8,
+          "argument_code_units": [
+            10,
+            15,
+            12,
+            4,
+            13,
+            4,
+            8,
+            27736
+          ],
+          "script_sha256": "4a30500d0d1871c5857ac1e426583d7ef2f57cd2aa2e5e536b742695a3ce389e",
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 11,
+          "session": 4,
+          "phase": "cold",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 12,
+          "session": 4,
+          "phase": "warm",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 13,
+          "session": 5,
+          "phase": "cold",
+          "role": "native_admission",
+          "executable_basename": "powershell.exe",
+          "args": null,
+          "argument_count": 8,
+          "argument_code_units": [
+            10,
+            15,
+            12,
+            4,
+            13,
+            4,
+            8,
+            27736
+          ],
+          "script_sha256": "4a30500d0d1871c5857ac1e426583d7ef2f57cd2aa2e5e536b742695a3ce389e",
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 14,
+          "session": 5,
+          "phase": "cold",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        },
+        {
+          "sequence": 15,
+          "session": 5,
+          "phase": "warm",
+          "role": "git",
+          "executable_basename": "git.exe",
+          "args": [
+            "rev-parse",
+            "--git-dir"
+          ],
+          "argument_count": 2,
+          "argument_code_units": [
+            9,
+            9
+          ],
+          "script_sha256": null,
+          "shell": false,
+          "windows_hide": true,
+          "status": 0,
+          "error_code": null
+        }
+      ],
+      "native_admission_child_count": 5,
+      "git_spawn_count": 10,
+      "duplicate_metadata_admissions": 0,
+      "parent_scope": "wall time and parent-process CPU/resource deltas only; child and system-wide CPU/memory are not measured",
+      "timing_interpretation": "cold minus warm is within-session admission amortization, not a version-before/after speedup"
+    }
+  },
+  "hashes": {
+    "source": {
+      "guard_factory_sha256": "8514e2befd545d4ad12550234713c528966d5768c6baecdf41f9c227775649dc",
+      "windows_host_helper_sha256": "b5b2aadb51e06fcb8a2f4ee0b734f9f4c1726cb2bc8070d1e74f223e23db9ea1",
+      "measurement_script_sha256": "8e46261960f74dfa090d64d32942abc900588260af1ddc7097bb1ba116541ace"
+    },
+    "binaries": {
+      "node": {
+        "version": "v22.23.2",
+        "executable_sha256": "0d0f5e39f9f3d9587bc19f73eab3c2c9c4903fd02d6dbf9c853dd81b3d95fad4"
+      },
+      "admitted_git": {
+        "role": "official-wrapper",
+        "expected_sha256": "81ef35ae005ca9318018d18e3327578ce939fb99feaad6b2d7c8ab15f3de8db5",
+        "measured_sha256": "81ef35ae005ca9318018d18e3327578ce939fb99feaad6b2d7c8ab15f3de8db5",
+        "unchanged": true
+      },
+      "native_host": {
+        "basename": "powershell.exe",
+        "executable_sha256": "60c9b29843624dd8af6b6a7b26147753be6aeef65098b9a503cc50850afe410f"
+      }
+    },
+    "platform": {
+      "descriptor": {
+        "platform": "win32",
+        "arch": "x64",
+        "os_release": "10.0.26200",
+        "endianness": "LE"
+      },
+      "descriptor_sha256": "0fd373028fc9c7a13d3160a03fc03a3addb85c3577e2f190ce14b69bc6bf3b3a"
+    }
+  },
+  "official_git_provenance": {
+    "product_version": "2.54.0.windows.1",
+    "architecture": "x64",
+    "signer": "Johannes Schindelin",
+    "certificate_fingerprint": "3E:B1:4A:3A:EF:84:B7:15:3E:13:93:97:F0:A4:9E:2F:AC:66:2B:0E",
+    "binary_hash_unchanged": true
+  },
+  "metrics_correctness": {
+    "status": "PASS",
+    "invariants": {
+      "meaningful_admission_once_per_session": true,
+      "identical_cold_warm_query_outputs": true,
+      "no_duplicated_metadata_admission": true,
+      "exact_readonly_tuple_only": true,
+      "security_controls_retained": true
+    },
+    "instrumentation": "spawn observer delegates to real child_process.spawnSync and returns its result object unchanged; observer metadata is not substituted for native output"
+  },
+  "security_controls": {
+    "actual_factory": "createGitSession",
+    "actual_windows_host_helper": "windowsHostPath",
+    "shell_false": true,
+    "windows_hide_true": true,
+    "forbidden_git_flags_invoked": [],
+    "direct_unadmitted_git_invoked": false,
+    "fallback_path_invoked": false,
+    "inherited_environment_serialized": false,
+    "node_startup_child_environment": "empty",
+    "worktree_mutation": false
+  },
+  "limits": {
+    "prior_uncontrolled_observations": "19.10s/3.46s observations were not a controlled benchmark and are not reused as a comparison",
+    "not_measured": {
+      "model_latency": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "No OMP model-serving call is made by this probe"
+      },
+      "token_usage": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "Git output contains no model/token data"
+      },
+      "model_cost": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "No model or billing source is observed"
+      },
+      "review_time_or_quality": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "No review execution is made by this probe"
+      },
+      "retry_count_or_backoff": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "No retry mechanism is exercised"
+      },
+      "fallback_or_serving": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "No fallback or model serving is exercised"
+      },
+      "child_or_systemwide_resources": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "Only parent-process CPU/resource information is sampled"
+      },
+      "version_before_after_speedup": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "Cold/warm is admission amortization within one version, not a version comparison"
+      },
+      "arbitrary_worktree_effects": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "Only the known private linked worktree is used"
+      },
+      "external_scheduler_parallelism": {
+        "status": "NOT_MEASURED",
+        "value": null,
+        "reason": "The harness is serial and cannot prove behavior of an external scheduler"
+      }
+    },
+    "remaining_ac020_limits": [
+      "No OMP/model latency, token, cost, serving, or batch metric is observed.",
+      "No review duration/quality metric is observed.",
+      "No retry count, retry backoff, or fallback metric is observed.",
+      "No child-process or system-wide CPU/memory metric is observed.",
+      "Cold/warm timing is admission amortization only; it is not a before/after release speedup.",
+      "The serial five-session sample cannot establish external scheduler parallelism or all-workload behavior.",
+      "The 19.10s/3.46s historical observations remain uncontrolled and are not compared."
+    ]
+  }
+}

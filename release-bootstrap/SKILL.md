@@ -5,6 +5,25 @@ description: Estabelecer fluxo completo de versionamento e release em um reposit
 
 # release-bootstrap — fluxo de releases completo para um repositório
 
+## Integração proporcional
+
+Leia [enforcement](references/quality-enforcement.md) antes de configurar CI/hooks.
+Configuração não prova proteção ativa; preserve maquinário e hooks alheios.
+Bootstrap só quando solicitado; entrega local não exige Git/issue/PR/servidor.
+Fases abaixo são recursos operacionais, não autorização implícita para publicar.
+[Origem/licença](SOURCE.md).
+
+## Política compartilhada e fronteira
+
+Leia `skill://tdd-orchestrator/references/quality-policy.md` na localização real
+resolvida pelo OMP ao definir critérios de CI e documentação. Esta skill instala
+o maquinário autorizado; `ship` opera a entrega e `tdd-orchestrator` conduz a
+implementação comportamental. Reutilize checks existentes em vez de duplicar
+jobs ou orquestradores. Scans de segredos e dependências devem ter escopo,
+resultado e limitações verificáveis; ferramenta obrigatória indisponível bloqueia
+o gate pertinente, sem virar NA. Não anuncie enforcement de documentação
+funcional no servidor até existir job configurado e validado para esse gate.
+
 Missão: transformar um repositório em projeto com disciplina de releases — mudanças só
 entram via issue + branch + PR, CI obrigatório, versão SemVer automática com
 release-please e versão visível na aplicação. Execute em fases, verificando o estado

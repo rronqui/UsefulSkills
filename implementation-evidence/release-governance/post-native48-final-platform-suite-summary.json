@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "kind": "POST_NATIVE48_RETAINED_CONFIGURED_PLATFORM_SUITE_LEDGER",
+  "classification": "LOCAL_EVIDENCE_RECONCILIATION_NOT_WHOLE_GOAL_OR_RELEASE_APPROVAL",
+  "scope_status": "RETAINED_CONFIGURED_SUITE_PASS_CURRENT_PUBLIC_BYTE_APPLICABILITY_FINAL_INDEPENDENT_VALIDATION_PENDING",
+  "reconciliation_recorded_at": "2026-11-18T00:07:59.640Z",
+  "timestamp_semantics": "The reconciliation timestamp records read-only evidence comparison, not a test rerun. Original run dates are inside each platform entry.",
+  "history": {
+    "supersedes_for_current_local_qa_interpretation": [
+      "implementation-evidence/release-governance/final-platform-suite-summary.json",
+      "implementation-evidence/release-governance/post-api-platform-suite-summary.json"
+    ],
+    "preservation": "Neither prior ledger, original diagnosis, raw report, original Native48 capture, four-file historical metrics bundle nor prepublication packet is modified. Prior cohort evidence remains historical, not deleted or rewritten.",
+    "prior_post_api_cases_per_platform": 1237,
+    "current_retained_cases_per_platform": 1250,
+    "prior_final_ledger_native_pending_text": "Historical Native22-era interpretation only; current authenticated Native48 consumer reinspection is recorded separately below. This artifact does not rewrite the original Native48 pending result."
+  },
+  "configured_suite": {
+    "scope": "Retained configured Vitest discovery only: 27 files, 80 suites and 1250 cases per OS, with unchanged public/configured inputs. Not a fresh execution against all private Goal sources.",
+    "configured_discovery": [
+      "ship/bin/**/*.test.mjs",
+      "scripts/**/*.test.mjs"
+    ],
+    "filters_added": false,
+    "checks_reexecuted": false,
+    "windows": {
+      "report_locator": {
+        "private_proof": ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json",
+        "json_pointer": "/windows/report",
+        "availability": "PRIVATE_LOCAL_NOT_BUNDLED",
+        "meaning": "Locator to the actual retained Vitest JSON; no private absolute path or raw report is bundled here."
+      },
+      "report_sha256": "edff16cf4ee9f936e79250ca2dbb189b24a4c167a236443781db443a3d1a96b3",
+      "report_sha256_method": "SHA-256 of exact actual report file bytes, computed read-only; not expanded from an abbreviated hash.",
+      "node": "22.23.2",
+      "report_start_time_epoch_ms": 1794891984493,
+      "report_start_time_utc": "2026-11-17T05:06:24.493000Z",
+      "last_test_result_end_time_epoch_ms": 1794892408846.026,
+      "last_test_result_end_time_utc": "2026-11-17T05:13:28.846026Z",
+      "date_semantics": "Original actual report startTime and maximum testResults[].endTime; endTime is not a new run or ledger creation timestamp. Epoch milliseconds retain original report precision.",
+      "success": true,
+      "test_files": 27,
+      "suites": 80,
+      "total": 1250,
+      "passed": 1216,
+      "failed": 0,
+      "skipped": 34,
+      "todo": 0,
+      "skipped_by_repository_file": {
+        "scripts/fs-transaction.test.mjs": 2,
+        "scripts/hitl-loop.test.mjs": 2,
+        "scripts/install-hooks.test.mjs": 3,
+        "scripts/install-transaction.test.mjs": 16,
+        "scripts/install.test.mjs": 8,
+        "scripts/quality.test.mjs": 1,
+        "scripts/retro.test.mjs": 1,
+        "ship/bin/lib.test.mjs": 1
+      },
+      "skip_reason_scope": "Actual POSIX-only/platform and symlink EPERM restrictions on Windows; actual platform and CAP_MKNOD restrictions on Linux. Skips are not passes or executions.",
+      "raw_skip_preservation": "All original assertion statuses, full display titles and mknod diagnostics remain in the immutable actual report; raw skip records also remain in the prior ledger. Private path-bearing titles are not copied into this portable artifact.",
+      "checks_reexecuted": false
+    },
+    "linux": {
+      "report_locator": {
+        "private_proof": ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json",
+        "json_pointer": "/linux/report",
+        "availability": "PRIVATE_LOCAL_NOT_BUNDLED",
+        "meaning": "Locator to the actual retained Vitest JSON; no private absolute path or raw report is bundled here."
+      },
+      "report_sha256": "b460a224e66b690c9c38c78071d919a26b2f670030842a54a29da2803b736c03",
+      "report_sha256_method": "SHA-256 of exact actual report file bytes, computed read-only; not expanded from an abbreviated hash.",
+      "node": "22.22.1",
+      "report_start_time_epoch_ms": 1794891985617,
+      "report_start_time_utc": "2026-11-17T05:06:25.617000Z",
+      "last_test_result_end_time_epoch_ms": 1794892002004.6948,
+      "last_test_result_end_time_utc": "2026-11-17T05:06:42.004695Z",
+      "date_semantics": "Original actual report startTime and maximum testResults[].endTime; endTime is not a new run or ledger creation timestamp. Epoch milliseconds retain original report precision.",
+      "success": true,
+      "test_files": 27,
+      "suites": 80,
+      "total": 1250,
+      "passed": 1236,
+      "failed": 0,
+      "skipped": 14,
+      "todo": 0,
+      "skipped_by_repository_file": {
+        "scripts/install-hooks.test.mjs": 4,
+        "scripts/install-transaction.test.mjs": 6,
+        "scripts/install.test.mjs": 2,
+        "ship/bin/lib.test.mjs": 2
+      },
+      "skip_reason_scope": "Actual POSIX-only/platform and symlink EPERM restrictions on Windows; actual platform and CAP_MKNOD restrictions on Linux. Skips are not passes or executions.",
+      "raw_skip_preservation": "All original assertion statuses, full display titles and mknod diagnostics remain in the immutable actual report; raw skip records also remain in the prior ledger. Private path-bearing titles are not copied into this portable artifact.",
+      "checks_reexecuted": false
+    },
+    "retained_unique_actual_passed_test_refs": 1325,
+    "unique_ref_semantics": "Retained native22-current-full-qa-actual.json unique file/fullName PASS references across platforms, not 1325 test instances on each platform; never add SKIP counts to PASS.",
+    "actual_skipped_instances_across_platforms": 48,
+    "actual_failed_instances_across_platforms": 0
+  },
+  "current_public_input_applicability": {
+    "fixed_candidate_entries": 228,
+    "public_entries": 201,
+    "private_entries": 27,
+    "compared_to_actual_windows_clone": 201,
+    "compared_to_actual_linux_clone": 201,
+    "differences": [],
+    "comparison_evidence": ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json",
+    "comparison_method": "Parent read-only comparison of every ordered public cohort file content hash and byte length against the current repository and both actual execution clones; zero differences. This ledger retains that comparison; no tests rerun.",
+    "public_inventory_sha256": "d039e4c1c14ea82a796f537f00c95e00a82b837be7e9e6b6bd9a1333d81ea334",
+    "digest_algorithm": "SHA256(UTF8(JSON.stringify(rows))); no whitespace, property insertion order path,bytes,sha256; preserve rows order from exact frozen228manifest, filtering implementation-evidence/ only; no re-sort",
+    "digest_rows_expression": "candidate49.manifest.filter(r => !r.path.startsWith(\"implementation-evidence/\")).map(r => ({path:r.path,bytes:r.bytes,sha256:r.sha256}))",
+    "inventory_evidence": ".omp/state/release-47/proofs/post-native48-public-qa-inventory.json",
+    "inventory_digest_recomputed_from_preserved_ordered_rows": true,
+    "scope_limit": "Exact 201-file public cohort only. No claim that all 228 files or private collector/probe bytes equal the old execution clones; newly authored closure artifacts fall outside the original frozen cohort."
+  },
+  "retained_independent_configured_dependency_graph": {
+    "status": "PASSOU_SCOPED_TECHNICAL_APPLICABILITY",
+    "evidence": ".omp/state/release-47/proofs/native45-independent-configured-qa-binding.json",
+    "configured_tests": 27,
+    "reachable_local_files": 39,
+    "edges": 29,
+    "unresolved": 0,
+    "private_implementation_evidence_imports": 0,
+    "checks_reexecuted": false,
+    "hash_policy": "The prior graph proof reports only an abbreviated graph digest; no full graph digest is invented here. Full source-proof and ordered public-inventory hashes are supplied separately.",
+    "limit": "Retained independent static configured-graph binding, not new final T014/whole-Goal validation or equality of private harness inputs."
+  },
+  "private_source_regression_scope": {
+    "current": {
+      "evidence": ".omp/state/release-47/proofs/post-native48-final-projection-red-green123.json",
+      "recorded_at": "2026-11-17T23:55:20.572Z",
+      "source_sha256": "7dded9e5a237ae9c735cc9b2730bfb75e8f16e345a909256a7c369db5c3a5859",
+      "retry_source_sha256": "fd22f38c81661e3d99c3569c95319f8461d960d6943dd10a723474e22fcff348",
+      "snapshot_manifest_sha256": "0aec7929658181f988db274468629d63f2e42e2f1b95f034921f984e03c2e063",
+      "greens": [
+        {
+          "probe": "early-lifecycle-binding",
+          "passed": 63
+        },
+        {
+          "probe": "machine-report-boundary",
+          "passed": 60
+        }
+      ],
+      "total_source_cases": 123,
+      "genuine_prior_reds": [
+        {
+          "cases": 60,
+          "passed": 59,
+          "expected_assertion_failures": 1
+        },
+        {
+          "cases": 63,
+          "passed": 62,
+          "expected_assertion_failures": 1
+        }
+      ],
+      "sdk_calls": 0,
+      "meaning": "Source-only producer/consumer regressions for canonical Root wait job_id and canonical route case lookup; raw SDK transport jobId and native/PASS predicates are not weakened."
+    },
+    "prior": {
+      "evidence": ".omp/state/release-47/proofs/native48-private-wire-red-green173.json",
+      "source_sha256": "a6affbb91a7f252f49539ca473dbab2ccb149621ad3e50613a52bfcbbac2deae",
+      "source_cases": 173,
+      "early": 63,
+      "async": 51,
+      "machine": 59,
+      "meaning": "Earlier private-wire cohort at a different source SHA. Its 51 async cases were not freshly rerun as part of the current Source123 proof."
+    },
+    "counting_limit": "123 current and 173 prior are separate overlapping source scopes, not 296 fresh cases and not a fresh all-probes suite. Source-only regression credit is not Native execution credit.",
+    "implementation_credit": "Current two-line Main producer/consumer fix: RootCodingAssistant. The authentic Native48 backend model repaired only the temporary capture app; it did not author the Main fix."
+  },
+  "authenticated_native48_reinspection": {
+    "evidence": ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json",
+    "kind": "CURRENT_CONSUMER_REINSPECTION_OF_AUTHENTIC_NATIVE48",
+    "status": "PASS",
+    "recorded_at": "2026-11-17T23:53:27.576Z",
+    "node": "22.23.2",
+    "source_sha256": "7dded9e5a237ae9c735cc9b2730bfb75e8f16e345a909256a7c369db5c3a5859",
+    "current_product_source_files_exact": 131,
+    "original_capture": {
+      "private_proof": ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json",
+      "json_pointer": "/original/path",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED",
+      "sha256": "c17689f5a4a97b2752f875a45ecb8fc324472261b67fb16a55aa5d5df540356b",
+      "original_bytes_rehashed_unchanged": true,
+      "original_status": "PENDING_NATIVE",
+      "original_exit_code": 2,
+      "original_finished_at": "2026-11-17T23:20:16.852Z",
+      "preserved": true
+    },
+    "managed_package": {
+      "manifest_verified": true,
+      "before_sha256": "8bb088f42c157b0ed5b16f4f4e9cfa038f7ac12a180c4bf530a0e2696f3c9a19",
+      "after_sha256": "8bb088f42c157b0ed5b16f4f4e9cfa038f7ac12a180c4bf530a0e2696f3c9a19",
+      "unchanged": true
+    },
+    "meaning": "Current consumer adjudication of authentic retained Native48 captures, not a newly executed Native49. Corrected derived Root canonical job projection and route case lookup allow the retained authentic evidence to satisfy the current consumer; original raw SDK fields and original exit2 capture are unchanged.",
+    "lifecycle_phase_count": 11,
+    "lifecycle_phases": {
+      "SHORT": {
+        "status": "PASS"
+      },
+      "FULL": {
+        "status": "PASS"
+      },
+      "LOCAL": {
+        "status": "PASS"
+      },
+      "EXTERNAL": {
+        "status": "PASS"
+      },
+      "DOC": {
+        "status": "PASS"
+      },
+      "REVIEW": {
+        "status": "PASS"
+      },
+      "VALIDATE": {
+        "status": "PASS"
+      },
+      "RETRO_OWNER": {
+        "status": "PASS"
+      },
+      "RETRO_OPT_OUT": {
+        "status": "PASS"
+      },
+      "FAILURE": {
+        "status": "PASS"
+      },
+      "RESUME": {
+        "status": "PASS"
+      }
+    },
+    "uncovered_phases": [],
+    "retained_authenticated_routes": [
+      {
+        "case": "SHORT_LOCAL",
+        "status": "PASS",
+        "native": true
+      },
+      {
+        "case": "FULL_LOCAL",
+        "status": "PASS",
+        "native": true
+      },
+      {
+        "case": "SHORT_GIT",
+        "status": "PASS",
+        "native": true
+      },
+      {
+        "case": "FULL_GIT",
+        "status": "PASS",
+        "native": true
+      }
+    ],
+    "sdk_routes_reexecuted": false,
+    "technical_retry": {
+      "status": "PASS",
+      "evidence_level": "native-omp-rpc",
+      "first_validation": "FAIL",
+      "first_observed_command_exit_code": 17,
+      "repair_writes": 1,
+      "repair_path": "app/bin/quality.mjs",
+      "repair_within_allowlist": true,
+      "outside_writes": [],
+      "normal_independent_peer": "APROVADO",
+      "second_validation": "PASSOU",
+      "execution_consumer": "PASS",
+      "execution_complete": true,
+      "execution_resumed": true,
+      "same_assignment": true,
+      "same_run": true,
+      "same_revision": true,
+      "distinct_public_jobs": true,
+      "distinct_public_instances": true,
+      "cap3_respected": true,
+      "validator_unchanged": true,
+      "dependency_unchanged": true,
+      "limit": "Actual FAIL -> one authorized temporary-app write -> independent normal peer approval -> second PASSOU -> execution/resume PASS. No new subprocess validation or SDK dispatch in this reinspection."
+    },
+    "new_sdk_calls": 0,
+    "new_model_calls": 0,
+    "subprocess_attempts": [],
+    "current_physical_serving": "NOT_OBSERVED_NOT_INFERRED",
+    "formal_task_or_goal_promotion": false
+  },
+  "historical_failure_diagnosis": {
+    "historical_failed_cases": 30,
+    "diagnosis": "Deadline/EBUSY failures belong to a prior cohort. Native48ClosureValidator attributed those historical failures to current retained QA by reading old state rather than the supplied actual reports.",
+    "actual_report_reconciliation": "Both actual retained 1250-case reports have success=true and failed=0; all 201 current public files match both actual clones. The prior 30 failures are not new failures in these reports.",
+    "preservation": "The original failure diagnosis and Native48ClosureValidator FALHOU report remain historical evidence. They are not deleted, silently relabeled PASS, or confirmed by rerunning checks.",
+    "limit": "This targeted evidence correction does not convert the prior validator report into final independent approval. Documentation/ledger/final-metrics closure and final independent validation remain separately required."
+  },
+  "unconfigured_checks": {
+    "coverage": {
+      "status": "NA_UNCONFIGURED_NOT_PASS",
+      "reason": "Configured Vitest execution has no coverage command/threshold and vitest.config.ts has no coverage configuration; retained JSON reports do not establish coverage percentages."
+    },
+    "lint": {
+      "status": "NA_UNCONFIGURED_NOT_PASS",
+      "reason": "package.json declares only test and prepare; no product lint script. Commit-message tooling is not a product lint run."
+    },
+    "type_check": {
+      "status": "NA_UNCONFIGURED_NOT_PASS",
+      "reason": "No configured type-check script is declared; no absent command is invented or reported PASS."
+    },
+    "build": {
+      "status": "NA_UNCONFIGURED_NOT_PASS",
+      "reason": "ESM source/skill distribution has no package build script; the preserved prerequisite packet records buildCommand as null. No compilation was performed."
+    },
+    "formal_status_limit": "Scope-supported NA reasons only; no automatic promotion of formal task gate statuses. Applicability remains subject to final independent validator adjudication."
+  },
+  "t014_and_remaining_conditions": {
+    "t014_scope": "Verification-only reconciliation of the existing configured platform runner and actual report/current public-input bindings; no implementation or invented RED requirement, no test/build/security rerun.",
+    "existing_scoped_independent_binding_retained": true,
+    "final_independent_validation": "PENDING",
+    "remaining_conditions": [
+      "Independent review and final validation must accept the completed closure artifact set and the corrected actual-report/cohort distinction; this artifact is not that approval.",
+      "Complete and formally record the separately owned final metrics receipt/documentary closure and required task-level peer/validator records before formal T011/T014/T015 or Goal closure.",
+      "Any intended release packet must explicitly include the newly authored closure artifacts; the original 228/201/131 frozen comparisons do not silently expand to cover them.",
+      "External branch/PR/CI/merge/release/publication steps have not been performed by this local proof and require their own actual evidence."
+    ],
+    "not_claimed": [
+      "Whole Goal completion",
+      "Task DONE",
+      "Native49 execution",
+      "Fresh configured-suite execution",
+      "Fresh cumulative private-source suite",
+      "Broad security approval",
+      "External PR or CI success",
+      "Release or publication",
+      "Current physical model serving",
+      "Measured speedup/token/cost improvement"
+    ]
+  },
+  "evidence_registry": [
+    {
+      "path": ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json",
+      "sha256": "a2a37a6e2d354259236991d5daa0c0f53b6e7297ee434eb865ce568d62d3c52a",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native45-independent-configured-qa-binding.json",
+      "sha256": "18020c063aff731711a13e46a8ff0becb840498cc87ca0d45ccae6205e19b4d1",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/post-native48-final-projection-red-green123.json",
+      "sha256": "600b1f43d260fae3982556f3c526b9847619f62a82e33e8c24f7c887b24252f7",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native48-private-wire-red-green173.json",
+      "sha256": "44d7d5d8843abbbd421e58aeb9f92bbb4c6eb971df967fd01b092f16a57d81ea",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json",
+      "sha256": "5ff086b98ae1ba45c23ee8ea646ebb7b18d95431e557b5cd8a044b8263c80512",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native48-completion-and-reprojection-boundary.json",
+      "sha256": "14c84a822506672db160cab49b2bcb68d5df0a4fec246b603f7e42b473d7c684",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native22-current-full-qa-actual.json",
+      "sha256": "c50e8d784fe147d9b70fe099725c62f9a9c369c443c9c2152721862e5f6365db",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/native22-linux-full-qa-actual.json",
+      "sha256": "ad6030c4ee3a8b9c545b50ac8f036b397f5e72060ef1003d1e8f8d81ba68fd39",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    },
+    {
+      "path": "implementation-evidence/release-governance/final-platform-suite-summary.json",
+      "sha256": "53e72339033c1202cd9b77e72bd596652b84e5ac05a1ac11f4553a1e6c330fb2",
+      "availability": "REPOSITORY_ARTIFACT"
+    },
+    {
+      "path": "implementation-evidence/release-governance/post-api-platform-suite-summary.json",
+      "sha256": "52ea5f62da77f248bd24396e7592785f8f71204fbab91ae63ba2a748bed13561",
+      "availability": "REPOSITORY_ARTIFACT"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/post-native48-public-qa-inventory.json",
+      "sha256": "5ab16e6b349292a944db8e98ef638198463ee1346897f24ec461163c2406209a",
+      "availability": "PRIVATE_LOCAL_NOT_BUNDLED"
+    }
+  ],
+  "private_provenance_policy": {
+    "private_reference_semantics": "Repository-relative .omp/state/release-47/proofs identifiers are private-local provenance locators only, not published attachments or remotely retrievable URLs. Their SHA-256 hashes bind the exact local proof bytes.",
+    "raw_reports_and_captures_bundled": false,
+    "private_absolute_paths_credentials_or_raw_sdk_transcripts_inlined": false,
+    "publication_claim": false
+  }
+}

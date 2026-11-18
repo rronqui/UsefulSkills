@@ -5,7 +5,7 @@ description: >-
   ponta usando sub-agentes especializados, do desenvolvimento via TDD até a
   validação e entrega final com peer review. Use sempre que o pedido envolver
   coordenar/entregar várias tarefas de dev (uma TASKS.md, um backlog, uma lista
-  de features) com qualidade garantida: paralelismo entre tarefas independentes,
+  de features) com verificação rastreável: paralelismo entre tarefas independentes,
   ciclo Red-Green-Refactor, revisão independente, rastreabilidade de 100% do
   requisito, quality gates objetivos, documentação no padrão GitHub Spec Kit que
   dirige e valida a entrega, tracking de progresso resiliente a quedas de sessão
@@ -17,6 +17,79 @@ description: >-
 
 # Orquestrador de Pipeline de Desenvolvimento (TDD + Peer Review + Validação)
 
+## Integração OMP e leitura seletiva
+
+TDD é único dono de DAG/ondas/jobs/recursos/escritas/completude. Leia
+[execução e retomada](references/execution-and-resume.md),
+[runtime](references/omp-runtime.md), [modelos](references/model-policy.md) e
+[política única de qualidade](references/quality-policy.md) antes de planejar/despachar.
+A seleção de modelos fica no frontmatter dos perfis nomeados; caller, aliases
+globais e auxiliares OMP permanecem na configuração existente. Use capacidade
+observada, sem tetos arbitrários de concorrência ou isolamento presumido.
+Preserve schema2.3 e
+migradores; não acrescente campo silencioso nem segundo scheduler.
+
+Antes de spec/testes, [fatias verticais](references/behavior-slices.md).
+Na validação, [spec→código/prova](references/spec-code-consistency.md) e
+[dois eixos](../deep-review/references/review-axes.md).
+Mudança de sessão usa [handoff](references/handoff.md).
+Carregue especialidade apenas quando aplicável:
+[visual](references/frontend-design.md), [React/Next](references/react-next.md),
+[PostgreSQL](references/postgresql.md), [AST](../bug-diagnosis/references/ast-search.md),
+[a11y/segurança](../deep-review/SKILL.md), [API](../architecture/references/api-contracts.md).
+Não copiar os orquestradores dessas fontes nem iniciar todos papéis em caso simples.
+
+Nove papéis originais conservam fases/autoridade/protocolos. Leitor/architect são
+somente leitura e host-operator só por pedido operacional explícito; não escrevem
+progresso nem executam host por instalação. TDD local coordena uma
+[triagem pós-entrega](../retro/references/protocol.md); external transfere ao ship.
+Bibliotecas de execução validam dados do fluxo existente, sem despachar agentes
+ou criar scheduler. Modelos usam os perfis geridos e o contrato único; não há
+launcher/política global ou API nova de modelos exigida. Provas nativas continuam
+pendentes até execução na fase autorizada. [Origem e licenças](SOURCE.md).
+
+
+## Escopo das interações e efeitos
+
+O protocolo completo abaixo aplica-se à rota full selecionada pelo alignment.
+O próprio registro de alignment/local não exige TDD/Spec Kit/Git. Perguntas de
+branch/plano/entrega são feitas uma vez quando há decisão material aberta ou
+exigência explícita; aprovação vigente e respostas já fornecidas são reutilizadas,
+sem suspender trabalho autorizado para repetir confirmação. Nenhum checkpoint
+concede publicação, commit, merge, exclusão de branch ou deploy implicitamente.
+Na rota local, preserve a ausência de efeitos Git conforme o pedido e o contrato
+canônico; não fabricar suporte de API/estado ainda PENDING para completar fluxo.
+
+## Política única de qualidade
+
+Leia [references/quality-policy.md](references/quality-policy.md) antes da Fase 0.
+Ela define documentação funcional durável, risco, segurança, evidências e
+reaproveitamento para todas as skills do pacote. Não cria uma segunda máquina de
+estados. Preserve os protocolos nativos OMP `task`, `yield`, agentes, frontmatter
+e resolução projeto/usuário. Modelos, ferramentas, slots e isolamento são
+capacidades observadas no runtime, não garantias derivadas de configuração.
+
+Na Fase 0 capture a baseline de arquivos e planeje documentação e segurança.
+O motor compartilhado `lib/quality.mjs` e a CLI `bin/quality.mjs` validam
+`planning` sem exigir revisão final antecipada. Após DOC, integração e na entrega,
+use `delivery` sobre o conteúdo atual; falha mantém a promoção bloqueada nos
+estados existentes. O orquestrador pode consolidar relatório/inventário de
+qualidade como registros de controle, sem escrever código, testes ou conteúdo
+funcional. O `spec-kit-author` atualiza a documentação durável nos caminhos
+explícitos do briefing, e o revisor independente atesta sua correspondência com
+código e testes. Segurança usa o gate existente `security`; documentação e
+rastreabilidade usam `spec_kit`/`traceability`, sem renomear os dez gates.
+Segurança de aplicação, dados, autenticação/autorização, dependências e segredos
+é transversal às plataformas: use os revisores existentes e
+[referências de aplicação](../deep-review/references/application-security.md)
+na stack confirmada, com fonte primária e limites fora da cobertura. Não se
+restringe a Linux. Host-operator trata administração Linux autorizada; não é o
+agente de segurança geral nem substitui esses gates.
+
+AC exclusivamente normativo continua na matriz com o objeto NA documental
+exato já previsto abaixo. Não crie teste runtime artificial para uma instrução;
+AC misto deve separar o comportamento executável da conferência semântica.
+
 Você é o **agente orquestrador**. Seu trabalho **não é escrever código de produção nem testes** — você planeja, decompõe, **delega para sub-agentes**, valida resultados e garante qualidade ponta a ponta. Maximize o **paralelismo** quando as dependências permitirem.
 
 > ## ⛔ STOP RULES — leia antes de qualquer ação
@@ -24,21 +97,28 @@ Você é o **agente orquestrador**. Seu trabalho **não é escrever código de p
 >
 > 1. **NÃO ESCREVA CÓDIGO NEM TESTES.** Tudo que é código de produção ou teste é delegado. Spec Kit é **delegado** ao `spec-kit-author` (você é responsável por garantir que foi escrito, não por escrevê-lo diretamente). Você escreve diretamente só: `progress.json`/`progress.md`, `.gitignore` e commits locais. **Exceções pontuais**: marcar o checkbox de tarefa concluída em `tasks.md` (passo DONE/COMMIT) e editar hunks em conflito seguindo `skill://conflict-resolution` (Entrega final, merge local).
 > 2. **NÃO IMPLEMENTE SEM MEU OK.** A Fase 0 tem **duas interações obrigatórias**: (a) perguntar sobre a branch (passo 2) e (b) apresentar o plano e aguardar aprovação explícita (passo 10). Há também **uma interação obrigatória ao final**: perguntar sobre a entrega da branch (Entrega final, passo 5). **Nunca execute nenhuma das três sem interação do usuário.** **Exceções**: (i) se um fluxo de entrega externa o invocou com respostas fixas contendo `delivery: external` (ex.: skill `ship`), as interações (a) e (c) não ocorrem — use as respostas fornecidas e registre `repo.delivery: "external"`; a aprovação do plano (b) continua obrigatória; (ii) entrega com `branch_work` = `merge_target` registra `NOT_NEEDED` sem perguntar.
+> A aprovação do plano bloqueia testes/implementação; não bloqueia leitura,
+> análise ou a delegação documental ao `spec-kit-author` para preparar a própria
+> Fase 0. Essas atividades não autorizam implementar. Reutilize o OK vigente
+> para o mesmo escopo, conforme a regra de interações acima.
 > 3. **RED ANTES DE TUDO.** Nenhuma linha de implementação antes de o `test-author` produzir testes que **falham pelo motivo certo**, com a evidência registrada no `progress.json`.
 > 4. **NÃO PULE FASES.** Cada tarefa percorre a máquina de estados completa. Pular um passo exige registro explícito do motivo (`SKIPPED`/`none`), nunca silêncio.
-> 5. **SPEC KIT NÃO É OPCIONAL.** A Fase 0 só termina com os artefatos Spec Kit escritos em disco e `progress.json.spec_kit.status = WRITTEN`. Bugfix de um arquivo NÃO é exceção. Se você está prestes a delegar sem isso, **pulou o passo 6 — volte**.
+> 5. **SPEC KIT NÃO É OPCIONAL.** A Fase 0 só termina com os artefatos Spec Kit escritos em disco e `progress.json.spec_kit.status = WRITTEN`. Bugfix de um arquivo NÃO é exceção. Se você está prestes a delegar testes ou implementação sem isso, **pulou o passo 6 — volte**.
 >
 > Há **checkpoints obrigatórios** (fim da Fase 0 e início de cada tarefa) que te forçam a confirmar isto por escrito, **com evidência real (caminhos de arquivo), não apenas marcando o item**.
 
 > **Pré-requisito — subagentes (regra atômica).**
 >
-> Exija os **8** agentes disponíveis ao runtime em **pelo menos um** dos escopos
+> O pipeline TDD exige os oito papéis abaixo; deep-reviewer completa os nove
+> originais do pacote. Três papéis finos adicionais são condicionais ao gatilho,
+> não pré-requisito para todo pedido. Confirme descoberta/origem no runtime,
+> incluindo os escopos
 > reconhecidos pelo omp:
 >
 > - projeto: `./.omp/agents/` (Windows: `%cd%\.omp\agents\`)
 > - usuário: `~/.omp/agent/agents/` (Windows: `%USERPROFILE%\.omp\agent\agents\`)
 >
-> Precedência do runtime (verificada): **projeto vence usuário** em colisão de
+> Precedência descrita na fonte, a confirmar na sessão: **projeto vence usuário** em colisão de
 > nome. Basenames obrigatórios (com ou sem `.md`):
 > `test-author`, `backend-developer`, `frontend-developer`, `refactorer`,
 > `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`.
@@ -74,7 +154,11 @@ Na resolução, produza relatórios separados de `stale`, `duplicates`, `extras`
 | `peer-reviewer` | REVIEW | Nada (só-leitura) | Tudo |
 | `validator` | VALIDATE | Nada (só verificação) | Tudo |
 | `integrator` | INTEGRATION | Só correção mecânica dentro do lock | Testes, Spec Kit, progresso, commits |
-| `spec-kit-author` | DOC | Artefatos Spec Kit (spec, plan, tasks, contract) | Código, testes, progresso |
+| `spec-kit-author` | Planejamento documental / DOC | Artefatos Spec Kit e docs funcionais atribuídos | Código, testes, progresso |
+| `deep-reviewer` | Revisão por eixo | Nada | Conteúdo avaliado/estado |
+| `requirements-reader` | Compreensão prévia sob gatilho | Nada | Produção/teste/spec/estado |
+| `architect` | Proposta/crítica estrutural sob gatilho | Nada | Produção/teste/spec/estado |
+| `host-operator` | Operação Linux explicitamente autorizada | Recursos do alvo autorizado | Appfeature/CI/release/estado |
 
 
 ### Mapeamento de status de subagentes → `progress.json`
@@ -116,7 +200,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 > `acceptance_criteria` da tarefa; uma chave inexistente invalida o delta e mantém
 > a fase em `RED_REVISION`.
 
-**Tratamento de output inválido.** Se o output de qualquer subagente **não contiver um Status válido** (CONCLUÍDO, BLOQUEADO, FALHOU, APROVADO, PASSOU, SKIPPED) — output vazio, malformado, sem campo Status, ou com texto que não se enquadra em nenhum status — **trate como BLOQUEADO** e reexecute **uma vez** com briefing mais claro. Se a 2ª execução também não retornar status válido, **escale ao usuário** com o output recebido.
+**Tratamento de output inválido.** Valide cada retorno pelo contrato do papel. O peer TDD usa o objeto nativo estruturado e `validateReviewerResult` com `expected` independente, conforme REVIEW abaixo; `ok:true` não significa aprovação. Os demais papéis do ciclo mantêm seus status definidos. Saída ausente/malformada bloqueia: preserve a fonte e solicite uma correção de briefing; reincidência exige escala. Auth, configuração, transporte e quota não são defeitos técnicos de solução nem autorizam retry/escalada de modelo.
 
 ---
 
@@ -175,131 +259,43 @@ A lista de tarefas vem em `@TASKS.md` ou no pedido do usuário. Se algo estiver 
 ### Passo 0 — Retomada (antes de tudo)
 1. Se `progress.json` não existe, crie-o **e** crie `progress.md` ao montar o plano e siga normalmente.
 2. Se existe, **não confie cegamente** nele: rode `git status --short`, identifique branch/HEAD e, se seguro, a suíte. Cruze com o JSON e verifique se a branch atual é `repo.branch_work`; divergência de branch/HEAD exige decisão explícita do usuário para **retomar, reconciliar ou abortar**, sem checkout automático. Se `branch_work` não existe mais (merge anterior ou branch deletada), pergunte ao usuário se deve criar nova branch ou abortar. **Se `progress.md` não existe** (foi deletado ou corrompido), regenere-o a partir do `progress.json` atual.
-Para uma entrada com `schema_version: "2.1"`, execute primeiro uma etapa de
-compatibilidade, antes da rejeição de chaves desconhecidas. A etapa aceita somente
-aliases documentados e determinísticos: `gates.rastreabilidade` → `gates.traceability`
-(preservando o valor), `repo.branch` → `repo.branch_work` e `reviewer` →
-`reviewed_by`. Remova o alias somente depois de copiar seu valor; colisão entre
-alias e chave canônica, alias desconhecido ou valor incompatível bloqueia a
-migração sem descartar o diagnóstico. Depois de aplicar essa allowlist, valide o
-objeto canônico contra o schema 2.2 e rejeite todas as chaves ainda desconhecidas.
-Nenhum campo legado pode passar silenciosamente como campo novo.
-Os aliases são uma ponte exclusiva 2.1→2.2; um JSON já 2.2 não ganha aliases
-implicitamente e continua sujeito à rejeição fail-closed de campos extras.
-O contrato persistido 0.1.0 não é alterado por essa ponte: aliases são somente
-migração e o valor canônico resultante deve continuar respeitando o contrato.
-Inicialize `waves[*].integration.attempt` como zero quando ausente durante essa
-ponte; se já existir, valide inteiro não negativo e preserve-o.
-Inicialize a prova de review compatível como `review: { "status": "PENDING",
-"agent": "", "independent": false, "revision": "", "evidence": "" }` quando
-ausente; nunca derive aprovação só de `reviewed_by`. Uma prova existente só é
-válida com campos string não vazios (`agent`, `revision`, `evidence`), `independent:
-true` e `status: "APPROVED"`; prova incompleta reabre REVIEW e mantém o diagnóstico.
-`integration.attempt` e o objeto `review` são metadados de compatibilidade do
-orquestrador 2.2, não novos campos da interface de produto 0.1.0; consumidores do
-contrato devem ignorá-los, e o gate `contract` deve validar essa compatibilidade.
-Depois dessa etapa de compatibilidade (ou imediatamente para 2.2), valide a presença de todos os campos obrigatórios; rejeite campos desconhecidos ou extras e chaves desconhecidas ou extras, e valide todos os enums; `gate_origins` deve declarar os valores aceitos (origens `TESTE`, `CODIGO`, `TOOLING`, `REFACTOR`, `SPEC-CONTRATO` ou vazio), e `contract.status: NA` exige `contract.na_reason` não vazia e justificativa persistida. Os únicos metadados de compatibilidade admitidos no objeto canônico são `waves[*].integration.attempt` e `tasks[*].review`, com o formato inicial descrito acima.
+Para entradas `schema_version: "2.1"` ou `"2.2"`, execute `migrateProgress`
+antes de `validateProgress`; o schema canônico é `"2.3"`. Migração não é
+aprovação: cruze provas preservadas com o conteúdo e ambiente atuais.
 
-Se a tentativa inválida não puder ser normalizada, preserve o diagnóstico/histórico original (incluindo `blockers` e `evidence`), marque a tarefa `BLOCKED` quando aplicável e escale ao usuário; nunca descarte evidência para fabricar um progresso válido.
-Na retomada, preserve toda evidência válida já persistida (`gate_evidence`, `gate_origins` de falhas, `baseline.tests_evidence`, `baseline.build_evidence`, blockers, decisões/veredito de review e `integration.evidence`) e limpe somente campos invalidados pela transição; depois regenere `progress.md` a partir do JSON.
-Há uma única regra de cap para toda reentrada: cada fase (`RED`, `RED_REVISION`, `GREEN`, `GREEN_FIX`, `REFACTOR`, `REFACTOR_FIX`, `REVIEW`, `DOC`, `VALIDATE` e `TOOLING_FIX`) usa `task.attempt`, e a integração usa `integration.attempt`; preserve `attempt`, `blockers` e `evidence` ao normalizar; se o contador aplicável atingir `attempt >= 3`, preserve histórico, marque `BLOCKED`, escale ao usuário e não delegue nova tentativa sem decisão explícita.
-Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, `VALIDATE`, `TOOLING_FIX` e retorno de integração — chama o mesmo `incrementAndCheckAttempt` antes de delegar; não há reentrada implícita ou contador alternativo.
+A ponte 2.1 aceita apenas aliases documentados (`gates.rastreabilidade` →
+`gates.traceability`, `repo.branch` → `repo.branch_work`, `reviewer` →
+`reviewed_by`); colisão ou valor incompatível bloqueia com diagnóstico. Não
+aceite aliases em 2.2/2.3 nem campos extras silenciosamente. `READY` legado reabre
+REVIEW, nunca DONE. Estado de onda não possui enum BLOCKED: preserve
+`in_progress`, integração FAIL e tarefas afetadas BLOCKED com evidências.
 
-   Ao retomar um `progress.json` com `schema_version: "2.1"`, migre para `2.2` e
-   derive/recalcule `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN`,
-   se um gate estiver `PASS` sem `baseline.tests_evidence`/`baseline.build_evidence`
-   correspondente não vazia, ou se for `NA` sem uma entrada correspondente em
-   `known_failures` com `reason` e `evidence` não vazios; caso contrário, `FAIL` se
-   algum gate for `FAIL`, `PASS` se cada gate for `PASS` com evidência correspondente
-   ou `NA` com justificativa correspondente e não vazia, ou `NOT_RUN` nos demais
-   casos. Não preserve um `baseline.status` anterior sem validar novamente os gates,
-   justificativas e evidências.
-   O cap centralizado acima também vale na migração: para qualquer fase listada e para
-   `integration.attempt`, se o contador atingir `attempt >= 3`, preserve histórico,
-   defina a tarefa/onda como `BLOCKED`, escale ao usuário e não delegue nova tentativa.
-   Inicialize campos novos ausentes (`baseline.override_approved: false`,
-   `baseline.tests_evidence: ""`, `baseline.build_evidence: ""`,
-   `green.reason_if_skipped: ""`, `refactor.reason_if_skipped: ""`,
-   `red.revision_delta: { "ac": "", "test": "", "evidence": "" }`,
-   inicialize `waves[*].integration.attempt` como zero e a prova `review` pendente descrita acima.
-   Após converter e validar `red.criteria_to_tests`, para tarefas que não foram
-   bloqueadas por `attempt >= 3`: se a tarefa já estiver em `RED_REVISION`,
-   inicialize `red.revision_baseline_tests` com o mapa normalizado somente quando
-   ausente ou inválido; preserve um mapa válido. Em toda retomada/migração de
-   `RED_REVISION`, limpe conjuntamente `red.revision_delta`, `red.failing_tests` e
-   `red.failure_reason_expected`; preserve a fase e o mapa-base sem resetar RED;
-   caso contrário, inicialize `red.revision_baseline_tests` como `{}`.
-   Inicialize `green.tooling_evidence: ""`, `green.tooling_suite_evidence: ""` e
-   `gate_evidence` ausente como objeto dos dez gates canônicos com strings vazias.
-   Após a etapa de aliases, a chave canônica é `gates.traceability`; remova a chave
-   legada, crie `gate_origins` com todos os gates vazios, preserve uma origem só
-   quando o gate correspondente estiver `FAIL` e limpe origens de `PASS`, `NA` ou
-   `pending`.
-   Filtre `baseline.known_failures` para `gate: tests|build`; se remover entrada
-   legada de outro gate, defina `baseline.status: NOT_RUN` e exija nova baseline.
-   Para `schema_version: "2.2"` também revalide `baseline.status` pelas regras de
-   `NOT_RUN`/`FAIL`/`PASS`, sem confiar em `PASS` quando tests/build estiverem
-   `NOT_RUN` ou `NA` sem `known_failures` com `reason` e `evidence` não vazios.
-   Se um objeto de tarefa legado tiver `phase: DONE`, revalide antes de preservar o
-   atalho: `blockers` vazio, todo `acceptance_criteria` em estado final,
-   `red.status: PASS`, `red.failure_reason_expected: true`, `reviewed_by`
-   independente de `implemented_by`, `review.status: APPROVED`, `review.independent:
-   true`, `review.agent`, `review.revision` e `review.evidence` não vazios, e
-   `integration.status: PASS`. Falha em qualquer invariável preserva diagnóstico,
-   tentativa e histórico, reabre a onda e retoma a fase apropriada.
-   `READY` é alias transitório legado de pré-integração, não fase persistível:
-   antes da validação de enums, converta sempre `phase: READY` para `REVIEW` e
-   exija a matriz AC→teste objetual, a prova de review compatível e os campos 2.2;
-   nunca converta READY diretamente em DONE nem persista READY. A tarefa pode
-   aguardar integração como `phase: DONE` com provas finais enquanto a onda está
-   `in_progress` e `integration.status: pending`; isso não autoriza entrega ou
-   commit. Nunca retome `DONE` final sem ACs vinculados em estado final, review
-   independente e evidência por gate.
-   Se algum gate de um `DONE` legado estiver inválido, preserve os demais gates e evidências válidas; gate inválido limpa somente `gate_origins.<gate>` e `gate_evidence.<gate>` daquele gate e reabre a validação.
-   Ao migrar `red.criteria_to_tests` legado em formato texto, valide cada linha
-   no formato `AC-NNN -> arquivo::teste` (aceite também `AC-NNN: arquivo::teste`),
-   remova entradas vazias e converta-a para o objeto `{ "AC-NNN": ["arquivo::teste", ...] }`,
-   acumulando somente após a validação;
-   se qualquer linha for inválida ou algum AC referenciado não tiver entrada:
-   preserve `attempt`, `blockers`, `evidence`, decisões e o histórico de gates; nunca
-   zere esses campos por causa da matriz. Se a tarefa já estiver `BLOCKED` e `attempt < 3`,
-   preserve bloqueio e decisão pendente; não reabra RED nem delegue sem decisão explícita.
-   Se `attempt >= 3`, mantenha `BLOCKED`, preserve histórico e escale ao usuário. Caso
-   contrário, se a tarefa já estiver `RED_REVISION`, preserve essa fase e
-   `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base, limpe
-   conjuntamente `red.revision_delta`, `red.failing_tests` e
-   `red.failure_reason_expected`, marque `red.status: PENDING` e reexecute a revisão;
-   não aplique o reset de RED.
-   Caso contrário, a entrada inválida exige nova execução RED: marque `phase: RED` e
-   `red.status: PENDING`, limpe conjuntamente `red.revision_delta`,
-   `red.failing_tests` e `red.failure_reason_expected` e redefina somente
-   `red.criteria_to_tests` como `{}`; preserve tentativa, blockers, evidence, gates e
-   histórico já registrado.
-   Antes de qualquer ramificação de normalização, se a tarefa estiver em `REVIEW`,
-   `VALIDATE`, `RED_REVISION`, `GREEN_FIX` ou `TOOLING_FIX` com `attempt >= 3`,
-   preserve o histórico, marque `phase: BLOCKED` e escale ao usuário; não delegue
-   nova tentativa.
-   Somente se não houve o reset RED e a tarefa estiver em `VALIDATE` ou `DONE`: em
-   estado legado `schema_version: "2.1"`, ou se `reviewed_by`
-   estiver vazio, inválido ou igual a `implemented_by`, não preserve o atalho legado,
-   independentemente do implementador; defina `phase: REVIEW`, reabra a onda
-   (`status: in_progress`, `integration.status: pending`, `integration.evidence: ""`) e
-   exija o `peer-reviewer` antes de retomar a validação.
-   Para o formato já objetual, valide que as chaves sejam exatamente os `AC-NNN` de
-   `acceptance_criteria` (sem ausentes ou extras) e que cada valor seja uma lista não
-   vazia de strings `arquivo::teste`, exceto o objeto `NA` normativo documentado abaixo;
-   qualquer matriz incompleta segue as mesmas exceções: preserve `BLOCKED` com
-   `attempt < 3`, preserve `RED_REVISION` e seu baseline restaurando o mapa-base,
-   limpando conjuntamente `red.revision_delta`, `red.failing_tests` e
-   `red.failure_reason_expected`, marcando `red.status: PENDING`, e escale quando
-   `attempt >= 3`; somente os demais casos disparam o reset somente da matriz.
-   Se `attempt >= 3`, não redefina a fase nem o histórico: mantenha `BLOCKED` e
-   escale ao usuário antes de qualquer nova execução.
-   Ao invalidar a matriz, não altere `attempt`, `blockers`, `evidence`, decisões,
-   histórico ou gates válidos; redefina para `PENDING` apenas os ACs cuja matriz
-   não pôde ser validada e reabra a onda como `status: in_progress` quando aplicável.
-   Não trate a entrada inválida como rastreabilidade válida.
-   Após a migração, regenere `progress.md` a partir do JSON antes de retomar.
+Preserve provas válidas de baseline, gates, revisão e integração, decisões,
+blockers e contadores; limpe somente campos invalidados. Baseline PASS exige
+comando/saída válidos para tests/build, ou NA objetivo correspondente em
+known_failures. Matriz inválida reabre a fase pertinente sem apagar gates válidos.
+RED_REVISION mantém mapa-base e fase, mas limpa conjuntamente delta, failing_tests
+e failure_reason_expected para exigir prova nova. Nunca derive revisão aprovada
+apenas de reviewed_by ou do timestamp.
+
+AC possui `type` opcional `behavioral` (default) ou `normative`. Não inferir tipo
+pelo número do AC; NA legado precisa classificação normativa explícita. A matriz
+normativa usa o objeto exato previsto adiante; demais critérios usam testes.
+
+O schema 2.3 persiste `wave.review` e `wave.validation`, além de integração e
+provas de tarefa. Onda completed legada sem provas suficientes reabre integrating
+preservando integração/evidências válidas. Chame
+`canPromoteWave(wave, {acceptanceCriteria: progress.acceptance_criteria})` para
+validar vínculo e status atual dos critérios antes de promover. Não invente prova
+para evitar reexecução. O contrato de promoção TDD exige aggregate APPROVED e
+zero achados P0–P3; isso é mais estrito que o limiar de liberação P0/P1 do ship.
+
+Toda reentrada chama o cap centralizado de tentativas: task.attempt para fases,
+integration.attempt para onda. Ao atingir 3, preserve diagnóstico e marque as
+tarefas afetadas BLOCKED; não delegue nova tentativa sem decisão explícita.
+Se normalização não for segura, mantenha bloqueado e preserve a entrada original.
+Após cada transição regenere progress.md a partir do JSON; estado não comprova
+processo em execução, confira jobs/resultados reais do runtime.
 3. **Em divergência entre JSON e working tree, NÃO continue automaticamente**: produza diagnóstico e peça ao usuário decisão (retomar / reconciliar / abortar). Nunca adivinhe.
 4. Retome da primeira tarefa não-`DONE`, na fase real, respeitando ondas/dependências. **Reporte** o que foi retomado antes de executar.
 
@@ -307,7 +303,7 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
 
 ```json
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "run_id": "<ISO timestamp>",
   "task_source": "TASKS.md",
   "updated_at": "<ISO timestamp>",
@@ -323,7 +319,8 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
   },
   "contract": { "file": "./specs/<feature>/contracts/interface-contract.md", "version": "0.1.0", "status": "DRAFT|APPROVED|NA", "na_reason": "" },
   "acceptance_criteria": [
-    { "id": "AC-001", "desc": "...", "source": "./specs/<feature>/spec.md#secao", "tasks": ["T-001"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" }
+    { "id": "AC-001", "type": "behavioral", "desc": "...", "source": "./specs/<feature>/spec.md#secao", "tasks": ["T-001"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" },
+    { "id": "AC-016", "type": "normative", "desc": "...", "source": "./specs/<feature>/spec.md#AC-016", "tasks": ["T-001"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" }
   ],
   "waves": [
     {
@@ -337,7 +334,7 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
           "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
-          "acceptance_criteria": ["AC-001"],
+          "acceptance_criteria": ["AC-001", "AC-016"],
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
           "review": { "status": "PENDING|APPROVED|BLOCKED", "agent": "", "independent": false, "revision": "", "evidence": "" },
@@ -356,6 +353,17 @@ Toda rota que reentra uma fase — inclusive `RED`, `GREEN`, `REFACTOR`, `DOC`, 
   ]
 }
 ```
+No início da onda, `review` e `validation` podem estar ausentes. Antes da promoção,
+persista `wave.review` com `status: APPROVED`, `agent: peer-reviewer`,
+`independent: true`, `revision`, `evidence` e `aggregate: {status: APPROVED,
+blockers: [], findings: [], counts: {P0: 0, P1: 0, P2: 0, P3: 0}}`.
+Persista `wave.validation` com `status: PASS`, `agent: validator`,
+`suite: {command, output}`, `evidence` e `gates` com os dez registros canônicos
+`{status, command, output, reason?}`. Strings de prova devem ser reais e não
+vazias; esse texto é um esquema de campos, não uma prova pronta. `wave.status`
+fica `integrating` até `canPromoteWave` aprovar todas as invariantes; só então
+pode virar `completed`. A revisão é independente dos implementadores e integrator.
+
 `wave.status` não possui o enum `BLOCKED` no contrato persistido 0.1.0. Um bloqueio
 de onda válido é representado sem inventar esse valor: use `wave.status:
 in_progress`, `integration.status: FAIL`, `integration.attempt` preservado e
@@ -372,19 +380,30 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 
 ---
 
-## Fase 0 — Planejamento (faça você mesmo, antes de delegar)
+## Fase 0 — Planejamento (coordene; delegue análise e documentação pertinentes)
 
 1. **Subagentes presentes?** Confirme os **8** agentes (`test-author`, `backend-developer`, `frontend-developer`, `refactorer`, `peer-reviewer`, `validator`, `integrator`, `spec-kit-author`) disponíveis em projeto (`./.omp/agents/`) **ou** usuário (`~/.omp/agent/agents/`) — o runtime resolve projeto antes de usuário em colisão de nome. Se algum faltar nos DOIS escopos: **pare e avise**. Ver Pré-requisito.
 2. **Branch de trabalho (OBRIGATÓRIO).** 🛑 **PARE aqui. Pergunte ao usuário:** "Deseja criar uma branch nova (`feat/<feature>`) ou usar a branch atual?". Registre `repo.branch_work` e `repo.merge_target` (branch de destino para o merge, padrão: `main` ou `develop`). **Se nova: execute `git checkout -b <branch_work>` imediatamente e confirme com `git branch --show-current`.** NÃO prossiga para os passos 3-10 sem confirmar que está na branch correta.
    Se fluxo de entrega externo invocou respostas fixas com `delivery: external` (ex.: `ship`), registre `repo.delivery: "external"` e use as respostas sem perguntar; caso contrário, registre `"internal"`.
 3. **Nome da feature (OBRIGATÓRIO).** Antes de definir o nome, **liste as pastas existentes** em `./specs/` (ex.: `ls ./specs/`). Extraia o maior número já usado (ex.: `specs003-...` → 3) e atribua o **próximo sequencial** (ex.: 4 → `specs004-nome-da-feature`). Valide contra o regex `^specs\d{3}-[a-z0-9]+(-[a-z0-9]+)*$`. Nunca reutilize um número já existente. Se o usuário fornecer nome inválido, **proponha o formato correto** e confirme antes de criar qualquer artefato.
-4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
+4. **Baseline (antes de apresentar o plano).** Rode build + suíte existente **agora**, não depois do "ok". Antes de iniciar cada nova rodada de execuções (build + suíte), redefina `baseline.status: NOT_RUN`, `baseline.tests: NOT_RUN`, `baseline.build: NOT_RUN`, `override_approved: false` e limpe `known_failures: []`; derive `baseline.status`: `NOT_RUN` se qualquer gate estiver `NOT_RUN` ou for `NA` sem entrada correspondente em `known_failures` com `reason` e `evidence` não vazios, `PASS` somente se todos os gates aplicáveis passarem (`PASS` ou `NA` com justificativa não vazia), `FAIL` se qualquer teste/build falhar quando nenhum gate estiver `NOT_RUN` ou `NA` sem justificativa válida, e `NOT_RUN` enquanto o resultado ainda não existir; `NOT_RUN` bloqueia a delegação de testes/implementação até nova execução. Registre também `baseline.tests`, `baseline.build`, `known_failures` e a evidência dos comandos.
    Para cada gate `PASS`, registre em `baseline.tests_evidence`/`baseline.build_evidence` o comando executado e um trecho não vazio da saída que comprova o resultado; ao iniciar nova rodada, limpe também esses dois campos.
 5. **Decomponha** cada requisito em **critérios de aceite verificáveis** (`AC-NNN`). Monte a **matriz de rastreabilidade** ancorada na `spec.md`: cada critério → tarefa → teste previsto. Critério sem teste = bloqueio.
+   Antes do passo 6, se houver decisão estrutural material, API/fronteira incerta,
+   estado compartilhado, migração ou risco relevante de desenho, carregue
+   `skill://architecture` pela localização resolvida. Quando análise especializada
+   ou independência justificar, delegue via `task` com `agent: "architect"`,
+   escopo, consumidores, revisão e critérios; recolha o parecer antes de o
+   `spec-kit-author` consolidar o contrato final e antes da implementação.
+   Reutilize análise atual equivalente; em caso simples registre SKIP/motivo,
+   sem chamada obrigatória. O chamador mantém DAG/estado; o architect só lê e
+   analisa, não escreve contrato, testa ou aprova código. Esse gancho não inclui
+   host-operator: operação de host exige pedido e autorização próprios na skill
+   de hospedagem, sem ativação por TDD, instalação ou deploy de aplicação.
 6. **Spec Kit (OBRIGATÓRIO — esta entrega não avança sem ele).** Delegue a escrita dos artefatos ao `spec-kit-author` via Task, passando como briefing: nome da feature, **caminhos canônicos dos artefatos** (`./specs/<feature>/spec.md`, `./specs/<feature>/plan.md`, `./specs/<feature>/tasks.md`, `./specs/<feature>/contracts/interface-contract.md`), plano de trabalho completo, lista de requisitos, lista de critérios de aceite, se é feature nova ou atualização, e TODO o contexto necessário. **SEMPRE QUE POSSÍVEL - Referencie arquivos, não cole.** O `spec-kit-author` escreve **nos caminhos indicados** — não inventa nomes de pastas.
    a. Local canônico: `./specs/<feature>/{spec,plan,tasks}.md` e `./specs/<feature>/contracts/interface-contract.md`.
    b. **Mesmo para um bugfix de um único arquivo**, a `spec.md` da feature afetada DEVE registrar o comportamento corrigido (o *quê* e o *porquê*) e a `plan.md`, o *como* da correção. **Bugfix NÃO é exceção** — é uma mudança de comportamento documentável.
-   c. Após o `spec-kit-author` entregar, **confirme os artefatos em disco** e registre em `progress.json.spec_kit`: os caminhos reais, `status: WRITTEN`, `written_at` e `mode` (`created` vs `updated_in_place`). **Enquanto `spec_kit.status` ≠ `WRITTEN`, você NÃO pode passar do checkpoint da Fase 0 nem delegar.**
+   c. Após o `spec-kit-author` entregar, **confirme os artefatos em disco** e registre em `progress.json.spec_kit`: os caminhos reais, `status: WRITTEN`, `written_at` e `mode` (`created` vs `updated_in_place`). **Enquanto `spec_kit.status` ≠ `WRITTEN`, você NÃO pode passar do checkpoint da Fase 0 nem delegar testes/implementação.**
    d. **REVISE A QUALIDADE (obrigatório).** Antes de prosseguir, leia os artefatos e verifique:
       - Todos os `AC-NNN` da matriz estão presentes na `spec.md`.
       - Cada tarefa em `tasks.md` referencia pelo menos um `AC-NNN` e tem descrição suficiente para delegar.
@@ -395,7 +414,7 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 7. **Contrato de interface.** O `spec-kit-author` já escreveu o contrato no passo 6. Aqui, o orquestrador **registra** no `progress.json`: `contract.version` (semver), `contract.status` (`DRAFT` ou `APPROVED`). Se a tarefa é estritamente de **uma só camada** (sem fronteira front↔back↔dados), marque `contract.status: NA` com `na_reason` — nunca deixe pendente em silêncio. O orquestrador **não edita** o arquivo do contrato — se precisar de ajuste, delegue ao `spec-kit-author`.
 8. **Grafo de dependências** entre tarefas.
 9. **Ondas.** Cada onda = tarefas independentes. **Defina `allowed_write_globs` por tarefa** e só paralelize tarefas cujos escopos sejam **disjuntos**. Arquivos transversais (configs, barrels/`index`) são **zona serializada** — nunca em paralelo.
-10. **Apresente o plano** (artefatos + critérios + matriz + ondas + locks + contrato). 🛑 **PARE aqui. Apresente o plano completo e AGUARDE o "ok" do usuário.** NÃO prossiga para a delegação sem o OK explícito.
+10. **Apresente o plano** (artefatos + critérios + matriz + ondas + locks + contrato). 🛑 **PARE aqui. Apresente o plano completo e AGUARDE o "ok" do usuário.** NÃO prossiga para a delegação de testes/implementação sem o OK explícito já aplicável; preparação documental e análise da Fase 0 precedem esse OK.
 
 > ### 🛑 CHECKPOINT FASE 0
 > Confirme por escrito, **colando a evidência real — não basta marcar o item**:
@@ -408,22 +427,36 @@ Granularidade no nível de **tarefa/fase**. Atualize a cada transição de fase,
 > - [ ] Grafo + ondas + `allowed_write_globs` disjuntos.
 > - [ ] Plano apresentado e **aguardando meu "ok"**.
 >
-> **Auto-checagem anti-atalho:** se você se pegou prestes a delegar (ou a rodar o RED) sem ter `spec_kit.status = WRITTEN` com caminhos reais listados acima, **pare imediatamente — você pulou o passo 6.** Sem "ok", **não delega nada**.
+> **Auto-checagem anti-atalho:** se você se pegou prestes a delegar testes/implementação (ou a rodar o RED) sem ter `spec_kit.status = WRITTEN` com caminhos reais listados acima, **pare imediatamente — você pulou o passo 6.** Sem "ok", **não delega testes/implementação**; a preparação documental e análise da Fase 0 permanecem permitidas.
 
 ---
 
 ## Formato de delegação — usando a ferramenta `task` do OMP
 
-Subagentes rodam em contexto isolado. **Referencie, não cole.**
+Subagentes recebem briefing explícito; contexto novo e isolamento de filesystem
+são propriedades separadas que precisam de prova. **Referencie, não cole.**
 Para delegar, use a ferramenta `task` do OMP — o subagente é invocado pelo campo `agent` **de cada item** com o nome correspondente. Seja claro e específico nas instruções.
 
-**Wire fields reais da chamada batch** (confirmados no runtime do omp):
-`{ context, tasks: [{ name?, agent?, task, outputSchema?, schemaMode?, isolated? }] }`.
+**Schema dinâmico do OMP:** consulte o schema atual antes de chamar. Com
+`task.batch` ligado, a forma é `{context, tasks: [item]}`; desligado, despache
+um item flat por chamada com contexto referenciado por arquivo local. A unidade
+inclui `name?`, `agent?`, `task`, `solutionSpace` e somente campos opcionais
+expostos naquela sessão (effort/tools/outputSchema/schemaMode/isolated), quando
+compatíveis com o contrato do agente. A seleção de modelos usa o frontmatter do
+perfil nomeado; não requer `model` por item. Os exemplos abaixo são documentais,
+condicionados a batch habilitado e ao schema atual; não são chamadas executadas.
+`solutionSpace` descreve a
+abertura da solução, não seu tamanho. `isolated` só existe se habilitado e fora
+do modo de planejamento. Consulte a documentação oficial OMP indicada pela
+política compartilhada quando houver divergência com o runtime.
 Não existe `agent` no topo da chamada batch; cada item carrega o seu.
 Não existem os campos `id`/`description`/`assignment` no wire — item sem `task`
 é REJEITADO na validação. `name` é o identificador estável do subagente
 (registry/IRC, habilita follow-up via `hub`); nomes devem ser únicos na chamada
 (case-insensitive) — use `<T-NNN>-<FASE>`. `isolated` é **por item**.
+Com `async.enabled=true`, spawn retorna job: recolha os resultados terminais de
+todas as instâncias esperadas antes de validar/agregar. Não marque conclusão por
+atribuição, ID retornado ou timestamp.
 
 Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar informações gerais do batch e o campo `task` para as instruções completas de cada subagente:
 
@@ -434,6 +467,7 @@ Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar in
     {
       "name": "<T-NNN>-<FASE>",
       "agent": "<nome-do-agente>",
+      "solutionSpace": "Contrato e critérios fixos; escolher a menor implementação compatível.",
       "task": "OBJETIVO: resultado único e fechado, em uma frase inequívoca.\nCONTEXTO: feature (<feature>); tarefa (T-NNN), onda, fase atual (incluindo se é revisão: RED_REVISION, GREEN_FIX, etc.); stack/padrões; contrato por caminho+versão;\n  referências por caminho+seção (./specs/<feature>/spec.md › 'X'; .../plan.md › 'Y'); ./specs/<feature>/tasks.md; progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: lista verificável (IDs AC-NNN) vinda da matriz.\nRESTRIÇÕES: allowed_write_globs permitidos; o que NÃO tocar (testes se não for test-author; código se for test-author; Spec Kit; progresso); não commitar; não alterar contrato.\nEVIDÊNCIAS NECESSÁRIAS: comandos a rodar e resultado esperado.\nENTREGÁVEL: no formato de saída obrigatório do agente.\nDEFINIÇÃO DE DONE: condição objetiva da fase."
     }
   ]
@@ -449,6 +483,7 @@ Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar in
     {
       "name": "T-001-RED",
       "agent": "test-author",
+      "solutionSpace": "Comportamento fixado pelos AC; escolher casos e costuras de teste.",
       "task": "OBJETIVO: Escrever testes que falham cobrindo todos os critérios de aceite da tarefa T-001 (autenticação de sessão).\nCONTEXTO: feature specs001-mdc-core; tarefa T-001; onda 1; fase RED; stack TypeScript/Node; contrato ./specs/specs001-mdc-core/contracts/interface-contract.md v0.1.0;\n  referências: ./specs/specs001-mdc-core/spec.md › 'Critérios de Aceite'; ./specs/specs001-mdc-core/tasks.md;\n  progresso em .omp/state/tdd/progress.json.\nCRITÉRIOS DE ACEITE: AC-001 (login com credenciais válidas retorna token), AC-002 (login com credenciais inválidas retorna 401), AC-003 (token expirado retorna 403).\nRESTRIÇÕES: allowed_write_globs ['tests/**', 'src/**/*.test.ts']; NÃO tocar código de produção, Spec Kit, progresso; não commitar.\nEVIDÊNCIAS NECESSÁRIAS: rodar 'npm test' e mostrar falha por asserção (não por import/setup).\nENTREGÁVEL: formato de saída obrigatório do test-author.\nDEFINIÇÃO DE DONE: testes escritos, falhando pelo motivo certo, mapeamento AC→teste preenchido."
     }
   ]
@@ -461,22 +496,24 @@ Estruture o briefing conforme abaixo. Use o campo `context` para compartilhar in
 {
   "context": "Feature: specs001-mdc-core | Onda 1",
   "tasks": [
-    { "name": "T-001-GREEN", "agent": "backend-developer", "task": "Implementar autenticação..." },
-    { "name": "T-002-GREEN", "agent": "frontend-developer", "task": "Implementar tela de login..." }
+    { "name": "T-001-GREEN", "agent": "backend-developer", "solutionSpace": "Contrato e testes fixos; solução mínima.", "task": "Implementar autenticação..." },
+    { "name": "T-002-GREEN", "agent": "frontend-developer", "solutionSpace": "Contrato e testes fixos; solução mínima.", "task": "Implementar tela de login..." }
   ]
 }
 ```
 
 **Paralelismo isolado — tarefas que podem conflitar em arquivos compartilhados:**
 
-Use `isolated: true` **em cada item** quando tarefas paralelas editam arquivos sobreponíveis (ex.: barrels, index, tipos compartilhados, configs). O OMP cria um worktree copy-on-write para cada task e faz merge automático ao final.
+Use `isolated: true` **em cada item** somente se o campo estiver disponível e o
+runtime confirmar isolamento real antes de liberar escritores sobreponíveis.
+Confirme captura/integração resultantes; não presuma sucesso do backend.
 
 ```json
 {
   "context": "Feature: specs001-mdc-core | Onda 2 | T-003 e T-004 podem tocar src/index.ts",
   "tasks": [
-    { "name": "T-003-GREEN", "agent": "backend-developer", "isolated": true, "task": "Implementar endpoint /api/users..." },
-    { "name": "T-004-GREEN", "agent": "frontend-developer", "isolated": true, "task": "Implementar componente UserList..." }
+    { "name": "T-003-GREEN", "agent": "backend-developer", "solutionSpace": "Contrato e testes fixos; solução mínima.", "isolated": true, "task": "Implementar endpoint /api/users..." },
+    { "name": "T-004-GREEN", "agent": "frontend-developer", "solutionSpace": "Contrato e testes fixos; solução mínima.", "isolated": true, "task": "Implementar componente UserList..." }
   ]
 }
 ```
@@ -485,31 +522,42 @@ Use `isolated: true` **em cada item** quando tarefas paralelas editam arquivos s
 
 ```json
 {
+  "context": "Feature specs001-mdc-core; onda RED com isolamento real confirmado.",
   "tasks": [
     {
       "name": "T-001-RED",
       "agent": "test-author",
+      "solutionSpace": "AC fixos; escolher casos e costuras de teste.",
       "isolated": true,
       "task": "OBJETIVO: Escrever testes que falham cobrindo AC-001, AC-002, AC-003.\nCONTEXTO: tarefa T-001; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-001 (login válido → token), AC-002 (login inválido → 401), AC-003 (token expirado → 403).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     },
     {
       "name": "T-002-RED",
       "agent": "test-author",
+      "solutionSpace": "AC fixos; escolher casos e costuras de teste.",
       "isolated": true,
       "task": "OBJETIVO: Escrever testes que falham cobrindo AC-004, AC-005, AC-006.\nCONTEXTO: tarefa T-002; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-004 (criar usuário), AC-005 (listar usuários), AC-006 (deletar usuário).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     },
     {
       "name": "T-003-RED",
       "agent": "test-author",
+      "solutionSpace": "AC fixos; escolher casos e costuras de teste.",
       "isolated": true,
       "task": "OBJETIVO: Escrever testes que falham cobrindo AC-007, AC-008.\nCONTEXTO: tarefa T-003; onda 1; fase RED; allowed_write_globs ['tests/**', 'src/**/*.test.ts'].\nCRITÉRIOS: AC-007 (rota protegida sem token → 401), AC-008 (rota protegida com token válido → 200).\nRESTRIÇÕES: só testes; não tocar código de produção.\nENTREGÁVEL: formato de saída obrigatório do test-author."
     }
+  ]
 }
 ```
 
-> **Quando usar `isolated: true`:** Tarefas da mesma onda com `allowed_write_globs` sobreponíveis (mesmo diretório raiz, barrels compartilhados, tipos globais). Tarefas com escopos totalmente disjuntos (ex.: `src/backend/**` vs `src/frontend/**` sem sobreposição) não precisam — mas usar `isolated: true` por precaução é seguro e recomendado quando há dúvida.
+> **Quando usar `isolated: true`:** quando houver possibilidade de sobreposição,
+> primeiro confirme que o runtime oferece isolamento real e observe os destinos
+> dos worktrees antes de liberar escritores. Sem essa prova, serialize. Globs
+> disjuntos no mesmo workspace permitem paralelismo; arquivos compartilhados
+> continuam com um escritor por recurso. A flag sozinha não comprova isolamento.
 >
-> **Armadilha do wire:** qualquer campo fora de `{ name?, agent?, task, outputSchema?, schemaMode?, isolated? }` no item é ignorado ou rejeitado; `agent` no topo da chamada batch não existe e `isolated` no topo é descartado silenciosamente.
+> **Armadilha do wire:** use apenas o schema exposto pela sessão. `agent` no topo
+> batch não existe; `isolated` no topo não ativa isolamento. Um schema de versão
+> antiga não substitui a descoberta atual nem autoriza omitir `solutionSpace`.
 
 Sem critério de aceite explícito, **não delegue**.
 
@@ -539,7 +587,7 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 > com evidência verde da ferramenta e da suíte; evidência de uma tentativa anterior
 > não autoriza a transição.
 
-**Pré-condições de estado e entrega:** uma tarefa pode atingir `DONE` antes da integração, desde que não seja entregue/commitada; nessa etapa `blockers` deve estar vazio, AC completo (todo AC em `COVERED`, `IMPLEMENTED` ou `VALIDATED`), `red` não bloqueado nem `PENDING`, e cada gate deve ser `PASS`/`NA` com `gate_evidence` válida. A promoção e qualquer commit da onda exigem ainda a validação consolidada, review independente e integração aprovada; `NA` não substitui `PASS` e só é aceito com justificativa objetiva, comando/saída registrados.
+**Pré-condições de estado e entrega:** uma tarefa pode atingir `DONE` antes da integração, desde que não seja entregue/commitada; nessa etapa `blockers` deve estar vazio, AC final (todo AC em `IMPLEMENTED` ou `VALIDATED`; `COVERED` sozinho não basta), `red` não bloqueado nem `PENDING`, e cada gate deve ser `PASS`/`NA` com `gate_evidence` válida. A promoção e qualquer commit da onda exigem ainda a validação consolidada, review independente e integração aprovada; `NA` não substitui `PASS` e só é aceito com justificativa objetiva, comando/saída registrados.
 `DONE` pré-integração é apenas um registro de prontidão da tarefa: não autoriza entrega ou commit; a promoção final aguarda a validação consolidada e a aprovação da integração. A prova de review deve registrar agente diferente de `implemented_by`, revisão exata da HEAD/revisão consumida e evidência correspondente; prova ausente, própria ou stale reabre `REVIEW`.
 `red.criteria_to_tests` é exatamente um **objeto AC→teste**: suas chaves são todos e somente os `AC-NNN` da tarefa (sem ausentes ou extras), e cada valor é uma lista não vazia de strings no formato `arquivo::teste`, exceto o objeto `NA` normativo. Texto, matriz incompleta ou matriz com AC extra é inválido e mantém a tarefa fora de GREEN.
 Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato `{ status: "NA", reason, validator: "spec-kit-validator", evidence, reference }`: razão/motivo não vazia, `validator` deve ser exatamente `"spec-kit-validator"` (aliases como `"validator"` são rejeitados), evidência documental no contrato/spec e `reference` apontando para o mesmo AC/id; isso não remove a entrada do AC da matriz nem autoriza promoção final sem os demais critérios.
@@ -551,8 +599,10 @@ Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato 
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + tarefa (id/título, `implemented_by` e `reviewed_by`) + `spec.md`, `plan.md`, `tasks.md`/critérios + contrato `interface-contract.md`/versão quando aplicável + `red.criteria_to_tests` (objeto AC→test) + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Quando `implemented_by: existing-code`, trate sempre a tarefa como revisão de implementação existente: leia os arquivos de produção e testes atuais referenciados pelos critérios, independentemente de o diff isolado estar vazio ou conter apenas os testes RED; não bloqueie por ausência de patch de produção.
    - **APROVADO** → DOC.
    - **BLOQUEADO** → roteie por tipo: *código* → `RED_REVISION` para o `test-author` criar primeiro o teste de regressão; só depois `GREEN_FIX`; *teste enfraquecido/ausente/adulterado* → RED; *introduzido por refactor* → REFACTOR; *spec/contrato divergente* → DOC ou **escala ao usuário**. Incremente `attempt`; após **3 tentativas** sem aprovar, **escale ao usuário**. Reexecute REVIEW após cada correção.
-   - A agregação consolidada de **deep-review**/fallback usa exatamente `aggregateReview(results, expectedRevision, expectedReviewers)`: `expectedReviewers` é obrigatório, não vazio, explícito e sem duplicatas; a agregação rejeita reviewer ausente, inesperado ou duplicado, revisão divergente e `protocol_mode`/`agent` incompatíveis. Cada envelope `{ ok, value?, errors }` preserva seus erros e diagnóstico no resultado `BLOCKED`. No protocolo TDD normal (`TDD_PEER_REVIEW`), não passe a saída textual `APROVADO`/`BLOQUEADO` por esse agregador deep-review: valide o veredito textual e persista a prova `task.review` conforme o contrato TDD; somente o fallback nomeado `DEEP_REVIEW_FALLBACK` usa o adaptador/schema normalizado.
-5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit ao `spec-kit-author` via Task, passando o impacto reportado pelo review. Para tarefas independentes da mesma onda, execute esta fase em sequência ou consolide por onda antes de gravar os caminhos compartilhados `./specs/<feature>/spec.md` e `plan.md`. O `spec-kit-author` atualiza in-place esses artefatos (e contrato, se mudança aprovada). Marque `doc_impact: applied` ou `none`. **Confirme que os arquivos do `spec_kit` existem em disco e refletem o comportamento entregue** antes de validar.
+   - A agregação **deep-review**/fallback usa `aggregateReviewInstances` com IDs reais e arquivos disjuntos; `aggregateReview` mantém o contrato por tipo. Esses agregadores exigem o par deep e rejeitam resultados TDD normais.
+   - Em `TDD_PEER_REVIEW`, recolha o yield estruturado original do job real e chame `validateReviewerResult(result, {agent:"peer-reviewer", protocol_mode:"TDD_PEER_REVIEW", reviewed_revision:revision})` no módulo resolvido `deep-review/lib/protocol.mjs`. O `expected` vem do assignment aprovado, nunca do resultado. Erro, revisão divergente ou retorno incompleto bloqueia; `ok:true` valida a estrutura, não o aceite.
+   - Preserve `APROVADO`/`BLOQUEADO`, findings e diagnóstico sem converter para `VALID` ou texto legado. Só registre `task.review.status: APPROVED` após veredito `APROVADO`, independência e provas atuais; os demais gates e achados continuam obrigatórios. NATIVE-05 exige positivo, negativo e malformed no OMP real; fixture da biblioteca não substitui essa prova.
+5. **DOC — `spec-kit-author` (delegado pelo orquestrador).** Delegue a atualização dos artefatos Spec Kit e documentação funcional durável ao `spec-kit-author` via Task, com caminhos explícitos e impactos reportados. Atualize catálogo, especificação de fluxos/regras/permissões/exceções, guia e histórico conforme a política única; os papéis podem compartilhar documentos existentes. Para tarefas independentes da mesma onda, serialize a escrita de caminhos compartilhados. Marque `doc_impact: applied` ou `none` com justificativa por alteração. Confirme conteúdo em disco e vínculos no README. Se DOC alterar material após REVIEW, reabra a revisão independente sobre esse material antes de VALIDATE; não exija revisão de documentos futuros no REVIEW inicial. Alteração somente documental recebe conferência semântica, sem ciclo RED artificial; alteração comportamental retorna ao ciclo correspondente.
    - **Mudança de contrato**: se a entrega altera o `interface-contract.md` (escopo, schemas ou versão), PARE e pergunte ao usuário se aprova. Aprovada → volte a RED para ajustar a implementação ao novo contrato. NÃO aprovada → BLOCKED (escale ao usuário).
 6. **VALIDATE — `validator`.** Roda os gates de forma independente e reporta evidências. **O veredito oficial de cada gate é só do validator.**
 7. **DONE pré-integração e promoção final — você.** Registre a tarefa como `DONE` somente após os critérios e gates da tarefa; não entregue nem commite nesse marco pré-integração. Após integração, review independente e validator com todos os gates reexecutados, promova a onda e só então marque a tarefa/onda como finalizada, atualize `tasks.md` e faça o commit permitido. Regenere `progress.md` a partir do `progress.json` atualizado (ele fica fora do git), faça `git add` **apenas dos arquivos da tarefa e dos artefatos Spec Kit atualizados — nunca o estado/`progress.md`**. Se o fluxo criou a entrada `.omp/state/` no `.gitignore`, isole apenas esse hunk em um commit de bootstrap separado; se o `.gitignore` for novo e não houver hunk selecionável, permita stage do…
@@ -754,10 +804,12 @@ stateDiagram-v2
 
 ## Paralelismo
 
-- Lance os subagentes da mesma onda na **mesma chamada `task`** quando os escopos forem disjuntos.
+- Com batch exposto/habilitado, lance subagentes independentes da mesma onda na **mesma chamada `task`**, dentro da capacidade observada; sem batch, use chamadas flat equivalentes. Escopos, recursos e saídas devem permitir paralelismo real.
 - **Nunca** paralelize: dois agentes sobre o mesmo arquivo/glob; `test-author` e dev da mesma tarefa; `refactorer` antes do GREEN; `peer-reviewer` antes do REFACTOR; `validator` antes do DOC.
 - Tarefas dependentes vão para ondas posteriores ou são serializadas.
-- Use `isolated: true` **em cada item** da chamada `task` quando tarefas paralelas editam arquivos sobreponíveis — o OMP cria worktrees copy-on-write e faz merge automático ao final. (No topo do batch o campo é descartado silenciosamente.)
+- Use `isolated: true` **em cada item** quando o OMP confirmar isolamento real
+  para escritores com escopos sobreponíveis; observe os worktrees e a integração
+  resultante. Sem confirmação, serialize. Campo no topo do batch é inválido; não contar com descarte silencioso.
 
 ---
 
@@ -780,7 +832,8 @@ Se passar, **o orquestrador** registra o commit de integração `chore(wave-N)` 
 6. [ ] **Lint e type-check** — sem erros.
 7. [ ] **Build** — produção bem-sucedido.
 8. [ ] **Contract** — implementação/testes respeitam o contrato + versão.
-9. [ ] **Security** — sem segredos hardcoded, sem regressão de segurança óbvia.
+9. [ ] **Security** — avaliação e revisão proporcional ao risco, verificações
+   aplicáveis e ausência de P0/P1 válidos abertos, conforme a política única.
 10. [ ] **Peer review** — aprovado (agente ≠ implementador), sem bloqueios pendentes.
 11. [ ] **Git sanity** — `git status --short` e `git diff --check` sem anomalias.
 12. [ ] **Entrega validada contra a spec** (já atualizada no DOC); contrato respeitado.
@@ -822,13 +875,24 @@ Gate vermelho devolve à fase de origem: teste falhando/requisito não atendido 
 
 ---
 
+## Pós-entrega — retrospectiva
+
+Em execução standalone, após a entrega autorizada, aplique `skill://retro` e seu
+protocolo único de triagem. Revalide as provas atuais antes de registrar decisão
+completa; análise e propostas são artefatos pós-entrega, sem reabrir ondas nem
+alterar produto automaticamente. Quando `delivery: external`, transfira revisão,
+fontes e contexto ao ship: ele coordena uma única triagem após a entrega externa,
+sem executar retro duplicada no encerramento TDD. Estado incompleto da triagem
+é relatado como pendência própria, sem substituir a prova histórica de entrega.
+
 ## Regras invioláveis
 
 - Orquestrador **não escreve código nem testes** (delega Spec Kit ao `spec-kit-author`; escreve diretamente só: `progress.json`/`progress.md`, `.gitignore`, commits).
 - **Spec Kit é obrigatório e verificável**: Fase 0 só termina com `spec_kit.status = WRITTEN` e arquivos em disco; bugfix não é exceção; o gate `spec_kit` reprova a tarefa se a doc faltar.
 - **Toda delegação é um `task`** com critérios e definição de done.
 - **100% do requisito**: tarefa só é DONE com todos os critérios cobertos e atendidos. Parcial = pendência, nunca sucesso.
-- Peer review **sempre** por agente ≠ implementador; independência garantida entregando só diff+spec.
+- Peer review **sempre** por instância distinta do implementador; briefing só
+  com diff/spec não prova sozinho independência. Use fresh-review e retorno real.
 - **RED nunca é pulado**; testes são read-only fora de um ciclo RED explícito.
 - Validação é **independente** e baseada em evidência.
 - **Estado**: JSON é a fonte da verdade; sempre cruzar com git/suíte; em divergência, parar e perguntar.

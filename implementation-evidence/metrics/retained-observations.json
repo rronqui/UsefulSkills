@@ -1,0 +1,327 @@
+{
+  "schema": {
+    "name": "usefulskills.retained-observations",
+    "version": "1.0.0",
+    "description": "Manually consolidated observations from retained receipts; not a new measurement, benchmark execution, generated validation report, or gate approval.",
+    "status_semantics": "OBSERVED_PARTIAL describes evidence availability only. PASS in a source receipt remains scoped to that receipt; FAILED describes each nonzero-exit Native evaluation, not a new test result.",
+    "missing_value_semantics": "NOT_MEASURED or NOT_OBSERVED always has value null and a reason; null never means zero.",
+    "units": {
+      "wall_ns": "Nanoseconds retained as decimal strings from the controlled probe.",
+      "parent_resource_delta": "Measuring Node process only: cpu_user_us/cpu_system_us in microseconds; resource_max_rss_kib in KiB; rss_bytes/heap_used_bytes/external_bytes in bytes. These are sample deltas, not child/system totals; negative memory deltas are retained, not clipped.",
+      "wall_seconds": "Whole-evaluation wall duration copied from a Native launch receipt; not model-serving latency.",
+      "host_display_duration": "Coarse host task-completion display, preserved as text; not a monotonic measurement or a quality score."
+    },
+    "source_reference_semantics": "Repository-relative paths identify retained evidence. JSON pointers select the original fields. External/local paths are retained provenance locations, not newly created files or portable bundled evidence. Parent-supplied host-display evidence is explicitly distinguished from independently read receipts."
+  },
+  "status": "OBSERVED_PARTIAL",
+  "task": "T-015",
+  "acceptance_criteria": ["AC-020"],
+  "scope": "Retained observations only; controlled serial Git admission probe, two failed evaluations in the newly unlimited Native window, a coarse host review duration, and separate pure-execution behavior evidence.",
+  "immutable_observation_cutoff": {
+    "at": "2026-11-15T22:11:52.751Z",
+    "basis": "Native attempt 2 actual.finished_at",
+    "scope": "Frozen Native evaluation observation subset: retained attempts 1 and 2 and the captured approval receipt, not a live window counter. Later source-only component context is separately cited and does not extend this Native observation cutoff.",
+    "update_policy": "Do not automatically update this historical artifact after Native attempt 3 or any future evaluation. Future actual observations remain in private proofs so the Native candidate can remain byte-stable.",
+    "current_review_authority": ".omp/state/tdd/progress.json; cited peer-review states below describe their original receipts, not current live review status."
+  },
+  "provenance": {
+    "controlled_probe": {
+      "path": "implementation-evidence/metrics/results.json",
+      "pointers": ["/sample_design", "/measurements", "/hashes", "/official_git_provenance", "/metrics_correctness", "/security_controls", "/limits"],
+      "original_status": "PASS",
+      "status_limit": "Original controlled-probe invariants only; not overall AC-020, Native, Goal, legal, or release approval."
+    },
+    "native_window": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-window-approval.json",
+      "pointers": ["/authorization", "/limit_mode", "/maximum_evaluations", "/spent", "/scope", "/timeout_semantics_correction", "/rpc_operation_timeout_ms", "/evaluation_job_timeout_seconds"]
+    },
+    "native_attempt_1": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-attempt1-launch.json",
+      "pointers": ["/manifest_digest", "/manifest_digest_algorithm", "/lifecycle_sha256", "/original_snapshot_limit", "/actual"]
+    },
+    "native_attempt_2": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-attempt2-launch.json",
+      "pointers": ["/source_sha256", "/source_review", "/original_file_hashes_verified", "/actual"]
+    },
+    "read_uri_peer": {
+      "path": ".omp/state/release-47/proofs/resumed-read-uri-diagnostic-review-blocked.json",
+      "pointers": ["/at", "/reviewer", "/verdict", "/source_sha256", "/findings", "/existing_evidence"]
+    },
+    "read_alias_peer": {
+      "path": ".omp/state/release-47/proofs/resumed-read-alias-review-approved.json",
+      "pointers": ["/reviewer", "/verdict", "/source_sha256", "/scope", "/tests", "/limits"]
+    },
+    "later_yield_component": {
+      "path": ".omp/state/release-47/proofs/resumed-yield-control-green.json",
+      "pointers": ["/source_sha256", "/status", "/cases", "/native", "/source_only", "/limits"]
+    },
+    "execution_behavior_receipt": {
+      "path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/bounded-workers-JAdVVL/vitest.json",
+      "selector": "testResults entry whose name is D:/Projects/UsefulSkills/scripts/execution.test.mjs; assertionResults",
+      "read_method": "Read existing JSON receipt only; no test execution."
+    },
+    "execution_behavior_repository_links": {
+      "paths": [".omp/state/tdd/progress.json", ".omp/state/release-47/proofs/qa-final-assessment.json", ".omp/state/release-47/proofs/resumed-ready17-gates-reconciled.json"],
+      "selectors": ["T-001 review.evidence and gate_evidence.tests", "acceptance_records entry AC-002", "T-001 scoped gate records"],
+      "availability_limit": "T-001 also cites local://ship-t001-green-vitest.json and agent://ExecutionPeer, which were unavailable to this consolidator. The existing bounded-suite JSON above was read directly and contains the 109 passed execution assertions. No unavailable artifact is treated as independently read."
+    },
+    "host_duration": {
+      "kind": "PARENT_SUPPLIED_HOST_OBSERVATION",
+      "source": "RetainedMetricsConsolidator assignment: host task-completion notice for ReadUriDiagnosticPeer displayed 9m39s.",
+      "associated_peer_receipt": ".omp/state/release-47/proofs/resumed-read-uri-diagnostic-review-blocked.json",
+      "availability_limit": "The associated peer receipt was read, but does not contain duration. The display value is supplied by the parent assignment, not independently recovered from a clock trace or inferred from receipt timestamps."
+    }
+  },
+  "controlled_probe": {
+    "source_ref": "controlled_probe",
+    "capture": {
+      "started_at": "2026-11-14T16:02:57.137Z",
+      "finished_at": "2026-11-14T16:03:11.950Z",
+      "retained_command_not_executed_here": "node implementation-evidence/metrics/guard-startup.mjs"
+    },
+    "design": {
+      "node_startup_samples": 5,
+      "guarded_sessions": 5,
+      "sessions_independent": true,
+      "execution_order": "serial; one fresh createGitSession per session",
+      "query": ["rev-parse", "--git-dir"],
+      "query_kind": "read-only",
+      "worktree_scope": "known private linked worktree only; no fixture writes or new branch",
+      "linked_worktree_pointer_sha256": "8b74585ee27c408ab1055087206160d0dedd60603b826ead20535cda74009808",
+      "node_startup_child_environment": "empty child environment; no inherited secrets exported"
+    },
+    "capture_hashes": {
+      "source": {
+        "measurement_script_sha256": "8e46261960f74dfa090d64d32942abc900588260af1ddc7097bb1ba116541ace",
+        "guard_factory_sha256": "8514e2befd545d4ad12550234713c528966d5768c6baecdf41f9c227775649dc",
+        "windows_host_helper_sha256": "b5b2aadb51e06fcb8a2f4ee0b734f9f4c1726cb2bc8070d1e74f223e23db9ea1"
+      },
+      "node": {
+        "version": "v22.23.2",
+        "executable_sha256": "0d0f5e39f9f3d9587bc19f73eab3c2c9c4903fd02d6dbf9c853dd81b3d95fad4"
+      },
+      "admitted_git": {
+        "role": "official-wrapper",
+        "expected_sha256": "81ef35ae005ca9318018d18e3327578ce939fb99feaad6b2d7c8ab15f3de8db5",
+        "measured_sha256": "81ef35ae005ca9318018d18e3327578ce939fb99feaad6b2d7c8ab15f3de8db5",
+        "unchanged_at_capture": true,
+        "product_version": "2.54.0.windows.1",
+        "architecture": "x64",
+        "signer": "Johannes Schindelin",
+        "certificate_fingerprint": "3E:B1:4A:3A:EF:84:B7:15:3E:13:93:97:F0:A4:9E:2F:AC:66:2B:0E"
+      },
+      "native_host": {
+        "basename": "powershell.exe",
+        "executable_sha256": "60c9b29843624dd8af6b6a7b26147753be6aeef65098b9a503cc50850afe410f"
+      },
+      "platform": {
+        "descriptor": {"platform": "win32", "arch": "x64", "os_release": "10.0.26200", "endianness": "LE"},
+        "descriptor_sha256": "0fd373028fc9c7a13d3160a03fc03a3addb85c3577e2f190ce14b69bc6bf3b3a"
+      },
+      "identity_limit": "These are hashes retained in the original measurement receipt, not hashes recomputed against the current workspace."
+    },
+    "node_startup": {
+      "sample_count": 5,
+      "parent_scope": "measuring Node process only; child CPU/memory not measured",
+      "samples": [
+        {"sample": 1, "wall_ns": "61508200", "child_status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 0, "resource_max_rss_kib": 368, "rss_bytes": 376832, "heap_used_bytes": 32384, "external_bytes": 59}},
+        {"sample": 2, "wall_ns": "59281500", "child_status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 0, "resource_max_rss_kib": 8, "rss_bytes": 8192, "heap_used_bytes": 8584, "external_bytes": 19}},
+        {"sample": 3, "wall_ns": "70612200", "child_status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 0, "resource_max_rss_kib": 28, "rss_bytes": 32768, "heap_used_bytes": 23408, "external_bytes": 19}},
+        {"sample": 4, "wall_ns": "60820900", "child_status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 16000, "resource_max_rss_kib": 16, "rss_bytes": 12288, "heap_used_bytes": 14840, "external_bytes": 19}},
+        {"sample": 5, "wall_ns": "58540100", "child_status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 0, "resource_max_rss_kib": 20, "rss_bytes": 16384, "heap_used_bytes": 16112, "external_bytes": 19}}
+      ]
+    },
+    "guarded_git": {
+      "native_admission_child_count": 5,
+      "git_spawn_count": 10,
+      "duplicate_metadata_admissions": 0,
+      "sessions": [
+        {
+          "session": 1,
+          "cold": {"wall_ns": "2807024800", "status": 0, "parent_resource_delta": {"cpu_user_us": 125000, "cpu_system_us": 15000, "resource_max_rss_kib": 27680, "rss_bytes": 7471104, "heap_used_bytes": 1177272, "external_bytes": -53388}},
+          "warm": {"wall_ns": "63082500", "status": 0, "parent_resource_delta": {"cpu_user_us": 16000, "cpu_system_us": 0, "resource_max_rss_kib": 0, "rss_bytes": 172032, "heap_used_bytes": 183216, "external_bytes": 165}},
+          "admission_child_count": 1, "git_spawn_count": 2, "warm_admission_child_count": 0, "outputs_identical": true, "admission_amortization_wall_delta_ns": "2743942300"
+        },
+        {
+          "session": 2,
+          "cold": {"wall_ns": "2796357300", "status": 0, "parent_resource_delta": {"cpu_user_us": 63000, "cpu_system_us": 63000, "resource_max_rss_kib": 1320, "rss_bytes": 1208320, "heap_used_bytes": -536856, "external_bytes": -165}},
+          "warm": {"wall_ns": "45331900", "status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 0, "resource_max_rss_kib": 0, "rss_bytes": 4096, "heap_used_bytes": 173600, "external_bytes": 165}},
+          "admission_child_count": 1, "git_spawn_count": 2, "warm_admission_child_count": 0, "outputs_identical": true, "admission_amortization_wall_delta_ns": "2751025400"
+        },
+        {
+          "session": 3,
+          "cold": {"wall_ns": "2813013600", "status": 0, "parent_resource_delta": {"cpu_user_us": 31000, "cpu_system_us": 16000, "resource_max_rss_kib": 916, "rss_bytes": 499712, "heap_used_bytes": 475920, "external_bytes": -165}},
+          "warm": {"wall_ns": "67569300", "status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 15000, "resource_max_rss_kib": 0, "rss_bytes": 0, "heap_used_bytes": 175048, "external_bytes": 165}},
+          "admission_child_count": 1, "git_spawn_count": 2, "warm_admission_child_count": 0, "outputs_identical": true, "admission_amortization_wall_delta_ns": "2745444300"
+        },
+        {
+          "session": 4,
+          "cold": {"wall_ns": "2909892500", "status": 0, "parent_resource_delta": {"cpu_user_us": 47000, "cpu_system_us": 63000, "resource_max_rss_kib": 488, "rss_bytes": 184320, "heap_used_bytes": 16712, "external_bytes": -165}},
+          "warm": {"wall_ns": "43157300", "status": 0, "parent_resource_delta": {"cpu_user_us": 15000, "cpu_system_us": 0, "resource_max_rss_kib": 0, "rss_bytes": 69632, "heap_used_bytes": 171088, "external_bytes": 165}},
+          "admission_child_count": 1, "git_spawn_count": 2, "warm_admission_child_count": 0, "outputs_identical": true, "admission_amortization_wall_delta_ns": "2866735200"
+        },
+        {
+          "session": 5,
+          "cold": {"wall_ns": "2800195300", "status": 0, "parent_resource_delta": {"cpu_user_us": 78000, "cpu_system_us": 47000, "resource_max_rss_kib": 252, "rss_bytes": 8192, "heap_used_bytes": -254080, "external_bytes": -165}},
+          "warm": {"wall_ns": "48586400", "status": 0, "parent_resource_delta": {"cpu_user_us": 0, "cpu_system_us": 31000, "resource_max_rss_kib": 0, "rss_bytes": 229376, "heap_used_bytes": 181112, "external_bytes": 165}},
+          "admission_child_count": 1, "git_spawn_count": 2, "warm_admission_child_count": 0, "outputs_identical": true, "admission_amortization_wall_delta_ns": "2751608900"
+        }
+      ],
+      "timing_interpretation": "Cold minus warm is within-session admission amortization in one version, not a release/version before-after speedup, model latency, or monetary saving.",
+      "count_scope": "Zero duplicate metadata admissions applies only to these five serial sessions. It is not a token deduplication measurement or proof of external scheduler duplicate-admission avoidance."
+    },
+    "retained_security_controls": {
+      "actual_factory": "createGitSession",
+      "actual_windows_host_helper": "windowsHostPath",
+      "shell_false": true,
+      "windows_hide_true": true,
+      "forbidden_git_flags_invoked": [],
+      "direct_unadmitted_git_invoked": false,
+      "fallback_path_invoked": false,
+      "inherited_environment_serialized": false,
+      "worktree_mutation": false,
+      "instrumentation": "Retained receipt states the spawn observer delegates to real child_process.spawnSync and returns its result object unchanged; observer metadata is not substituted for native output."
+    }
+  },
+  "native_unlimited_window": {
+    "source_ref": "native_window",
+    "authorization": "APPROVED",
+    "limit_mode": "UNLIMITED_EVALUATIONS_UNTIL_GOAL_COMPLETE",
+    "maximum_evaluations": null,
+    "observed_attempt_subset_count": 2,
+    "count_scope": "Includes ONLY retained attempts 1 and 2 and spent=2 in the captured approval receipt at the immutable observation cutoff. This is not the live unlimited-window counter, the total Native attempts, or the retry/backoff count across Goal47 or earlier windows; future evaluations do not automatically update this artifact.",
+    "previous_windows_preserved": true,
+    "authorization_limit": "Native evaluations for this Goal only; no gate waiver, credential/profile/model global mutation, or premature publication approval.",
+    "configuration_not_measurement": {
+      "rpc_operation_timeout_ms": 300000,
+      "evaluation_job_timeout_seconds": 3600,
+      "interpretation": "The 300000 ms setting is an RPC/session operation timeout, not a whole-evaluation deadline. Neither configured value is observed serving duration, throughput, spending, or a measured gain."
+    },
+    "attempts": [
+      {
+        "source_ref": "native_attempt_1",
+        "attempt_in_this_window": 1,
+        "run_id": "27240c55-07e7-46e0-af2d-7a1745f588ba",
+        "status": "FAILED",
+        "receipt_status": "COMPLETED_BLOCKED",
+        "exit": 2,
+        "wall_seconds": 77.61,
+        "duration_scope": "Whole failed evaluation; not model-serving latency or physical serving time. Copied from actual.wall_seconds, not recomputed from timestamps.",
+        "started_at": "2026-11-15T21:15:39.183Z",
+        "finished_at": "2026-11-15T21:16:56.269Z",
+        "lifecycle_source_sha256": "d66cd08d6cdd30d81901dfcd38d819266b88658baed8ce48a0a143eca7ee2894",
+        "manifest_digest": "ab3faa643f1b6a738b446f0bab9e9db902fc8508184f5a86b528883eeb92ce29",
+        "manifest_digest_algorithm": "sha256(JSON.stringify(parent_manifest_array)); not a harness revision",
+        "failure": {"kind": "BLOCKED", "reason_code": "HARNESS_BLOCKED", "message": "read used a non-project resource URI"},
+        "exact_rejected_uri": "UNRETAINED",
+        "preservation": {"source_changed": [], "binary_changed": false, "workload_receipt_stable": true},
+        "receipt_limits": [
+          "No inference of actual URI scheme; no claim that prior Root extra-args issue was exercised or resolved.",
+          "This receipt used reconstructed original191: two original quality blobs authentic, full191 byte identity not proven because of .npmignore divergence. Later recovery is not retroactively this run's snapshot."
+        ]
+      },
+      {
+        "source_ref": "native_attempt_2",
+        "attempt_in_this_window": 2,
+        "run_id": "a95cb6e5-5cc9-43b9-9343-c91398336de5",
+        "status": "FAILED",
+        "receipt_status": "COMPLETED_BLOCKED",
+        "exit": 2,
+        "wall_seconds": 145.42,
+        "duration_scope": "Whole failed evaluation; not model-serving latency or physical serving time. Copied from actual.wall_seconds, not recomputed from timestamps.",
+        "started_at": "2026-11-15T22:09:27.832Z",
+        "finished_at": "2026-11-15T22:11:52.751Z",
+        "lifecycle_source_sha256": "7e962c69aa1efb3d8ebbdbd1033a71a308d72bcf15ab99dccd4a95108f712a4d",
+        "source_review_ref": "read_alias_peer",
+        "original_file_hashes_verified_in_receipt": 191,
+        "failure": {"kind": "BLOCKED", "reason_code": "OBSERVATION_GUARD", "message": "subagent used forbidden/non-read tool yield"},
+        "preservation": {"source_changed": [], "binary_changed": false, "workload_receipt_stable": true},
+        "receipt_limits": ["Operational canonical P1 fixes written; final documentary review pending; not a Native permission waiver or release-gate PASS."]
+      }
+    ],
+    "later_source_boundary": {
+      "source_ref": "later_yield_component",
+      "lifecycle_source_sha256": "1308b31e9be6e502cd40627b835658e511478810b4100722b2c671e9ba4981dd",
+      "retained_component_status": "PASS",
+      "cases": 14,
+      "source_only": true,
+      "native": false,
+      "receipt_review_state": "Independent YieldControlPeer pending in the cited source receipt only; not a statement of current review status. Current review authority is .omp/state/tdd/progress.json; no live counts or later approval are copied here.",
+      "identity_limit": "The yield fix is later source, different from both actual Native launch hashes. Neither failed evaluation proves current-source equivalence or Native success after this fix. No current workspace hash was measured for this report."
+    },
+    "aggregate_duration": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "Per-run wall durations are retained without a sum. They do not establish sequential elapsed wallclock for the window or total Goal47 duration."
+    }
+  },
+  "host_review_observation": {
+    "source_ref": "host_duration",
+    "peer": "ReadUriDiagnosticPeer",
+    "host_display_duration": "9m39s",
+    "observation_kind": "COARSE_HOST_DISPLAY",
+    "meaning": "Actual read/review task elapsed duration displayed by the host, as supplied by the parent; not a review-quality metric, serving latency, or controlled comparative benchmark.",
+    "monotonic_duration": {"status": "NOT_MEASURED", "value": null, "reason": "No monotonic clock samples or finer precision retained in the provided observation."},
+    "associated_peer_result": {
+      "source_ref": "read_uri_peer",
+      "verdict": "BLOQUEADO",
+      "source_sha256": "0d9892add9534edb7f57f66262fc67a0d031c5bb074997d367ff76be715da65f",
+      "finding": "Read tool aliases bypassed exact-read correlation; existing Source9PASS/RPC13PASS did not cover aliases."
+    },
+    "later_scoped_peer_result": {
+      "source_ref": "read_alias_peer",
+      "reviewer": "ReadAliasFinalPeer",
+      "verdict": "APROVADO",
+      "source_sha256": "7e962c69aa1efb3d8ebbdbd1033a71a308d72bcf15ab99dccd4a95108f712a4d",
+      "scope": "URI bounded diagnostic plus two-line alias guard closure only",
+      "retained_test_statement": "Actual11PASS source_only/nativefalse; earlierRPC13PASS predecessor0d preserved",
+      "limits": "No URI allowance, Native, Goal, or release approval; not approval of later 1308 yield-fix source."
+    }
+  },
+  "separate_execution_behavior_evidence": {
+    "source_refs": ["execution_behavior_receipt", "execution_behavior_repository_links"],
+    "test_file": "scripts/execution.test.mjs",
+    "assertions": 109,
+    "passed": 109,
+    "failed": 0,
+    "kind": "RETAINED_PURE_EXECUTION_ASSERTIONS_NOT_BENCHMARK",
+    "observed_passed_examples": [
+      "AC-011: pure execution projection, schema and DAG is pure with deeply frozen inputs and returns fresh deterministic views",
+      "AC-011: observed resource identity, aliases and capacity reports case alias as a serializable conflict, not structural failure",
+      "AC-011: observed resource identity, aliases and capacity rejects unsafe resource capture: duplicate observation",
+      "AC-011: exact current returns, history and partial visibility rejects duplicate current return with E_RETURN_SET and leaves independent tasks visible",
+      "AC-011: review closure T003-IR-001 running resource occupancy IR001 leaves both idle conflicting tasks individually ready for dispatcher serialization",
+      "AC-002: safe execution locks and filesystem roots keeps a conflicting writer blocked when history is RUNNING and its job is absent",
+      "AC-002: safe execution locks and filesystem roots keeps a conflicting writer blocked when history is RUNNING and its job is UNKNOWN"
+    ],
+    "interpretation": "Separate evidence of pure conflict/duplicate-observation/return/admission-decision behavior. It is not measured external parallel execution, physical dispatcher locking, token deduplication, or performance. In particular, individually ready conflicting tasks still require dispatcher serialization."
+  },
+  "unknowns": {
+    "model_serving_latency": {"status": "NOT_MEASURED", "value": null, "reason": "The controlled probe makes no model call; failed Native whole-evaluation durations do not isolate model-serving intervals."},
+    "physical_model_serving_or_fallback": {"status": "NOT_OBSERVED", "value": null, "reason": "No retained serving-provider/backend, routing, or physical fallback telemetry is consolidated here."},
+    "model_billing_and_cost": {"status": "NOT_OBSERVED", "value": null, "reason": "No provider billing ledger or measured cost source was supplied; authorization/configuration and elapsed time cannot establish cost or savings."},
+    "model_token_usage": {"status": "NOT_MEASURED", "value": null, "reason": "Git output has no model/token data; these Native launch receipts supply no measured token accounting."},
+    "token_deduplication": {"status": "NOT_OBSERVED", "value": null, "reason": "Zero duplicate Git metadata admissions and pure-execution duplicate checks are not provider token/cache deduplication observations."},
+    "child_or_systemwide_resources": {"status": "NOT_MEASURED", "value": null, "reason": "The controlled probe samples only parent Node CPU/resource deltas; no child Git/PowerShell/Node, model service, or system-wide CPU/memory measurements are retained."},
+    "review_quality": {"status": "NOT_MEASURED", "value": null, "reason": "A host elapsed-duration display and scoped peer verdicts do not define or measure review quality."},
+    "controlled_review_duration": {"status": "NOT_MEASURED", "value": null, "reason": "The controlled Git probe executes no review. The separate 9m39s host display is coarse, parent-supplied elapsed time, not a controlled review benchmark."},
+    "goal_wide_retry_count_and_backoff": {"status": "NOT_MEASURED", "value": null, "reason": "Only spent=2 in the newly unlimited Native window is consolidated; earlier windows are preserved, not counted here. No Goal-wide retry or backoff measurement is inferred."},
+    "controlled_probe_retry_or_fallback": {"status": "NOT_MEASURED", "value": null, "reason": "No retry mechanism, model serving, or fallback is exercised by the controlled Git probe."},
+    "version_before_after_speedup": {"status": "NOT_MEASURED", "value": null, "reason": "Cold/warm is admission amortization in one version, not a version comparison."},
+    "arbitrary_worktree_effects": {"status": "NOT_MEASURED", "value": null, "reason": "Only the known private linked worktree was sampled."},
+    "external_scheduler_parallelism": {"status": "NOT_MEASURED", "value": null, "reason": "The five-session benchmark is serial. Pure execution assertions do not observe an external scheduler executing parallel tasks."},
+    "model_batch_or_throughput_metrics": {"status": "NOT_MEASURED", "value": null, "reason": "No model-serving or batch telemetry or throughput workload is present in the consolidated receipts."}
+  },
+  "limits": [
+    "The original results.json limits remain applicable to its probe. This artifact adds separately scoped observations; it does not rewrite historical not-measured fields as if the probe had observed Native or review activity.",
+    "Historical 19.10s/3.46s observations were uncontrolled and are not reused as a comparison.",
+    "Five serial sessions of one exact read-only Git tuple cannot establish external scheduler parallelism, all-workload behavior, or a release before/after performance gain.",
+    "Parent resource deltas are not total machine, child-process, or physical model-service resource use; observed zero parent deltas do not turn unmeasured resources into zero.",
+    "Native attempts 1 and 2 failed with exit 2; their durations measure whole evaluations only. No model-serving, cost, token, physical serving, or current-source Native success is inferred.",
+    "Source hashes identify the particular receipts: d66 for Native1, 7e96 for Native2, and later 1308 for the source-only yield fix. They are not interchangeable.",
+    "The host 9m39s observation is coarse displayed elapsed read/review time, not review quality and not invented monotonic precision.",
+    "Unlimited evaluation authorization is permission, not observed spending, completed acceptance criteria, or a quality/release gate waiver.",
+    "No legal approval, overall Native PASS, Goal PASS, release/publication permission, or task DONE promotion is granted by this artifact.",
+    "This artifact is a new candidate file requiring the parent's final inventory inclusion and independent review. It is not claimed to belong to either earlier frozen Native manifest."
+  ]
+}

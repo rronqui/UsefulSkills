@@ -395,7 +395,10 @@ function validateReviewerResult(result, expected) {
   if (!REVIEWER_AGENTS.includes(expected.agent)) errors.push("expected.agent must be a named reviewer agent");
   if (!PROTOCOL_MODES.includes(expected.protocol_mode)) errors.push("expected.protocol_mode is invalid");
   if (!nonEmptyString(expected.reviewed_revision)) errors.push("expected.reviewed_revision must be a non-empty revision");
-  if (result.status !== "VALID") errors.push("reviewer status must be VALID");
+  const tddPeer = expected.agent === "peer-reviewer" && expected.protocol_mode === "TDD_PEER_REVIEW";
+  if (tddPeer) {
+    if (!["APROVADO", "BLOQUEADO"].includes(result.status)) errors.push("TDD reviewer status must be APROVADO or BLOQUEADO");
+  } else if (result.status !== "VALID") errors.push("reviewer status must be VALID");
   if (result.reviewed_revision !== expected.reviewed_revision) errors.push("reviewer revision does not match expected reviewed_revision");
   if (!nonEmptyString(result.explanation)) errors.push("explanation must be a non-empty string");
   if (result.agent !== expected.agent) errors.push("reviewer agent identity does not match expected agent");
@@ -416,7 +419,7 @@ function validateReviewerResult(result, expected) {
     }
   }
   const expectedPair = REVIEWER_PRIORITY.find(({ agent }) => agent === result.agent);
-  if (expectedPair && result.protocol_mode !== expectedPair.protocol_mode) {
+  if (expectedPair && !tddPeer && result.protocol_mode !== expectedPair.protocol_mode) {
     errors.push(`${result.agent} must use ${expectedPair.protocol_mode}`);
   }
   if (typeof result.confidence !== "number" || !Number.isFinite(result.confidence) || result.confidence < 0 || result.confidence > 1) errors.push("confidence must be a number from 0 to 1");
@@ -426,7 +429,7 @@ function validateReviewerResult(result, expected) {
   const value = {
     agent: result.agent,
     protocol_mode: result.protocol_mode,
-    status: "VALID",
+    status: result.status,
     reviewed_revision: result.reviewed_revision,
     overall_correctness: result.overall_correctness,
     explanation: result.explanation,
@@ -610,6 +613,81 @@ function aggregateReview(results, expectedRevision, expectedReviewers) {
   return validResult(value);
 }
 
+function isCanonicalReviewPath(path) {
+  return nonEmptyString(path) && !/[\\:\x00-\x1f\x7f]/.test(path)
+    && !path.startsWith("/") && path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+// Coordinator envelope only: native reviewer `agent` remains the named agent type.
+function aggregateReviewInstances(results, expectedRevision, assignments) {
+  const errors = [];
+  if (!nonEmptyString(expectedRevision)) errors.push("expectedRevision must be a non-empty revision");
+  if (!Array.isArray(assignments) || assignments.length === 0) return blocked("assignments must be an explicit non-empty array");
+  errors.push(...unknownArrayKeys(assignments, "assignments"));
+  const expected = new Map();
+  const owners = new Map();
+  const modes = new Set();
+  for (const [index, assignment] of assignments.entries()) {
+    const path = `assignments[${index}]`;
+    if (!isRecord(assignment)) { errors.push(`${path} must be an object`); continue; }
+    errors.push(...unknownKeys(assignment, new Set(["id", "agent", "files"]), path));
+    requireOwnEnumerable(assignment, ["id", "agent", "files"], path, errors);
+    if (!nonEmptyString(assignment.id) || assignment.id.trim() !== assignment.id) errors.push(`${path}.id must be a non-empty trimmed instance ID`);
+    else {
+      const key = assignment.id.toLowerCase();
+      if (expected.has(key)) errors.push(`${path}.id duplicate instance ID`);
+      else expected.set(key, assignment);
+    }
+    const pair = REVIEWER_PRIORITY.find(({ agent }) => agent === assignment.agent);
+    if (!pair) errors.push(`${path}.agent must be a named reviewer type`);
+    else modes.add(pair.protocol_mode);
+    validateStringArray(assignment.files, `${path}.files`, errors);
+    if (Array.isArray(assignment.files)) for (const file of assignment.files) {
+      if (!isCanonicalReviewPath(file)) { errors.push(`${path}.files must use canonical relative paths`); continue; }
+      const key = file.toLowerCase();
+      if (owners.has(key)) errors.push(`${path}.files overlap or duplicate: ${file}`);
+      else owners.set(key, assignment.id);
+    }
+  }
+  if (modes.size > 1) errors.push("instances must use a single protocol_mode; fallback requires its own round");
+  if (!Array.isArray(results) || results.length === 0) errors.push("results must be a non-empty array");
+  else errors.push(...unknownArrayKeys(results, "results"));
+  if (errors.length) return blocked(...errors);
+  const actual = new Set();
+  const normalized = [];
+  for (const [index, item] of results.entries()) {
+    const path = `results[${index}]`;
+    if (!isRecord(item)) { errors.push(`${path} must be an instance envelope`); continue; }
+    errors.push(...unknownKeys(item, new Set(["id", "result"]), path));
+    requireOwnEnumerable(item, ["id", "result"], path, errors);
+    if (!nonEmptyString(item.id) || item.id.trim() !== item.id) { errors.push(`${path}.id must be a non-empty trimmed instance ID`); continue; }
+    const key = item.id.toLowerCase();
+    if (actual.has(key)) errors.push(`${path}.id duplicate instance ID`);
+    actual.add(key);
+    const assignment = expected.get(key);
+    if (!assignment) { errors.push(`${path}.id unexpected instance ID`); continue; }
+    const pair = REVIEWER_PRIORITY.find(({ agent }) => agent === assignment.agent);
+    const checked = validateReviewerResult(item.result, { agent: assignment.agent, reviewed_revision: expectedRevision, protocol_mode: pair.protocol_mode });
+    if (!checked.ok) { errors.push(...checked.errors.map((error) => `${path}: ${error}`)); continue; }
+    for (const finding of checked.value.findings) {
+      if (!isCanonicalReviewPath(finding.file_path) || !assignment.files.includes(finding.file_path)) errors.push(`${path}: finding path is invalid or outside assignment: ${finding.file_path}`);
+    }
+    normalized.push({ id: assignment.id, result: checked.value });
+  }
+  for (const [key, assignment] of expected) if (!actual.has(key)) errors.push(`missing expected instance: ${assignment.id}`);
+  if (errors.length || normalized.length !== assignments.length) return blocked(...errors, ...(normalized.length !== assignments.length ? ["instance result set must match assignments exactly"] : []));
+  const findings = normalized.flatMap(({ result }) => result.findings.map((finding) => ({ ...finding })));
+  const counts = Object.fromEntries(PRIORITIES.map((priority) => [priority, 0]));
+  for (const finding of findings) counts[`P${finding.priority}`] += 1;
+  const blockers = findings.filter((finding) => finding.priority <= 1);
+  return validResult({
+    status: blockers.length ? "BLOCKED" : "APPROVED", protocol_mode: [...modes][0], reviewed_revision: expectedRevision,
+    blockers, findings, counts, reviewers: normalized.map(({ id }) => id),
+    reviewer_instances: normalized.map(({ id, result }) => ({ id, agent: result.agent })),
+    fallback_agent: [...modes][0] === "DEEP_REVIEW_FALLBACK" ? "peer-reviewer" : "",
+  });
+}
+
 function resolveReviewer(input = {}) {
   if (!isRecord(input)) return blocked("reviewer candidates input must be an object");
   const errors = [];
@@ -652,6 +730,7 @@ function resolveReviewer(input = {}) {
 
 export {
   aggregateReview,
+  aggregateReviewInstances,
   resolveReviewer,
   validateRequest,
   validateReviewerResult,

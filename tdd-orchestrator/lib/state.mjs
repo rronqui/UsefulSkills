@@ -40,14 +40,13 @@ const SPEC_KIT_MODES = new Set(["created", "updated_in_place"]);
 const CONTRACT_STATUSES = new Set(["DRAFT", "APPROVED", "NA"]);
 const BASELINE_GATES = ["tests", "build"];
 const RED_COMPLETE_PHASES = new Set(["GREEN", "GREEN_FIX", "TOOLING_FIX", "REFACTOR", "REFACTOR_FIX", "REVIEW", "DOC", "VALIDATE", "DONE"]);
-const TEST_REF = /^[^:\r\n]+::[^:\r\n]+$/;
 const FEATURE_NAME_PATTERN = "specs\\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*";
 const SPEC_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/spec\\.md$`);
 const PLAN_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/plan\\.md$`);
 const TASKS_PATH_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/tasks\\.md$`);
 const BUILD_COMMAND_NULL_RE = /\bbuildCommand\s*(?:=|:)\s*null(?![A-Za-z0-9_$.-])/i;
 const AC_SOURCE_RE = new RegExp(`^\\.\\/specs\\/${FEATURE_NAME_PATTERN}\\/spec\\.md#\\S+$`);
-const NORMATIVE_AC = "AC-019";
+const CRITERION_TYPES = new Set(["behavioral", "normative"]);
 
 const ROOT_KEYS = [
   "schema_version", "run_id", "task_source", "updated_at", "repo", "baseline",
@@ -104,6 +103,27 @@ function isObject(value) {
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim() !== "";
+}
+
+function parseTestRef(reference) {
+  if (typeof reference !== "string" || reference.length === 0 || /[\u0000-\u001f\u007f-\u009f]/.test(reference)) return null;
+  const separator = reference.indexOf("::");
+  if (separator <= 0 || separator !== reference.lastIndexOf("::") || separator === reference.length - 2) return null;
+  const file = reference.slice(0, separator);
+  const title = reference.slice(separator + 2);
+  if (
+    file.startsWith("/")
+    || file.includes("\\")
+    || file.includes(":")
+    || /^[A-Za-z]:/.test(file)
+  ) return null;
+  const segments = file.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return null;
+  return { file, title };
+}
+
+function isValidTestRef(reference) {
+  return parseTestRef(reference) !== null;
 }
 
 function checkKeys(object, expected, path, errors, { required = true } = {}) {
@@ -170,11 +190,32 @@ function validateGateMaps(task, path, errors) {
     validateGateEntry(task.gates, task.gate_origins, task.gate_evidence, path, gate, errors);
   }
 }
-function isNormativeTask(task) {
+function isNormativeCriterion(ac, acceptanceCriteria = []) {
+  return acceptanceCriteria.find((criterion) => criterion?.id === ac)?.type === "normative";
+}
+
+function validateCriterionTypes(acceptanceCriteria, errors) {
+  if (!Array.isArray(acceptanceCriteria)) {
+    errors.push("acceptanceCriteria: array required");
+    return;
+  }
+  const ids = new Set();
+  for (const criterion of acceptanceCriteria) {
+    if (!isObject(criterion) || !/^AC-\d{3}$/.test(criterion.id)) {
+      errors.push("acceptanceCriteria: criterion with valid id required");
+      continue;
+    }
+    if (ids.has(criterion.id)) errors.push(`acceptanceCriteria: duplicate ${criterion.id}`);
+    ids.add(criterion.id);
+    if (hasOwn(criterion, "type") && !CRITERION_TYPES.has(criterion.type)) errors.push(`acceptanceCriteria.${criterion.id}.type: expected behavioral or normative`);
+  }
+}
+
+function isNormativeTask(task, acceptanceCriteria = []) {
   return Array.isArray(task?.acceptance_criteria)
     && task.acceptance_criteria.length === 1
-    && task.acceptance_criteria[0] === NORMATIVE_AC
-    && task.red?.criteria_to_tests?.[NORMATIVE_AC]?.status === "NA";
+    && isNormativeCriterion(task.acceptance_criteria[0], acceptanceCriteria)
+    && task.red?.criteria_to_tests?.[task.acceptance_criteria[0]]?.status === "NA";
 }
 
 function hasCanonicalSpecKitEvidence(evidence) {
@@ -209,6 +250,31 @@ function indexTasksById(waves) {
     for (const task of wave.tasks) if (isObject(task) && nonEmptyString(task.id)) tasksById.set(task.id, task);
   }
   return tasksById;
+}
+
+function validateUniqueStateIdentity(waves, errors, path = "progress.waves") {
+  const waveNumbers = new Map();
+  const taskIds = new Map();
+  for (const [waveIndex, wave] of waves.entries()) {
+    if (!isObject(wave)) continue;
+    if (Number.isInteger(wave.wave)) {
+      if (waveNumbers.has(wave.wave)) {
+        errors.push(`${path}[${waveIndex}].wave: duplicate wave number ${wave.wave}; first seen at ${path}[${waveNumbers.get(wave.wave)}]`);
+      } else {
+        waveNumbers.set(wave.wave, waveIndex);
+      }
+    }
+    if (!Array.isArray(wave.tasks)) continue;
+    for (const [taskIndex, task] of wave.tasks.entries()) {
+      if (!isObject(task) || !nonEmptyString(task.id)) continue;
+      if (taskIds.has(task.id)) {
+        const first = taskIds.get(task.id);
+        errors.push(`${path}[${waveIndex}].tasks[${taskIndex}].id: duplicate task ID ${task.id}; first seen at ${first}`);
+      } else {
+        taskIds.set(task.id, `${path}[${waveIndex}].tasks[${taskIndex}]`);
+      }
+    }
+  }
 }
 
 function validateDoneAcceptanceLinks(waves, acceptanceById, errors) {
@@ -266,8 +332,10 @@ function validateNormativeEntry(entry, ac, path, errors) {
   if (typeof entry?.reference === "string" && !entry.reference.includes(ac)) errors.push(`${path}.reference: must reference ${ac}`);
 }
 
-export function validateCriteriaMatrix(task) {
+export function validateCriteriaMatrix(task, { acceptanceCriteria = [] } = {}) {
   const errors = [];
+  validateCriterionTypes(acceptanceCriteria, errors);
+  if (errors.length) return result(false, undefined, errors);
   if (!isObject(task)) return result(false, undefined, ["task must be an object"]);
   const acceptance = task.acceptance_criteria;
   const matrix = task.red?.criteria_to_tests;
@@ -286,14 +354,14 @@ export function validateCriteriaMatrix(task) {
       for (const key of Object.keys(matrix)) if (!allowed.has(key)) errors.push(`criteria_to_tests.${key}: unknown or extra AC`);
       for (const ac of acceptance) {
         const entry = matrix[ac];
-        if (ac === NORMATIVE_AC) {
+        if (isNormativeCriterion(ac, acceptanceCriteria)) {
           if (acceptance.length !== 1) errors.push(`criteria_to_tests.${ac}: normative NA is allowed only for an exclusively normative task`);
           validateNormativeEntry(entry, ac, `criteria_to_tests.${ac}`, errors);
         } else if (!Array.isArray(entry) || entry.length === 0 || Object.keys(entry ?? {}).length !== entry.length) {
           errors.push(`criteria_to_tests.${ac}: executable AC needs a dense non-empty test list`);
         } else {
           entry.forEach((ref, index) => {
-            if (typeof ref !== "string" || !TEST_REF.test(ref)) {
+            if (!isValidTestRef(ref)) {
               errors.push(`criteria_to_tests.${ac}[${index}]: invalid test reference; expected arquivo::teste`);
             } else if (owners.has(ref) && owners.get(ref) !== ac) {
               errors.push(`criteria_to_tests: test ${ref} is duplicated across ACs ${owners.get(ref)} and ${ac}`);
@@ -313,7 +381,7 @@ export function validateCriteriaMatrix(task) {
   }
 }
 
-function validateRevisionBaseline(task, path, errors) {
+function validateRevisionBaseline(task, path, errors, acceptanceCriteria = []) {
   const baseline = task.red?.revision_baseline_tests;
   if (!isObject(baseline)) return;
   const acceptance = Array.isArray(task.acceptance_criteria) ? task.acceptance_criteria : [];
@@ -323,13 +391,13 @@ function validateRevisionBaseline(task, path, errors) {
   }
   if (task.phase !== "RED_REVISION") return;
   for (const ac of acceptance) {
-    if (ac === NORMATIVE_AC) continue;
+    if (isNormativeCriterion(ac, acceptanceCriteria)) continue;
     if (!hasOwn(baseline, ac)) {
       errors.push(`${path}.red.revision_baseline_tests.${ac}: complete baseline map required`);
       continue;
     }
     const refs = baseline[ac];
-    if (!Array.isArray(refs) || refs.length === 0 || Object.keys(refs).length !== refs.length || refs.some((ref) => typeof ref !== "string" || !TEST_REF.test(ref))) {
+    if (!Array.isArray(refs) || refs.length === 0 || Object.keys(refs).length !== refs.length || refs.some((ref) => !isValidTestRef(ref))) {
       errors.push(`${path}.red.revision_baseline_tests.${ac}: non-empty dense test references required`);
     }
   }
@@ -346,19 +414,19 @@ function validateRevisionBaseline(task, path, errors) {
   }
 }
 
-function validateRed(task, path, errors, { allowLegacyPendingReview = false } = {}) {
+function validateRed(task, path, errors, { allowLegacyPendingReview = false, acceptanceCriteria = [] } = {}) {
   if (!checkKeys(task.red, RED_KEYS, `${path}.red`, errors)) return;
   if (!RED_STATUSES.has(task.red.status)) errors.push(`${path}.red.status: invalid enum`);
-  if (!Array.isArray(task.red.failing_tests) || task.red.failing_tests.some((ref) => typeof ref !== "string" || !TEST_REF.test(ref))) errors.push(`${path}.red.failing_tests: invalid test references`);
+  if (!Array.isArray(task.red.failing_tests) || task.red.failing_tests.some((ref) => !isValidTestRef(ref))) errors.push(`${path}.red.failing_tests: invalid test references`);
   if (typeof task.red.failure_reason_expected !== "boolean") errors.push(`${path}.red.failure_reason_expected: must be boolean`);
   if (!checkKeys(task.red.revision_delta, RED_DELTA_KEYS, `${path}.red.revision_delta`, errors)) return;
   for (const key of RED_DELTA_KEYS) if (typeof task.red.revision_delta[key] !== "string") errors.push(`${path}.red.revision_delta.${key}: must be string`);
   if (!isObject(task.red.revision_baseline_tests)) errors.push(`${path}.red.revision_baseline_tests: must be an object`);
   else for (const [ac, refs] of Object.entries(task.red.revision_baseline_tests)) {
-    if (!Array.isArray(refs) || refs.length === 0 || refs.some((ref) => typeof ref !== "string" || !TEST_REF.test(ref))) errors.push(`${path}.red.revision_baseline_tests.${ac}: invalid test references`);
+    if (!Array.isArray(refs) || refs.length === 0 || refs.some((ref) => !isValidTestRef(ref))) errors.push(`${path}.red.revision_baseline_tests.${ac}: invalid test references`);
   }
-  validateRevisionBaseline(task, path, errors);
-  const matrixResult = validateCriteriaMatrix(task);
+  validateRevisionBaseline(task, path, errors, acceptanceCriteria);
+  const matrixResult = validateCriteriaMatrix(task, { acceptanceCriteria });
   if (!matrixResult.ok) errors.push(...matrixResult.errors.map((error) => `${path}.red.criteria_to_tests: ${error}`));
   if (task.phase === "RED_REVISION") {
     const delta = task.red.revision_delta;
@@ -369,7 +437,7 @@ function validateRed(task, path, errors, { allowLegacyPendingReview = false } = 
       && delta.ac === "" && delta.test === "" && delta.evidence === "";
     if (!reset) {
       if (!nonEmptyString(delta.ac) || !Array.isArray(task.acceptance_criteria) || !task.acceptance_criteria.includes(delta.ac)) errors.push(`${path}.red.revision_delta.ac: must name an existing AC`);
-      if (!nonEmptyString(delta.test) || !TEST_REF.test(delta.test)) errors.push(`${path}.red.revision_delta.test: new test reference required`);
+      if (!nonEmptyString(delta.test) || !isValidTestRef(delta.test)) errors.push(`${path}.red.revision_delta.test: new test reference required`);
       const baseline = Array.isArray(task.red.revision_baseline_tests?.[delta.ac])
         ? task.red.revision_baseline_tests[delta.ac]
         : [];
@@ -394,7 +462,7 @@ function validateRed(task, path, errors, { allowLegacyPendingReview = false } = 
     && task.review?.status === "PENDING";
   const postRedProofRequired = !legacyPendingReview && RED_COMPLETE_PHASES.has(task.phase);
   const redProofRequired = postRedProofRequired || (task.phase === "RED" && task.red.status === "PASS");
-  if (redProofRequired && task.implemented_by !== "existing-code" && !isNormativeTask(task)) {
+  if (redProofRequired && task.implemented_by !== "existing-code" && !isNormativeTask(task, acceptanceCriteria)) {
     if (task.red.status !== "PASS") errors.push(`${path}.red: expected PASS before ${task.phase}`);
     if (task.red.failure_reason_expected !== true) errors.push(`${path}.red.failure_reason_expected: expected assertion failure required for RED`);
     if (!Array.isArray(task.red.failing_tests) || task.red.failing_tests.length === 0) errors.push(`${path}.red.failing_tests: expected assertion test required`);
@@ -408,23 +476,24 @@ function validateRed(task, path, errors, { allowLegacyPendingReview = false } = 
     }
     if (!nonEmptyString(task.evidence)) errors.push(`${path}.evidence: RED assertion evidence required`);
   }
-  if (task.implemented_by === "existing-code" && task.phase === "REVIEW") {
+  if (task.implemented_by === "existing-code" && ["REVIEW", "DOC", "VALIDATE", "DONE"].includes(task.phase)) {
     if (task.red.status !== "PASS" || task.red.failure_reason_expected !== false || !Array.isArray(task.red.failing_tests) || task.red.failing_tests.length !== 0) errors.push(`${path}.red: existing behavior requires PASS with no failing tests and false failure_reason_expected`);
+    if (!nonEmptyString(task.evidence)) errors.push(`${path}.evidence: existing behavior verification evidence required`);
   }
 }
 function isDoneTask(task) {
   return isObject(task) && task.phase === "DONE";
 }
 
-function validateDoneTask(task, path, errors) {
+function validateDoneTask(task, path, errors, { acceptanceCriteria = [] } = {}) {
   if (!isDoneTask(task)) return;
   if (Array.isArray(task.blockers) && task.blockers.length !== 0) errors.push(`${path}: DONE task cannot have blockers`);
   validateReview(task.review, `${path}.review`, errors, { requireApproval: true, requirePeerReviewer: true });
   if (task.red?.status !== "PASS") errors.push(`${path}: DONE requires RED PASS`);
-  if (isNormativeTask(task) && (task.red?.failure_reason_expected !== false || !Array.isArray(task.red?.failing_tests) || task.red.failing_tests.length !== 0)) {
+  if (isNormativeTask(task, acceptanceCriteria) && (task.red?.failure_reason_expected !== false || !Array.isArray(task.red?.failing_tests) || task.red.failing_tests.length !== 0)) {
     errors.push(`${path}: normative DONE requires RED PASS with no failing tests and false failure_reason_expected`);
   }
-  if (!(isNormativeTask(task) ? ["PASS", "SKIPPED"] : ["PASS"]).includes(task.green?.status)) errors.push(`${path}: DONE requires GREEN PASS`);
+  if (!(isNormativeTask(task, acceptanceCriteria) || task.implemented_by === "existing-code" ? ["PASS", "SKIPPED"] : ["PASS"]).includes(task.green?.status)) errors.push(`${path}: DONE requires GREEN PASS`);
   if (!["PASS", "SKIPPED"].includes(task.refactor?.status)) errors.push(`${path}: DONE requires REFACTOR PASS or SKIPPED`);
   for (const gate of GATES) if (!COMPLETED_GATE_STATUSES.has(task.gates?.[gate])) errors.push(`${path}: DONE requires all gates PASS or justified NA`);
 }
@@ -445,7 +514,6 @@ function validateTask(task, path, errors, options = {}) {
     errors.push(`${path}.allowed_write_globs: non-empty string array required`);
   }
   if (typeof task.evidence !== "string") errors.push(`${path}.evidence: must be string`);
-  if (task.phase === "DONE" && task.implemented_by === "existing-code") errors.push(`${path}: existing behavior cannot be promoted directly to DONE`);
   if (!TASK_PHASES.has(task.phase)) errors.push(`${path}.phase: invalid enum`);
   if (!Number.isInteger(task.attempt) || task.attempt < 0 || task.attempt > 3) errors.push(`${path}.attempt: non-negative integer capped at 3 required`);
   validateReview(task.review, `${path}.review`, errors, { requirePeerReviewer: task.review?.status === "APPROVED" });
@@ -467,13 +535,14 @@ function validateTask(task, path, errors, options = {}) {
     if (!["PASS", "SKIPPED"].includes(task.green.status)) errors.push(`${path}: ${task.phase} requires GREEN PASS or SKIPPED`);
     if (!["PASS", "SKIPPED"].includes(task.refactor.status)) errors.push(`${path}: ${task.phase} requires REFACTOR PASS or SKIPPED`);
   }
-  if (task.implemented_by === "existing-code" && task.phase === "REVIEW") {
+  if (task.implemented_by === "existing-code" && ["REVIEW", "DOC", "VALIDATE", "DONE"].includes(task.phase)) {
     if (task.green.status !== "SKIPPED" || task.refactor.status !== "SKIPPED") errors.push(`${path}: existing-code requires GREEN and REFACTOR SKIPPED`);
+    if (task.green.changed_files?.length !== 0) errors.push(`${path}: existing-code cannot claim implementation changed files`);
   }
   validateGateMaps(task, path, errors);
   const blockersValid = Array.isArray(task.blockers) && task.blockers.every((item) => typeof item === "string" && nonEmptyString(item));
   if (!blockersValid) errors.push(`${path}.blockers: string array required`);
-  validateDoneTask(task, path, errors);
+  validateDoneTask(task, path, errors, options);
   if (task.phase === "BLOCKED" && Array.isArray(task.blockers) && task.blockers.length === 0) errors.push(`${path}: BLOCKED task requires blocker diagnosis`);
   if (task.attempt >= 3 && task.phase !== "BLOCKED") errors.push(`${path}: attempt cap requires BLOCKED phase`);
 }
@@ -485,7 +554,8 @@ function validateAcceptanceCriteria(criteria, canonicalSpecRoot, errors) {
   const ids = new Set();
   criteria.forEach((ac, index) => {
     const path = `progress.acceptance_criteria[${index}]`;
-    if (!checkKeys(ac, AC_KEYS, path, errors)) return;
+    if (!checkKeys(ac, hasOwn(ac, "type") ? [...AC_KEYS, "type"] : AC_KEYS, path, errors)) return;
+    if (hasOwn(ac, "type") && !CRITERION_TYPES.has(ac.type)) errors.push(`${path}.type: expected behavioral or normative`);
     if (!/^AC-\d{3}$/.test(ac.id)) errors.push(`${path}.id: invalid AC id`);
     if (ids.has(ac.id)) errors.push(`progress.acceptance_criteria: duplicate ${ac.id}`);
     ids.add(ac.id);
@@ -516,7 +586,7 @@ function validateAcceptanceCriteria(criteria, canonicalSpecRoot, errors) {
 
 function validateProgressObject(progress, errors, options = {}) {
   if (!checkKeys(progress, ROOT_KEYS, "progress", errors)) return;
-  if (progress.schema_version !== "2.2") errors.push("progress.schema_version: expected 2.2");
+  if (progress.schema_version !== "2.3") errors.push("progress.schema_version: expected 2.3; migrate legacy progress first");
   for (const field of ["run_id", "task_source", "updated_at"]) if (!nonEmptyString(progress[field])) errors.push(`progress.${field}: non-empty string required`);
   if (checkKeys(progress.repo, REPO_KEYS, "progress.repo", errors)) {
     validateStringFields(progress.repo, ["branch_start", "branch_work", "merge_target", "delivery", "merge_status", "pr_url", "head_start", "head_current"], "progress.repo", errors);
@@ -586,9 +656,11 @@ function validateProgressObject(progress, errors, options = {}) {
   }
   validateAcceptanceCriteria(progress.acceptance_criteria, canonicalSpecRoot, errors);
   if (!Array.isArray(progress.waves) || progress.waves.length === 0) errors.push("progress.waves: non-empty array required");
-  else progress.waves.forEach((wave, wi) => {
+  else {
+    validateUniqueStateIdentity(progress.waves, errors);
+    progress.waves.forEach((wave, wi) => {
     const path = `progress.waves[${wi}]`;
-    if (!checkKeys(wave, WAVE_KEYS, path, errors)) return;
+    if (!checkKeys(wave, [...WAVE_KEYS, ...["review", "validation"].filter((key) => hasOwn(wave, key))], path, errors)) return;
     if (!Number.isInteger(wave.wave) || wave.wave < 1) errors.push(`${path}.wave: positive integer required`);
     if (!WAVE_STATUSES.has(wave.status)) errors.push(`${path}.status: invalid enum`);
     if (checkKeys(wave.integration, INTEGRATION_KEYS, `${path}.integration`, errors)) {
@@ -606,14 +678,24 @@ function validateProgressObject(progress, errors, options = {}) {
     }
     if (!Array.isArray(wave.tasks) || wave.tasks.length === 0) errors.push(`${path}.tasks: non-empty array required`);
     else {
-      wave.tasks.forEach((task, ti) => validateTask(task, `${path}.tasks[${ti}]`, errors, options));
+      wave.tasks.forEach((task, ti) => validateTask(task, `${path}.tasks[${ti}]`, errors, { ...options, acceptanceCriteria: Array.isArray(progress.acceptance_criteria) ? progress.acceptance_criteria : [] }));
       if (isObject(wave.integration) && wave.integration.status !== "PASS" && Number.isInteger(wave.integration.attempt) && wave.integration.attempt >= 3) {
         for (const [ti, task] of wave.tasks.entries()) {
           if (isObject(task) && task.phase !== "BLOCKED") errors.push(`${path}.tasks[${ti}]: integration attempt cap requires BLOCKED task`);
         }
       }
     }
+    if (wave.status === "completed") {
+      // Persist exactly the promotion contract; completed is the post-promotion state.
+      const promotion = canPromoteWave({ ...wave, status: "integrating" }, { acceptanceCriteria: progress.acceptance_criteria });
+      errors.push(...promotion.errors.map((message) => `${path}: ${message}`));
+    } else {
+      // Optional proofs are absent until produced, never fabricated pending approvals.
+      if (hasOwn(wave, "review")) validateApprovedReview(wave.review, Array.isArray(wave.tasks) ? wave.tasks : [], errors);
+      if (hasOwn(wave, "validation")) validateWaveValidation(wave.validation, errors);
+    }
   });
+  }
   validateFinalAcceptanceLinks(progress, errors);
   if (progress.spec_kit?.status === "PENDING" && Array.isArray(progress.waves)) {
     for (const [wi, wave] of progress.waves.entries()) {
@@ -679,11 +761,21 @@ function parseLegacyCriteriaMatrix(task, errors) {
   const references = new Set();
   const lines = matrix.split(/\r?\n/);
   for (const [index, raw] of lines.entries()) {
-    const line = raw.trim();
-    if (!line) continue;
-    const match = line.match(/^(AC-\d{3})\s*(?:->|:)\s*(.+)$/);
-    const reference = match?.[2]?.trim();
-    if (!match || !TEST_REF.test(reference)) {
+    if (!raw.trim()) continue;
+    const ac = raw.slice(0, 6);
+    let cursor = 6;
+    while (raw[cursor] === " " || raw[cursor] === "\t") cursor += 1;
+    let delimiterLength = 0;
+    if (raw.startsWith("->", cursor)) delimiterLength = 2;
+    else if (raw[cursor] === ":") delimiterLength = 1;
+    cursor += delimiterLength;
+    if (!/^AC-\d{3}$/.test(ac) || delimiterLength === 0) {
+      errors.push(`legacy criteria matrix line ${index + 1}: invalid AC mapping`);
+      continue;
+    }
+    if (raw[cursor] === " " || raw[cursor] === "\t") cursor += 1;
+    const reference = raw.slice(cursor);
+    if (!isValidTestRef(reference)) {
       errors.push(`legacy criteria matrix line ${index + 1}: invalid AC mapping`);
       continue;
     }
@@ -692,8 +784,8 @@ function parseLegacyCriteriaMatrix(task, errors) {
       continue;
     }
     references.add(reference);
-    if (!hasOwn(parsed, match[1])) parsed[match[1]] = [];
-    parsed[match[1]].push(reference);
+    if (!hasOwn(parsed, ac)) parsed[ac] = [];
+    parsed[ac].push(reference);
   }
   if (Object.keys(parsed).length > 0 && errors.length === 0) task.red.criteria_to_tests = parsed;
 }
@@ -805,13 +897,13 @@ function normalizeReviewProof(task, { preserveRevisionPhase = false } = {}) {
 }
 
 
-function resetRedRevisionProof(task, force = false) {
+function resetRedRevisionProof(task, force = false, acceptanceCriteria = []) {
   if ((!force && task.phase !== "RED_REVISION") || !isObject(task.red)) return;
   const baseline = isObject(task.red.revision_baseline_tests) ? clone(task.red.revision_baseline_tests) : {};
   const currentMatrix = isObject(task.red.criteria_to_tests) ? task.red.criteria_to_tests : {};
   const matrix = {};
   for (const ac of Array.isArray(task.acceptance_criteria) ? task.acceptance_criteria : []) {
-    if (ac === NORMATIVE_AC && hasOwn(currentMatrix, ac)) matrix[ac] = clone(currentMatrix[ac]);
+    if (isNormativeCriterion(ac, acceptanceCriteria) && hasOwn(currentMatrix, ac)) matrix[ac] = clone(currentMatrix[ac]);
     else if (hasOwn(baseline, ac)) matrix[ac] = clone(baseline[ac]);
   }
   task.red.criteria_to_tests = matrix;
@@ -821,28 +913,28 @@ function resetRedRevisionProof(task, force = false) {
   task.red.revision_delta = { ac: "", test: "", evidence: "" };
 }
 
-function revisionBaselineFromMatrix(task) {
+function revisionBaselineFromMatrix(task, acceptanceCriteria = []) {
   const matrix = task.red?.criteria_to_tests;
   const baseline = {};
   const acceptance = Array.isArray(task.acceptance_criteria) ? task.acceptance_criteria : [];
   for (const ac of acceptance) {
-    if (ac === NORMATIVE_AC) continue;
-    if (Array.isArray(matrix?.[ac]) && matrix[ac].length > 0 && matrix[ac].every((ref) => typeof ref === "string" && TEST_REF.test(ref))) {
+    if (isNormativeCriterion(ac, acceptanceCriteria)) continue;
+    if (Array.isArray(matrix?.[ac]) && matrix[ac].length > 0 && matrix[ac].every((ref) => isValidTestRef(ref))) {
       baseline[ac] = [...matrix[ac]];
     }
   }
   return baseline;
 }
 
-function hasValidRevisionBaseline(task) {
+function hasValidRevisionBaseline(task, acceptanceCriteria = []) {
   const baseline = task.red?.revision_baseline_tests;
   if (!isObject(baseline)) return false;
   const acceptance = Array.isArray(task.acceptance_criteria) ? task.acceptance_criteria : [];
   const allowed = new Set(acceptance);
   if (Object.keys(baseline).some((ac) => !allowed.has(ac))) return false;
   return acceptance.every((ac) => (
-    ac === NORMATIVE_AC
-      || (Array.isArray(baseline[ac]) && baseline[ac].length > 0 && Object.keys(baseline[ac]).length === baseline[ac].length && baseline[ac].every((ref) => typeof ref === "string" && TEST_REF.test(ref)))
+    isNormativeCriterion(ac, acceptanceCriteria)
+      || (Array.isArray(baseline[ac]) && baseline[ac].length > 0 && Object.keys(baseline[ac]).length === baseline[ac].length && baseline[ac].every((ref) => isValidTestRef(ref)))
   ));
 }
 
@@ -851,25 +943,23 @@ function normalizeGateOrigins(task) {
   for (const gate of GATES) if (task.gates[gate] !== "FAIL") task.gate_origins[gate] = "";
 }
 
-function ensureRevisionBaseline(task, { derive = false } = {}) {
-  if (task.phase !== "RED_REVISION" || !isObject(task.red) || !derive) return;
-  if (!hasValidRevisionBaseline(task)) {
-    task.red.revision_baseline_tests = revisionBaselineFromMatrix(task);
-  }
+function ensureRevisionBaseline(task, { derive = false, acceptanceCriteria = [] } = {}) {
+  if (task.phase !== "RED_REVISION" || !isObject(task.red) || !derive || hasOwn(task.red, "revision_baseline_tests")) return;
+  task.red.revision_baseline_tests = revisionBaselineFromMatrix(task, acceptanceCriteria);
 }
 
-function normalizeTask22(task) {
+function normalizeTask22(task, acceptanceCriteria = [], { deriveBaseline = true } = {}) {
   if (task.phase === "READY") task.phase = "REVIEW";
   const wasRevision = task.phase === "RED_REVISION";
-  ensureRevisionBaseline(task, { derive: true });
-  if (wasRevision) resetRedRevisionProof(task, true);
+  ensureRevisionBaseline(task, { derive: deriveBaseline, acceptanceCriteria });
+  if (wasRevision) resetRedRevisionProof(task, true, acceptanceCriteria);
   normalizeReviewProof(task, { preserveRevisionPhase: wasRevision });
-  if (wasRevision && task.phase === "RED_REVISION") resetRedRevisionProof(task, true);
+  if (wasRevision && task.phase === "RED_REVISION") resetRedRevisionProof(task, true, acceptanceCriteria);
   normalizeGateOrigins(task);
   markTaskBlockedAtRetryCap(task);
 }
 
-function initializeTask21(task, errors) {
+function initializeTask21(task, errors, acceptanceCriteria = []) {
   if (!isObject(task)) return;
   if (task.phase === "READY") task.phase = "REVIEW";
   if (!hasOwn(task, "attempt")) task.attempt = 0;
@@ -877,6 +967,7 @@ function initializeTask21(task, errors) {
   if (!hasOwn(task, "reviewed_by")) task.reviewed_by = "";
   if (!hasOwn(task, "doc_impact")) task.doc_impact = "none";
   if (!hasOwn(task, "review")) task.review = { status: "PENDING", agent: "", independent: false, revision: "", evidence: "" };
+  const revisionBaselineMissing = !isObject(task.red) || !hasOwn(task.red, "revision_baseline_tests");
   if (!hasOwn(task, "red")) {
     task.red = {
       status: "PENDING",
@@ -894,6 +985,7 @@ function initializeTask21(task, errors) {
   if (typeof task.red?.criteria_to_tests === "string") parseLegacyCriteriaMatrix(task, errors);
   if (isObject(task.red)) {
     if (!hasOwn(task.red, "revision_delta")) task.red.revision_delta = { ac: "", test: "", evidence: "" };
+    if (revisionBaselineMissing) ensureRevisionBaseline(task, { derive: true, acceptanceCriteria });
     if (!hasOwn(task.red, "revision_baseline_tests")) task.red.revision_baseline_tests = {};
   }
   if (isObject(task.green)) {
@@ -908,15 +1000,14 @@ function initializeTask21(task, errors) {
       }
     }
   }
-  if (!hasOwn(task.gate_origins) && isObject(task.gates)) task.gate_origins = Object.fromEntries(GATES.map((gate) => [gate, ""]));
-  if (!hasOwn(task.gate_evidence) && isObject(task.gates)) task.gate_evidence = Object.fromEntries(GATES.map((gate) => [gate, ""]));
+  if (!hasOwn(task, "gate_origins") && isObject(task.gates)) task.gate_origins = Object.fromEntries(GATES.map((gate) => [gate, ""]));
+  if (!hasOwn(task, "gate_evidence") && isObject(task.gates)) task.gate_evidence = Object.fromEntries(GATES.map((gate) => [gate, ""]));
   if (isObject(task.gate_origins)) for (const gate of GATES) if (!hasOwn(task.gate_origins, gate)) task.gate_origins[gate] = "";
   if (isObject(task.gate_evidence)) for (const gate of GATES) if (!hasOwn(task.gate_evidence, gate)) task.gate_evidence[gate] = "";
   const wasRevision = task.phase === "RED_REVISION";
-  ensureRevisionBaseline(task, { derive: true });
-  if (wasRevision) resetRedRevisionProof(task, true);
+  if (wasRevision) resetRedRevisionProof(task, true, acceptanceCriteria);
   if (isObject(task.review)) normalizeReviewProof(task, { preserveRevisionPhase: wasRevision });
-  if (wasRevision && task.phase === "RED_REVISION") resetRedRevisionProof(task, true);
+  if (wasRevision && task.phase === "RED_REVISION") resetRedRevisionProof(task, true, acceptanceCriteria);
   normalizeGateOrigins(task);
   markTaskBlockedAtRetryCap(task);
 }
@@ -964,11 +1055,23 @@ export function migrateProgress(input) {
   }
   const errors = [];
   const legacySchema = value.schema_version === "2.1";
+  const legacy22Schema = value.schema_version === "2.2";
+  const legacyWaveProof = ["2.1", "2.2"].includes(value.schema_version);
   const waves = Array.isArray(value.waves) ? value.waves : [];
+  if (value.schema_version === "2.3") {
+    const validation = validateProgress(value);
+    if (validation.ok) return result(true, value, []);
+    try {
+      validation.errors.push(...collectDiagnostics(input));
+    } catch (error) {
+      validation.errors.push(`progress diagnostics failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return result(false, undefined, validation.errors);
+  }
   try {
     if (value.schema_version === "2.1") {
       migrateAliases(value, errors);
-      value.schema_version = "2.2";
+      value.schema_version = "2.3";
       if (isObject(value.baseline)) normalizeBaseline(value);
       for (const wave of waves) {
         if (!isObject(wave)) continue;
@@ -985,11 +1088,12 @@ export function migrateProgress(input) {
         if (isObject(wave.integration) && !hasOwn(wave.integration, "attempt")) wave.integration.attempt = 0;
         for (const task of tasks) {
           if (!isObject(task)) continue;
-          initializeTask21(task, errors);
+          initializeTask21(task, errors, Array.isArray(value.acceptance_criteria) ? value.acceptance_criteria : []);
           if (legacyBlockedWave) markTaskBlocked(task, "legacy wave BLOCKED");
         }
       }
     } else if (value.schema_version === "2.2") {
+      value.schema_version = "2.3";
       normalizeBaseline(value);
       for (const wave of waves) {
         if (!isObject(wave)) continue;
@@ -998,15 +1102,20 @@ export function migrateProgress(input) {
         const tasks = Array.isArray(wave.tasks) ? wave.tasks : [];
         for (const task of tasks) {
           if (!isObject(task)) continue;
-          normalizeTask22(task);
+          normalizeTask22(task, Array.isArray(value.acceptance_criteria) ? value.acceptance_criteria : [], { deriveBaseline: legacy22Schema });
         }
       }
     } else {
-      errors.push("progress.schema_version: only 2.1 migration or 2.2 validation is supported");
+      errors.push("progress.schema_version: only 2.1/2.2 migration or 2.3 validation is supported");
     }
     for (const wave of waves) {
       if (!isObject(wave)) continue;
       const tasks = Array.isArray(wave.tasks) ? wave.tasks : [];
+      if (legacyWaveProof && wave.status === "completed" && (!hasOwn(wave, "review") || !hasOwn(wave, "validation"))) {
+        // Historical completion cannot prove gates that were not durable in 2.1/2.2.
+        // Keep every existing artifact and successful integration, but require promotion again.
+        wave.status = "integrating";
+      }
       reopenWaveAfterTaskNormalization(wave, tasks);
       markTasksBlockedAtIntegrationCap(wave, tasks);
     }
@@ -1143,27 +1252,8 @@ function validateApprovedReview(review, tasks, errors) {
   if (implementers.has(review.agent)) errors.push("wave.review: reviewer must be independent from implementers");
 }
 
-export function canPromoteWave(wave) {
-  const errors = [];
-  if (!isObject(wave)) return result(false, undefined, ["wave must be an object"]);
-  if (!WAVE_STATUSES.has(wave.status)) errors.push("wave.status: invalid enum");
-  if (!Number.isInteger(wave.wave) || wave.wave < 1) errors.push("wave.wave: positive integer required");
-  if (wave.status !== "integrating") errors.push("wave.status: promotion requires integrating");
-  if (!checkKeys(wave, ["wave", "status", "integration", "tasks", "review", "validation"], "wave", errors)) return result(false, undefined, errors);
-  if (!Array.isArray(wave.tasks) || wave.tasks.length === 0) errors.push("wave.tasks: at least one task required");
-  if (!isObject(wave.integration)) errors.push("wave.integration: required");
-  else {
-    if (wave.integration.status !== "PASS") errors.push(`wave.integration: promotion requires PASS, got ${wave.integration.status ?? "missing"}`);
-    if (!Number.isInteger(wave.integration.attempt) || wave.integration.attempt < 1 || wave.integration.attempt > 3) errors.push("wave.integration.attempt: successful integration attempt required");
-    if (!nonEmptyString(wave.integration.evidence)) errors.push("wave.integration.evidence: integration evidence required");
-  }
-  if (Array.isArray(wave.tasks)) for (const [index, task] of wave.tasks.entries()) {
-    if (!isObject(task)) { errors.push(`wave.tasks[${index}]: task must be object`); continue; }
-    validateTask(task, `wave.tasks[${index}]`, errors);
-    if (task.phase !== "DONE") errors.push(`wave.tasks[${index}]: task must be DONE before promotion`);
-    if (!hasGateEvidence(task.gate_evidence)) errors.push(`wave.tasks[${index}]: gate evidence required`);
-  }
-  validateApprovedReview(wave.review, Array.isArray(wave.tasks) ? wave.tasks : [], errors);
+function validateWaveValidation(validation, errors) {
+  const wave = { validation };
   if (!isObject(wave.validation)) errors.push("wave.validation: consolidated validator report required");
   else {
     checkKeys(wave.validation, ["status", "agent", "suite", "gates", "evidence"], "wave.validation", errors);
@@ -1179,6 +1269,48 @@ export function canPromoteWave(wave) {
     errors.push(...reportResult.errors.map((message) => `wave.validation: ${message}`));
     if (isObject(wave.validation.gates) && GATES.some((gate) => !COMPLETED_GATE_STATUSES.has(wave.validation.gates[gate]?.status))) errors.push("wave.validation.gates: every gate must PASS or justified NA");
   }
+}
+
+export function canPromoteWave(wave, options = {}) {
+  const { acceptanceCriteria = [] } = options;
+  const errors = [];
+  validateCriterionTypes(acceptanceCriteria, errors);
+  if (errors.length) return result(false, undefined, errors);
+  if (!isObject(wave)) return result(false, undefined, ["wave must be an object"]);
+  if (!WAVE_STATUSES.has(wave.status)) errors.push("wave.status: invalid enum");
+  if (!Number.isInteger(wave.wave) || wave.wave < 1) errors.push("wave.wave: positive integer required");
+  if (wave.status !== "integrating") errors.push("wave.status: promotion requires integrating");
+  if (!checkKeys(wave, ["wave", "status", "integration", "tasks", "review", "validation"], "wave", errors)) return result(false, undefined, errors);
+  if (!Array.isArray(wave.tasks) || wave.tasks.length === 0) errors.push("wave.tasks: at least one task required");
+  if (Array.isArray(wave.tasks)) validateUniqueStateIdentity([wave], errors, "wave");
+  if (!isObject(wave.integration)) errors.push("wave.integration: required");
+  else {
+    if (wave.integration.status !== "PASS") errors.push(`wave.integration: promotion requires PASS, got ${wave.integration.status ?? "missing"}`);
+    if (!Number.isInteger(wave.integration.attempt) || wave.integration.attempt < 1 || wave.integration.attempt > 3) errors.push("wave.integration.attempt: successful integration attempt required");
+    if (!nonEmptyString(wave.integration.evidence)) errors.push("wave.integration.evidence: integration evidence required");
+  }
+  if (Array.isArray(wave.tasks)) for (const [index, task] of wave.tasks.entries()) {
+    if (!isObject(task)) { errors.push(`wave.tasks[${index}]: task must be object`); continue; }
+    validateTask(task, `wave.tasks[${index}]`, errors, { acceptanceCriteria });
+    if (task.phase !== "DONE") errors.push(`wave.tasks[${index}]: task must be DONE before promotion`);
+    if (!hasGateEvidence(task.gate_evidence)) errors.push(`wave.tasks[${index}]: gate evidence required`);
+  }
+  if (hasOwn(options, "acceptanceCriteria") && Array.isArray(wave.tasks)) {
+    const criteriaById = new Map(acceptanceCriteria.map((criterion) => [criterion.id, criterion]));
+    validateDoneAcceptanceLinks([wave], criteriaById, errors);
+    const tasksById = indexTasksById([wave]);
+    for (const criterion of acceptanceCriteria) {
+      if (!Array.isArray(criterion.tasks)) continue; // Required links are checked above.
+      for (const taskId of criterion.tasks) {
+        const task = tasksById.get(taskId);
+        if (task && (!Array.isArray(task.acceptance_criteria) || !task.acceptance_criteria.includes(criterion.id))) {
+          errors.push(`wave.acceptanceCriteria.${criterion.id}: task ${taskId} is not linked back to criterion`);
+        }
+      }
+    }
+  }
+  validateApprovedReview(wave.review, Array.isArray(wave.tasks) ? wave.tasks : [], errors);
+  validateWaveValidation(wave.validation, errors);
   return result(errors.length === 0, errors.length === 0 ? clone(wave) : undefined, errors);
 }
 

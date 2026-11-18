@@ -1,0 +1,958 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "GOAL47_PREPUBLICATION_GOVERNANCE_EVIDENCE",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "task": "T-013A",
+  "criterion": "AC-001",
+  "criterion_type": "normative",
+  "artifact_scope_status": "CONCLUIDO",
+  "readiness": "PARTIAL_NOT_AUTHORIZED_FOR_PUBLICATION",
+  "task_complete": false,
+  "criterion_complete": false,
+  "gate_promotion": false,
+  "publication_performed_by_this_assignment": false,
+  "evidence_cutoff": {
+    "latest_retained_event_at": "2026-11-16T22:13:08.086Z",
+    "meaning": "Latest inspected official progress timestamp, not a live GitHub refresh. Current Source157 proof precedes it by milliseconds; Native14 completed PENDING, and Native15 has not launched. Historical observations retain their original scope and timestamps.",
+    "sources": ["progress", "native15_source157", "native14_integrated", "contract07_documents", "native15_privacy"],
+    "approximate_source_age_anchor": "2026-11-15T19:09:50.234Z",
+    "source_age_note": "Previously recorded approximate source ages remain historical estimates at their earlier checkpoints, not recalculated ages at the updated cutoff. Each source's actual retained timestamp governs freshness."
+  },
+  "evidence_policy": {
+    "repository_paths": "Paths without a URI scheme are repository-relative. The artifact itself is intended for version control; .omp/ and .git/ references remain private local proof references, not published attachments.",
+    "hashes": "Hashes are copied from the explicitly cited retained observations; none was recomputed in this assignment. A missing source-file hash is not replaced with a guessed digest. References and source ages remain explicit.",
+    "freshness": "A retained observation proves only its recorded scope and revision. Historical GitHub settings, suite runs, approvals and byte comparisons are not fresh terminal evidence.",
+    "privacy": "No credential values, raw transcripts, authentication files, local user data or absolute private home paths are embedded.",
+    "activity": "Read-only inspection followed by editing this single JSON artifact; no commands, network, tests, build, lint, type-check, Git mutation, Native/model calls, installation or publication."
+  },
+  "sources": {
+    "assignment": {
+      "reference": "Current Goal47GovernanceEvidenceRefresh assignment",
+      "recorded_at": null,
+      "age": "Current delegated evidence refresh; historical recovery, dirty-baseline and remote observations remain scoped to their original receipts.",
+      "authority": "Assignment supplies current 12/22 DONE, 19 green-resolved and 18 review-registered checkpoint counts; only official progress.json is state authority, never this public artifact."
+    },
+    "intake_chronology": {
+      "path": ".omp/state/release-47/proofs/resumed-intake-chronology-recovered.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "16 recovered events, original artifact SHA-256 bindings, source session and source item references",
+      "recorded_at": "2026-11-15T20:00:50.260Z",
+      "age": "Historical 10-11 November events authentically recovered on 15 November, approximately three minutes before updated cutoff; no historical command was reexecuted."
+    },
+    "issue_creation_primary": {
+      "path": ".omp/state/release-47/proofs/resumed-issue47-created-primary.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "Parent's actual issue read and server-created timestamp",
+      "recorded_at": "2026-11-15T19:55:06.109Z",
+      "age": "Approximately eight minutes before updated cutoff; independently observed issue metadata, not an inferred rename chronology."
+    },
+    "recovered_initial_approval": {
+      "path": ".omp/state/release-47/proofs/recovered-ship-user-approval.json",
+      "visibility": "PRIVATE_LOCAL",
+      "original_reference": "local://ship-user-approval.json in historical source session",
+      "original_artifact_sha256": "9ef536d73d4584fe81329f9d034ca61e2ab2844a384dde99c0f45e747506c35f",
+      "original_artifact_bytes": 1579,
+      "binding_source": ".omp/state/release-47/proofs/resumed-intake-chronology-recovered.json",
+      "recorded_at": "2026-11-10T12:43:54.375Z",
+      "recovered_at": "2026-11-15T20:00:50.260Z",
+      "age": "Historical persisted approval, approximately five days old; authentic local copy recovered, not a new user decision."
+    },
+    "recovered_intake": {
+      "path": ".omp/state/release-47/proofs/recovered-ship-intake.json",
+      "visibility": "PRIVATE_LOCAL",
+      "original_reference": "local://ship-intake.json in historical source session",
+      "original_artifact_sha256": "68e25bd119d20ebb62f5fa154f11161045f5e338b1f8f01ad605e8ede8cb131e",
+      "original_artifact_bytes": 490,
+      "binding_source": ".omp/state/release-47/proofs/resumed-intake-chronology-recovered.json",
+      "recorded_at": "2026-11-10T12:44:38.140Z",
+      "recovered_at": "2026-11-15T20:00:50.260Z",
+      "age": "Historical manual intake, approximately five days old; its timestamp is not substituted for the separately recovered command completion."
+    },
+    "recovered_branch_decision": {
+      "path": ".omp/state/release-47/proofs/recovered-ship-branch-user-decision.json",
+      "visibility": "PRIVATE_LOCAL",
+      "original_artifact_sha256": "a7e1a859943c7c3946747f063ea6418da7fbe2dffb7b7269118015383c0b126b",
+      "original_artifact_bytes": 393,
+      "binding_source": ".omp/state/release-47/proofs/resumed-intake-chronology-recovered.json",
+      "recorded_at": "2026-11-10T12:45:58.693Z",
+      "recovered_at": "2026-11-15T20:00:50.260Z",
+      "age": "Historical persisted branch preference after an intermediate restoration attempt; approximately five days old."
+    },
+    "recovered_wire_approval": {
+      "path": ".omp/state/release-47/proofs/recovered-ship-peer-wire-approval.json",
+      "visibility": "PRIVATE_LOCAL",
+      "original_artifact_sha256": "e640265fcc894d050c69062840d5e39652f8b14cf925a3e945f37de275f11ecd",
+      "original_artifact_bytes": 468,
+      "binding_source": ".omp/state/release-47/proofs/resumed-intake-chronology-recovered.json",
+      "recorded_at": "2026-11-11T11:42:15.192Z",
+      "recovered_at": "2026-11-15T20:00:50.260Z",
+      "age": "Historical bounded clean-cutover decision, approximately four days old; human answer preceded persistence."
+    },
+    "diagnostic_privacy_review": {
+      "path": ".omp/state/release-47/proofs/resumed-root-diagnostic-review-blocked.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:57:14.663Z",
+      "source_sha256": "9e75d142738235dc17126f0708ad7f7ca4945a31170b5101e69685c1166605ff",
+      "age": "Approximately six minutes before updated cutoff; independent BLOCKED review of diagnostic-only predecessor, retained rather than overwritten."
+    },
+    "diagnostic_privacy_green": {
+      "path": ".omp/state/release-47/proofs/resumed-root-path-green.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:59:39.486Z",
+      "source_sha256": "d66cd08d6cdd30d81901dfcd38d819266b88658baed8ce48a0a143eca7ee2894",
+      "age": "Approximately four minutes before updated cutoff; seven source-only cases, not Native or independent approval."
+    },
+    "ready_gates_manifest": {
+      "path": ".omp/state/release-47/proofs/resumed-ready-gates-manifest.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:54:06.390Z",
+      "revision": "3cc9c3b5874a400ca4a591e4006130377300a1630a0591f8ab20c71090f5aaa7",
+      "source_sha256": "9e75d142738235dc17126f0708ad7f7ca4945a31170b5101e69685c1166605ff",
+      "age": "Approximately nine minutes before updated cutoff; ready-gate snapshot of 17 peer-approved tasks, explicitly excluding T-011/T-012A/B/T-013A/B promotion."
+    },
+    "validator_dependency_recovery": {
+      "path": ".omp/state/release-47/proofs/resumed-validator-dependency-reuse.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T20:03:36.349Z",
+      "reference": "Owned temporary dependency junction; exact retained lock identity; initial validator tooling errors",
+      "age": "Latest inspected retained timestamp; recovery prerequisite only, not a completed suite or validator verdict."
+    },
+    "spec": {
+      "path": "specs/specs005-omp-compatible-release/spec.md",
+      "reference": "AC-001; baseline identity and external delivery sections",
+      "binding_source": ".omp/state/release-47/proofs/resumed-canonical-doc-review-approved.json",
+      "sha256": "93a825dcc9d1da486cd34944b54e894562db8e5ce09b7c90a04b0771c8bfc382",
+      "recorded_at": "2026-11-15T19:09:36.761Z",
+      "age": "Historical canonical-document binding; superseded for current document identity by contract07_documents, not overwritten."
+    },
+    "tasks": {
+      "path": "specs/specs005-omp-compatible-release/tasks.md",
+      "reference": "P-004, T-013A, T-013B",
+      "binding_source": ".omp/state/release-47/proofs/resumed-canonical-doc-review-approved.json",
+      "sha256": "8bed50045a67cc102552ab9dfc8a9cc0783fd91f0cc52ead7bc7bdf57d73c20e",
+      "recorded_at": "2026-11-15T19:09:36.761Z",
+      "age": "Historical canonical-document binding; current contract 0.7 document cohort is separately cited."
+    },
+    "plan": {
+      "path": "specs/specs005-omp-compatible-release/plan.md",
+      "reference": "T-013A dependencies and write boundary",
+      "binding_source": ".omp/state/release-47/proofs/resumed-canonical-doc-review-approved.json",
+      "sha256": "6ded9fcff7c2c986a985f4dfd6475c45927c2a76d0ab6fef5251d930ffbaa02f",
+      "recorded_at": "2026-11-15T19:09:36.761Z",
+      "age": "Historical canonical-document binding; current contract 0.7 document cohort is separately cited."
+    },
+    "progress": {
+      "path": ".omp/state/tdd/progress.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "repo, baseline, contract, AC-001, T-013A",
+      "recorded_at": "2026-11-16T22:13:08.086Z",
+      "age": "Inspected official mutable state; sole task/gate authority. No state written or live counters published by this assignment."
+    },
+    "initial_approval": {
+      "path": ".omp/state/tdd/approval.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "decision, answers, planFiles, baselineOverride, permissions, limitations",
+      "recorded_at": "2026-11-10T12:43:54.375Z",
+      "age": "Historical initial approval, approximately five days before cutoff; explicitly contract 0.1.0, not a new approval of all later bytes."
+    },
+    "alignment": {
+      "path": ".git/ship-alignment.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "CLOSED fully-specified-fast-close; separate plan approval boundary",
+      "request_digest": "sha256:63ab1b43c6241c1e5d86471766760e35e347570c051262175f59acebc1c1e82a",
+      "recorded_at": null,
+      "age": "Historical intake record without an embedded timestamp."
+    },
+    "intake_note": {
+      "path": ".git/ship-issue-47.md",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "Accepted scope, baseline caveat, manual intake and preserved branch",
+      "recorded_at": null,
+      "age": "Historical local intake description without an embedded timestamp; not a GitHub mutation receipt."
+    },
+    "github_history": {
+      "path": ".omp/state/release-47/proofs/ci-engine-github-validation.md",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "GitHub real observations and bounded verdict, lines 19-45",
+      "recorded_at": null,
+      "age": "Historical retained read-only observation; directory listing reports approximately one day old, exact observation timestamp absent."
+    },
+    "github_prerequisites": {
+      "path": ".omp/state/release-47/proofs/resumed-delivery-prerequisites.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T15:32:35.038Z",
+      "age": "Approximately 3 hours 37 minutes before evidence cutoff; no live refresh here."
+    },
+    "github_enforcement": {
+      "path": ".omp/state/release-47/proofs/resumed-main-delivery-enforcement.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T15:34:25.246Z",
+      "age": "Approximately 3 hours 35 minutes before evidence cutoff; no live refresh here."
+    },
+    "platform_suite": {
+      "path": "implementation-evidence/release-governance/final-platform-suite-summary.json",
+      "reference": "counts, report_bindings, scope_limits",
+      "tested_source_revision": "2421a87c3e2a8b3d52a34133eecad4fc70e895e8234e6bf49d4665c8ba3aa9ec",
+      "recorded_at": null,
+      "age": "Historical 2026-11-14 platform runs retained in a ledger approximately 23 hours old; not a final run of the current candidate."
+    },
+    "byte_scope": {
+      "path": ".omp/state/release-47/proofs/resumed-recovered-unit-byte-equivalence.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T17:39:20.001Z",
+      "age": "Approximately 90 minutes before cutoff; comparison of an earlier recovered snapshot, not a new test run."
+    },
+    "candidate": {
+      "path": ".omp/state/release-47/proofs/native-additional-final-candidate.json",
+      "visibility": "PRIVATE_LOCAL",
+      "reference": "Frozen root, revision and per-path SHA-256 inventory",
+      "revision": "26ef0fa2c8cf234a96bf210f1649b18775218727e487cacabfb2aa47985e6222",
+      "recorded_at": "2026-11-15T19:02:06.312Z",
+      "age": "Approximately eight minutes before cutoff; frozen candidate precedes this new governance artifact."
+    },
+    "source_preflight": {
+      "path": ".omp/state/release-47/proofs/resumed-accepted-source-preflight.json",
+      "visibility": "PRIVATE_LOCAL",
+      "source_sha256": "80921469f9c0041ed16e0454c598ee1d53af528ca20cdc69b3ef5659cc6186d0",
+      "recorded_at": "2026-11-15T19:01:00.825Z",
+      "age": "Approximately nine minutes before cutoff; source-only non-Native preflight."
+    },
+    "component_review": {
+      "path": ".omp/state/release-47/proofs/resumed-accepted-terminal-review-approved.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:05:24.487Z",
+      "age": "Approximately four minutes before cutoff; bounded independent source-component review."
+    },
+    "canonical_review": {
+      "path": ".omp/state/release-47/proofs/resumed-canonical-doc-review-approved.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:09:36.761Z",
+      "age": "Immediately before cutoff; bounded independent documentation review."
+    },
+    "native_authorization": {
+      "path": ".omp/state/release-47/proofs/native-additional-window-approval.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T18:00:30.382Z",
+      "reserved_at": "2026-11-15T19:09:50.220Z",
+      "age": "Separate additional window authorized approximately 69 minutes before cutoff; reservation at cutoff."
+    },
+    "native_launch": {
+      "path": ".omp/state/release-47/proofs/native-additional-attempt1-launch.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T19:05:51.080Z",
+      "invocation_requested_at": "2026-11-15T19:09:50.234Z",
+      "completion_recorded_at": "2026-11-15T19:14:22.096Z",
+      "age": "Completed blocked evaluation, updated by Main and read at the latest evidence cutoff; not a Native PASS."
+    },
+    "original_audit_receipts": {
+      "visibility": "PRIVATE_LOCAL",
+      "source_session": "01a1c52c-57aa-7533-ba19-90c694eb489f",
+      "references": [
+        {"original_reference": "local://audit-manifest.json", "recorded_at": "2026-11-10T11:17:02.749Z", "reference": "Original per-path size/hash manifest; .git explicitly excluded"},
+        {"original_reference": "local://audit-git-preservation-before.json", "recorded_at": "2026-11-10T11:24:46.028Z", "reference": "Supplementary hashes of four Git metadata files, not backup bytes"},
+        {"original_reference": "local://audit-preservation.json", "recorded_at": "2026-11-10T11:44:34.363Z", "reference": "191 before/after; no changed, added or missing paths; four metadata hashes equal"},
+        {"original_reference": "local://ship-current-snapshot.json", "recorded_at": "2026-11-10T12:02:01.904Z", "reference": "191 paths, changedSinceAudit empty, currentSameBytes true"}
+      ],
+      "age": "Authentic historical receipts read from the retained original session's local artifact directory; not a reexecution or a claim that its later snapshot directory still has original bytes."
+    },
+    "original191_recovery": {
+      "path": ".omp/state/release-47/proofs/resumed-original191-recovery-assessment.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T21:16:46.586Z",
+      "reference": "Parent's actual retained-byte comparison against original per-path cryptographic identities, including exact-hash-verified newline variants; 187/191 recoverable, four unmatched",
+      "age": "Historical 187/191 checkpoint, superseded by the 191/191 reconstructed byte-exact backup receipt; never proof of permanent loss."
+    },
+    "original191_intermediate_recoveries": {
+      "visibility": "PRIVATE_LOCAL",
+      "references": [
+        {"path": ".omp/state/release-47/proofs/resumed-original-state-blob-recovery.json", "recorded_at": "2026-11-15T21:24:40.560Z", "recovered_total": 188, "reference": "Exact original state.mjs size/hash from retained Git blob and checksum-verified mixed newline pattern"},
+        {"path": ".omp/state/release-47/proofs/resumed-original-test-blob-recovery.json", "recorded_at": "2026-11-15T21:25:39.375Z", "recovered_total_parent_reported": 189, "reference": "Exact original ship-quality-cli.test.mjs size/hash from retained Git blob and checksum-verified mixed newline pattern"}
+      ],
+      "status": "HISTORICAL_CHECKPOINTS_SUPERSEDED_BY_191_OF_191"
+    },
+    "original191_recovered_exact": {
+      "path": ".omp/state/release-47/proofs/resumed-original191-recovered-exact.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T21:27:08.923Z",
+      "reference": "Parent independently compared every reconstructed file's size/SHA-256 to the authentic original 191-file manifest; all 191 match",
+      "status": "PASS_ALL_191_ORIGINAL_MANIFEST_BYTE_HASHES",
+      "age": "Historical completed recovery: materialized reconstructed byte-exact original backup, not an untouched initial directory or .git backup."
+    },
+    "native_unlimited_authorization": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-window-approval.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T21:15:18.012Z",
+      "reference": "Explicit operational authorization for unlimited Native evaluations until this Goal completes; inspected receipt records 14 spent",
+      "age": "Current operational permission, separate from historical spent/cancelled windows and from terminal release authorization."
+    },
+    "native_unlimited_launch": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-attempt1-launch.json",
+      "visibility": "PRIVATE_LOCAL",
+      "recorded_at": "2026-11-15T21:15:38.731Z",
+      "source_sha256": "d66cd08d6cdd30d81901dfcd38d819266b88658baed8ce48a0a143eca7ee2894",
+      "reference": "Retained completion receipt status COMPLETED_BLOCKED: Native27240c55 exited 2 after 77.61 seconds; rejected non-project URI remains UNRETAINED.",
+      "age": "Completed failed Native observation, not Native PASS; receipt is authoritative rather than a parent-only report."
+    },
+    "package": {
+      "path": "package.json",
+      "reference": "version, engines, scripts",
+      "sha256": "bfa353a50aaa76ad91ec90e7a98450a471bd7c6b6270ddaceadec9e6f084c334",
+      "binding_source": ".omp/state/release-47/proofs/current-toolchain-peer-review.md",
+      "recorded_at": null,
+      "age": "Current content read directly; hash is a retained historical binding, not recomputed here."
+    },
+    "manifest": {
+      "path": ".release-please-manifest.json",
+      "sha256": "bf552f5fcca167b801c26f9eadf7240ae32bcc01f57d76136ca462dacb325b0b",
+      "binding_source": ".omp/state/release-47/proofs/resumed-delivery-prerequisites.json",
+      "recorded_at": "2026-11-15T15:32:35.038Z",
+      "age": "Retained hash approximately 3 hours 37 minutes old; current version content also read directly."
+    },
+    "ship_config": {
+      "path": "ship.config.json",
+      "reference": "buildCommand, stopCommand, startCommand and versionCheckUrl are null",
+      "recorded_at": null,
+      "age": "Current content read directly; no command executed and no hash calculated."
+    },
+    "contract07_documents": {
+      "path": ".omp/state/release-47/proofs/contract-0-7-written-seven-docs.json",
+      "review_path": ".omp/state/release-47/proofs/contract-0-7-doc-peer-approved.json",
+      "recorded_at": "2026-11-16T19:09:25.616Z",
+      "bundle_sha256": "79c5ac2640a0963c68f3bed59531ec410d915d67656855590b445ce7e20fc65c",
+      "scope": "Seven normative documents independently APROVADO; no implementation, Native or Goal completion."
+    },
+    "native14_reader_source157": {
+      "path": ".omp/state/release-47/proofs/native14-reader-green157.json",
+      "recorded_at": "2026-11-16T21:50:48.826Z",
+      "scope": "Historical d32ef9/fe22ee/9d3bd7 Source157 PASS; superseded by native15_source157, never Native PASS."
+    },
+    "native15_source157": {
+      "path": ".omp/state/release-47/proofs/native15-completion-and-tag-green157.json",
+      "recorded_at": "2026-11-16T22:13:08.080Z",
+      "scope": "Current 157 source-only PASS; no Native15 launch."
+    },
+    "native15_reader_objection": {
+      "path": ".omp/state/release-47/proofs/native15-reader-peer-blocked.json",
+      "recorded_at": "2026-11-16T22:10:09.231Z",
+      "scope": "Independent BLOQUEADO on d32ef9/fe22ee predecessor; two prompt findings addressed in current source, independent recheck active and not adjudicated here."
+    },
+    "native15_privacy": {
+      "path": ".omp/state/release-47/proofs/native15-package-privacy-independent-assessment.json",
+      "recorded_at": "2026-11-16T22:05:24.717Z",
+      "scope": "Bounded independent static assessment; no new P0/P1, no universal secrets or current whole-Native approval."
+    },
+    "native15_replay_hygiene": {
+      "path": ".omp/state/release-47/proofs/native15-explicit-replay-input-hygiene.json",
+      "recorded_at": "2026-11-16T21:57:44.303Z",
+      "scope": "Personal absolute replay defaults removed; explicit immutable historical inputs remain required. Source-only replay is not hermetic Native."
+    },
+    "contract07_qa": {
+      "path": ".omp/state/release-47/proofs/contract07-authority-final-full-qa-actual.json",
+      "recorded_at": "2026-11-16T20:18:20.646Z",
+      "scope": "Actual Windows/Linux 1250-case suites of older 875908 cohort, not current whole-Native/CI/release."
+    },
+    "native14_integrated": {
+      "path": ".omp/state/release-47/proofs/native-unlimited-attempt14-integrated-launch.json",
+      "recorded_at": "2026-11-16T20:37:32.750Z",
+      "scope": "Launch timestamp; retained completion COMPLETED_PENDING_NATIVE, exit 2, 1232.50 seconds. Embedded running job field is historical, not current activity."
+    },
+    "contract07_security": {
+      "path": ".omp/state/release-47/proofs/contract07-current-security-binding-composition.json",
+      "recorded_at": "2026-11-16T20:52:22.469Z",
+      "scope": "Exact scoped static/dependency/known-format reuse at manifest 249d747; its running-Native14 statement is superseded by completed receipt, not global AC019 approval."
+    },
+    "tdd_automatic_authorization": {
+      "path": ".omp/state/release-47/proofs/tdd-automatic-three-attempt-window-approval.json",
+      "recorded_at": "2026-11-15T23:44:07.190Z",
+      "scope": "Automatic renewal in windows of maximum three reentries with archived history, tests and independent review; no gate waiver or publication/terminal-release authorization."
+    }
+  },
+  "repository_identity": {
+    "url": "https://github.com/rronqui/UsefulSkills",
+    "default_branch": "main",
+    "active_branch": "feat/47-omp-compatible-release",
+    "current_git_head": "02582a867f660bf8aa387fe51f71b7fffd3a7dfd",
+    "delivery": "external",
+    "merge_target": "main",
+    "sources": ["assignment", "github_prerequisites", "progress"],
+    "git_head_is_not_working_tree_digest": true,
+    "frozen_candidate_revision": "26ef0fa2c8cf234a96bf210f1649b18775218727e487cacabfb2aa47985e6222",
+    "frozen_candidate_source": "candidate",
+    "new_artifact_outside_frozen_candidate": true,
+    "ready_gate_snapshot_revision": "3cc9c3b5874a400ca4a591e4006130377300a1630a0591f8ab20c71090f5aaa7",
+    "ready_gate_snapshot_source": "ready_gates_manifest",
+    "later_diagnostic_source_sha256": "d66cd08d6cdd30d81901dfcd38d819266b88658baed8ce48a0a143eca7ee2894",
+    "revision_limit": "All frozen/reviewed revisions and 225-entry/17-task observations above are historical scopes, not the current candidate identity. Current source hashes and contract07 document bundle are separately bound below. Final intended inventory must include this governance artifact and every subsequent intended delta; exclusion from an older validator scope is not a gate waiver."
+  },
+  "baseline_and_preservation": {
+    "historical_audit": {
+      "head": "02582a867f660bf8aa387fe51f71b7fffd3a7dfd",
+      "historical_branch": "feat/quality-evolution",
+      "audit_digest": "3f5d0ad989f1eaf2367e7f543d411b907bda83c572e8cd6b6c6b185dd460c990",
+      "files": 191,
+      "status": "FAIL",
+      "selected_suite_passed": 988,
+      "selected_suite_failed": 14,
+      "not_executed": 44,
+      "full_suite": false,
+      "excluded_suite": "ship/bin/ship.test.mjs",
+      "sources": ["spec", "progress", "intake_note", "original_audit_receipts", "original191_recovery", "original191_intermediate_recoveries", "original191_recovered_exact"],
+      "original_snapshot_reference": "local://ship-current-snapshot.json in historical source session",
+      "original_snapshot_availability": "AUTHENTIC_RECEIPTS_AND_RECONSTRUCTED_BYTE_EXACT_191_FILE_BACKUP_AVAILABLE",
+      "original_capture_at": "2026-11-10T11:17:02.749Z",
+      "preserved_through_receipt_at": "2026-11-10T12:02:01.904Z",
+      "availability_history": {
+        "previous_status": "UNAVAILABLE_IN_CURRENT_SESSION",
+        "previous_observation": "Earlier current-session glob and direct read did not resolve the historical local URI; digest and count were then retained declarations rather than reinspected original receipts.",
+        "status": "SUPERSEDED_BY_AUTHENTIC_RECEIPTS_AND_COMPLETE_BYTE_EXACT_RECONSTRUCTION",
+        "superseded_at": "2026-11-15T21:27:08.923Z",
+        "partial_recovery_checkpoint_at": "2026-11-15T21:16:46.586Z",
+        "partial_recovery_checkpoint_status": "AUTHENTIC_RECEIPTS_AND_187_OF_191_RECOVERABLE_THEN_SUPERSEDED",
+        "limit": "The earlier lookup failure and partial recovery remain factual history, not present evidence that original file bytes are absent, lost or still unmatched."
+      },
+      "original_snapshot_directory": {
+        "historical_preservation": "Original 191-path identity was retained through the 12:02 receipt; the initial snapshot directory later drifted and must not be treated as an immutable original backup.",
+        "historical_reconstructed_candidate_name": "usefulskills-original191-git-9058",
+        "historical_reconstruction_reference_parent_reported": "de645",
+        "historical_candidate_identity": "UsefulSkills reconstruction with two authentic original quality blobs, not the OMP upstream SDK.",
+        "historical_candidate_full191_byte_identity_proven": false,
+        "current_reconstructed_backup_name": "original191-hash-recovered-oXEAkR",
+        "current_root_reference": ".omp/state/release-47/proofs/resumed-original191-recovered-exact.json#root",
+        "current_backup_identity": "Materialized UsefulSkills reconstruction; every original file's byte size and SHA-256 matches the authentic 191-file manifest. It is not the untouched initial snapshot directory.",
+        "future_native_original_source": "Use the current exact-recovery proof's root, not the superseded original191-git-9058 candidate; Parent owns any future Native execution."
+      },
+      "historical_byte_recovery_assessment": {
+        "assessed_at": "2026-11-15T21:16:46.586Z",
+        "total": 191,
+        "recoverable": 187,
+        "unmatched": 4,
+        "method": "Actual retained-byte matches to original manifest hashes, including newline-only variants accepted only when transformed bytes match the expected original cryptographic identity. No source or old snapshot was modified; newline candidates were assessed, not written.",
+        "unmatched_paths": [
+          "scripts/quality-context-security.test.mjs",
+          "scripts/ship-quality-cli.test.mjs",
+          "scripts/state-evolution.test.mjs",
+          "tdd-orchestrator/lib/state.mjs"
+        ],
+        "complete_snapshot_recovered": false,
+        "search_exhausted": false,
+        "status": "SUPERSEDED_BY_COMPLETE_BYTE_EXACT_RECONSTRUCTION",
+        "limit": "Four paths were unmatched at this historical checkpoint, never proven absent or permanently lost. All four were subsequently recovered and verified in the complete 191/191 receipt."
+      },
+      "recovery_checkpoint_history": [
+        {"at": "2026-11-15T21:16:46.586Z", "recoverable": 187, "source": "original191_recovery", "status": "SUPERSEDED"},
+        {"at": "2026-11-15T21:24:40.560Z", "recovered": 188, "source": "original191_intermediate_recoveries", "status": "SUPERSEDED"},
+        {"at": "2026-11-15T21:25:39.375Z", "recovered_parent_reported": 189, "source": "original191_intermediate_recoveries", "status": "SUPERSEDED"},
+        {"at": "2026-11-15T21:27:08.923Z", "recovered": 191, "source": "original191_recovered_exact", "status": "CURRENT_EXACT_ORIGINAL_BYTES_BACKUP"}
+      ],
+      "byte_recovery_assessment": {
+        "assessed_at": "2026-11-15T21:27:08.923Z",
+        "status": "PASS_ALL_191_ORIGINAL_MANIFEST_BYTE_HASHES",
+        "original_capture_at": "2026-11-10T11:17:02.749Z",
+        "original_inventory_digest": "3f5d0ad989f1eaf2367e7f543d411b907bda83c572e8cd6b6c6b185dd460c990",
+        "total": 191,
+        "matched": 191,
+        "unmatched": 0,
+        "unmatched_paths": [],
+        "complete_original_file_bytes_backup_reconstructed": true,
+        "untouched_initial_directory_claim": false,
+        "method": "Parent materialized authentic retained bytes and Git-blob bodies with bounded mixed LF/CRLF patterns accepted only by the original SHA-256 oracle, then independently compared every output size/SHA-256 to the authentic manifest. All 191 original file identities match.",
+        "current_project_index_old_snapshots_modified": false,
+        "root_reference": ".omp/state/release-47/proofs/resumed-original191-recovered-exact.json#root",
+        "current_missing_original_file_bytes_blocker": false,
+        "limit": "This establishes a reconstructed byte-exact backup of the original 191-file product scope, not an untouched initial directory, complete .git backup, preservation of every later user edit, Native/E2E success or any task/gate promotion."
+      },
+      "git_backup_boundary": ".git was excluded from the original 191-file capture. Historical equal hashes for HEAD/index/config/packed-refs demonstrate only the recorded bounded metadata comparison, not retained Git backup bytes or a complete .git backup."
+    },
+    "override": {
+      "approved": true,
+      "scope": "Start correction from the known failing baseline only; never final green, compatibility approval or a gate waiver.",
+      "sources": ["initial_approval", "progress"]
+    },
+    "user_dirty_work": {
+      "initial_modified_reported": 28,
+      "initial_untracked_reported": 120,
+      "initial_tree_dirty": true,
+      "initial_cohort": "Original 191-file audit capture, not the later 41-modified/62-untracked cohort.",
+      "sources": ["assignment", "original_audit_receipts", "original191_recovery", "original191_recovered_exact"],
+      "count_history": {
+        "previous_initial_unstaged_reported": 41,
+        "previous_initial_untracked_reported": 62,
+        "previous_sources": ["assignment", "progress"],
+        "status": "SUPERSEDED_AS_INITIAL_COUNTS_RETAINED_AS_LATER_COHORT",
+        "limit": "41/62 describes a later reported cohort and must not replace original 28/120; neither pair is a current dirty-tree measurement."
+      },
+      "current_dirty_counts": "NOT_MEASURED_HERE",
+      "clean_tree_claim": false,
+      "git_sanity_verdict": "PENDING",
+      "preservation": "No reset, stash, clean, checkout, local merge, discard or unrelated edit performed by this assignment. Authentic receipts support bounded original preservation through 12:02; the later-drifted snapshot is distinct from the newly materialized 191/191 byte-exact reconstructed original backup. Current project/index/old snapshots were untouched by recovery; no universal preservation of later edits or complete .git backup is claimed."
+    }
+  },
+  "intake_and_approvals": {
+    "alignment": {
+      "status": "RETAINED_CLOSED",
+      "sources": ["alignment"],
+      "limit": "Intake closure is not plan approval."
+    },
+    "initial_plan": {
+      "status": "RETAINED_APPROVED",
+      "decision": "approve_plan_and_known_failing_baseline",
+      "run_id": "b8692f35-2ae0-4daa-b58f-f68f01dd2ed1",
+      "contract_version_at_approval": "0.1.0",
+      "approved_file_sha256": {
+        "specs/specs005-omp-compatible-release/spec.md": "adde88580aa2840d8b6dfc086a29b4a7f379ddeaa44b218c199bcd7a068deb26",
+        "specs/specs005-omp-compatible-release/plan.md": "04a38de8cab6b7f61531a0f65b30b0c925758a26f6751d12a40bccc261aaf4bd",
+        "specs/specs005-omp-compatible-release/tasks.md": "21b1a94458de86068b4cc0cce568d1a1a69308e820b2d6023240be5fd0bfe79c",
+        "specs/specs005-omp-compatible-release/contracts/interface-contract.md": "cecf3051d5f5b404fd4937e423d4c6ee5f08a1063c3fef4102b1ef4d9d335134"
+      },
+      "sources": ["initial_approval", "recovered_initial_approval", "intake_chronology"],
+      "human_approval_at": "2026-11-10T12:42:51.152Z",
+      "persisted_at": "2026-11-10T12:43:54.375Z",
+      "original_user_approval_reference": "local://ship-user-approval.json",
+      "original_user_approval_availability": "RECOVERED_AUTHENTIC_PRIVATE_COPY",
+      "availability_history": {
+        "previous_status": "UNAVAILABLE_IN_CURRENT_SESSION",
+        "previous_observation": "Initial current-session glob and direct read did not resolve the historical local URI.",
+        "status": "SUPERSEDED_BY_AUTHENTIC_RECOVERY",
+        "superseded_at": "2026-11-15T20:00:50.260Z",
+        "current_path": ".omp/state/release-47/proofs/recovered-ship-user-approval.json"
+      }
+    },
+    "issue": {
+      "number": 47,
+      "url": "https://github.com/rronqui/UsefulSkills/issues/47",
+      "retained_remote_state": "OPEN",
+      "sources": ["issue_creation_primary", "intake_chronology", "recovered_intake", "github_history"],
+      "created_at": "2026-11-10T12:43:55Z",
+      "creation_receipt": "PRIMARY_SERVER_TIMESTAMP_AND_RECOVERED_CREATE_RESULT",
+      "create_result_at": "2026-11-10T12:43:55.958Z",
+      "creation_after_approval_before_implementation": "PROVEN_WITHIN_RECOVERED_CHAIN",
+      "previous_evidence_status": {
+        "creation_receipt": "UNKNOWN_NOT_RETAINED_IN_INSPECTED_PROOFS",
+        "creation_order": "NOT_INDEPENDENTLY_PROVEN_BY_AVAILABLE_TIMESTAMPED_RECORDS",
+        "status": "SUPERSEDED_BY_PRIMARY_ISSUE_METADATA_AND_AUTHENTIC_CHRONOLOGY",
+        "superseded_at": "2026-11-15T20:00:50.260Z"
+      }
+    },
+    "branch_association": {
+      "branch": "feat/47-omp-compatible-release",
+      "status": "AUTHENTIC_RENAME_CLARIFICATION_AND_FINAL_ASSOCIATION_RECOVERED",
+      "sources": ["recovered_intake", "recovered_branch_decision", "intake_chronology", "progress"],
+      "rename_operation_and_timestamp": "RECOVERED_WITH_INTERMEDIATE_RESTORATION_COMPLETION_UNOBSERVED",
+      "first_rename_started_at": "2026-11-10T12:44:36.784Z",
+      "first_rename_success_at": "2026-11-10T12:44:38.146Z",
+      "human_clarification_at": "2026-11-10T12:44:38.183Z",
+      "intermediate_restore_requested_at": "2026-11-10T12:45:32.746Z",
+      "intermediate_restore_completion": "UNOBSERVED",
+      "explicit_human_preference_at": "2026-11-10T12:45:32.830Z",
+      "preference_persisted_at": "2026-11-10T12:45:58.693Z",
+      "final_requested_branch_confirmed_at": "2026-11-10T12:46:15.831Z",
+      "create_another_branch": false,
+      "previous_evidence_status": {
+        "rename_operation_and_timestamp": "UNKNOWN_NOT_RETAINED_IN_INSPECTED_PROOFS",
+        "status": "SUPERSEDED_BY_AUTHENTIC_RECOVERY",
+        "superseded_at": "2026-11-15T20:00:50.260Z"
+      },
+      "limit": "The original association was followed by a human clarification and an attempted restoration to feat/quality-evolution whose completion is unobserved, then the explicit preference for feat/47-omp-compatible-release and final confirmation. No rename was performed by this assignment; no uninterrupted-branch-name history or universal audit of preexisting user bytes is claimed."
+    },
+    "manual_intake_record": {
+      "status": "RECOVERED_AUTHENTIC_PRIVATE_COPY",
+      "sources": ["recovered_intake", "intake_chronology"],
+      "recorded_at": "2026-11-10T12:44:38.140Z",
+      "issue": 47,
+      "from_branch": "feat/quality-evolution",
+      "associated_branch": "feat/47-omp-compatible-release",
+      "head": "02582a867f660bf8aa387fe51f71b7fffd3a7dfd",
+      "delivery": "external",
+      "target": "main",
+      "original_intake_reference": "local://ship-intake.json in historical source session",
+      "current_copy": ".omp/state/release-47/proofs/recovered-ship-intake.json",
+      "previous_evidence_limit": "Earlier authoring had only the descriptive intake note and unproven exact chronology.",
+      "previous_limit_status": "SUPERSEDED_BY_AUTHENTIC_RECOVERY_AT_2026-11-15T20:00:50.260Z",
+      "limit": "The recovered manual intake records the intended non-destructive route for the preexisting dirty tree; it is not a universal byte-preservation audit. Its own persistence timestamp is distinct from the observed rename command result and subsequent branch clarification."
+    },
+    "current_contract": {
+      "version": "0.7.0",
+      "status_in_parent_state": "APPROVED",
+      "publication_status": "UNRELEASED",
+      "sources": ["progress", "contract07_documents", "recovered_wire_approval", "intake_chronology"],
+      "bounded_cutover_decision": "native_structured_clean_cutover",
+      "human_cutover_reply_at": "2026-11-11T11:40:50.295Z",
+      "decision_persisted_at": "2026-11-11T11:42:15.192Z",
+      "explicit_decision_link_to_contract_0_5_0_at": "2026-11-11T11:45:02.197Z",
+      "limit": "Official state records approved contract 0.7.0 and its seven-document cohort has independent scoped approval. The historical decision linked to 0.5.0 remains historical; initial 0.1.0 hashes and bounded wire-cutover permission do not authenticate all later bytes or authorize terminal release."
+    },
+    "chronology": {
+      "status": "AUTHENTIC_BOUNDED_CHAIN_RECOVERED_PENDING_FINAL_ADJUDICATION",
+      "sources": ["intake_chronology", "issue_creation_primary", "recovered_initial_approval", "recovered_intake", "recovered_branch_decision", "recovered_wire_approval"],
+      "source_session": "01a1c52c-57aa-7533-ba19-90c694eb489f",
+      "recovered_at": "2026-11-15T20:00:50.260Z",
+      "events": [
+        {"at": "2026-11-10T12:42:51.152Z", "source_item": "17f44a5f", "kind": "human_plan_approval"},
+        {"at": "2026-11-10T12:43:54.375Z", "source_item": "5b14c3f9/fc6c76de", "kind": "approval_persisted_not_first_human_approval"},
+        {"at": "2026-11-10T12:43:55Z", "source": "issue_creation_primary", "kind": "issue_created_server_timestamp"},
+        {"at": "2026-11-10T12:43:55.958Z", "source_item": "79561dee", "kind": "issue_create_result"},
+        {"at": "2026-11-10T12:44:36.784Z", "source_item": "7f6764d9", "kind": "first_branch_rename_started"},
+        {"at": "2026-11-10T12:44:38.146Z", "source_item": "e9f0d710", "kind": "first_branch_rename_and_issue_update_success"},
+        {"at": "2026-11-10T12:44:38.183Z", "source_item": "0ec00a62", "kind": "human_branch_clarification"},
+        {"at": "2026-11-10T12:45:32.746Z", "source_item": "f1e44dbd", "kind": "intermediate_restore_rename_requested", "requested_branch": "feat/quality-evolution", "completion": "UNOBSERVED"},
+        {"at": "2026-11-10T12:45:32.830Z", "source_item": "15984544", "kind": "explicit_human_branch_preference", "branch": "feat/47-omp-compatible-release"},
+        {"at": "2026-11-10T12:46:15.831Z", "source_item": "10f95841", "kind": "final_requested_branch_confirmed"},
+        {"at": "2026-11-10T12:48:01.209Z", "source_item": "1ccfad56", "kind": "first_recovered_implementation_wave_delegation"},
+        {"at": "2026-11-10T12:51:20.811Z", "source_item": "QualityRed/77cde630", "kind": "first_recovered_permanent_test_edit"},
+        {"at": "2026-11-10T12:59:11.304Z", "source_item": "ReferenceCorrections/d75263db", "kind": "first_recovered_normative_fix"},
+        {"at": "2026-11-10T13:04:08.334Z", "source_item": "ExecutionGreen/255613f8", "kind": "first_recovered_runtime_fix"},
+        {"at": "2026-11-11T11:40:50.295Z", "source_item": "3a22a7f9", "kind": "human_native_wire_clean_cutover_authorization"},
+        {"at": "2026-11-11T11:45:02.197Z", "source_item": "ab3f9d33", "kind": "explicit_decision_link_to_contract_0_5_0"}
+      ],
+      "conclusion": "Human approval precedes persistence, issue creation, initial rename, clarification and attempted restoration, explicit branch preference and final confirmation, then the first recovered implementation delegation, test edit, normative fix and runtime fix.",
+      "limits": [
+        "No before-intake implementation appears in this bounded recovered chain; this is not a universal audit of all preexisting user working-tree bytes or unknown earlier activity.",
+        "A permanent RED test edit is not a GREEN runtime implementation.",
+        "The intermediate restoration completion remains UNOBSERVED, not inferred successful or failed.",
+        "Initial approval and bounded clean-cutover authorization do not approve all later bytes or a terminal release.",
+        "Original current-session URI resolution failures are historical superseded observations, not current missing-approval or missing-intake claims.",
+        "No task, AC or gate is promoted by recovery."
+      ]
+    }
+  },
+  "github_delivery_prerequisites": {
+    "status": "OBSERVED_READINESS_ONLY",
+    "sources": ["github_prerequisites", "github_enforcement"],
+    "release_secret": {
+      "name": "RELEASE_PLEASE_TOKEN",
+      "metadata_present": true,
+      "value_read": false,
+      "limit": "Metadata presence is not a proof of effective token scopes, future authorization, workflow success or release creation."
+    },
+    "main_ruleset": {
+      "id": 20563693,
+      "pull_request_required": true,
+      "required_status_checks": ["quality"],
+      "deletion_blocked": true,
+      "non_fast_forward_blocked": true,
+      "required_approving_review_count": 0,
+      "strict_required_status_checks_policy": false,
+      "do_not_enforce_on_create": true,
+      "limit": "A required approving-review count of zero does not waive independent project review gates; ruleset observation is historical, not a current PR verdict."
+    },
+    "merge_settings": {
+      "allow_auto_merge": true,
+      "allow_squash_merge": true,
+      "allow_merge_commit": false,
+      "allow_rebase_merge": false,
+      "settings_changed_here": false
+    },
+    "ci": {
+      "node": 22,
+      "commands": ["npm ci", "npm test"],
+      "events": ["pull_request", "default_branch_push"],
+      "required_job": "quality",
+      "workflow_path": ".github/workflows/ci.yml",
+      "workflow_sha256": "61672b029d5a694ceba5cc55021610e74b0a9c22ce1c14187bf641935ce9332f",
+      "current_feature_pr_ci": "NOT_RUN_NO_PR",
+      "historical_main_success_is_not_feature_ci": true
+    },
+    "release_workflow": {
+      "path": ".github/workflows/release-please.yml",
+      "sha256": "1f8037fa3cbc8a506228a89680edab09142849cebec38d901ef697051ab9c981",
+      "engine": "release-please",
+      "default_branch_only": true,
+      "manifest_version": "0.4.0",
+      "contract_0_5_0_is_not_published_version": true,
+      "sources": ["github_prerequisites", "manifest", "package", "spec"]
+    },
+    "unsupported_commands": {
+      "sources": ["package", "ship_config", "progress"],
+      "build": {
+        "applicability": "NA_SUPPORTED_BY_OBJECTIVE_REASON",
+        "reason": "ESM source/skill distribution has no package build script and ship.config.json buildCommand is null. No compilation command was executed or invented."
+      },
+      "type_check": {
+        "applicability": "NA_SUPPORTED_BY_OBJECTIVE_REASON",
+        "reason": "package.json declares only test and prepare; no configured type-check script. No absent command is reported as PASS."
+      },
+      "lint": {
+        "applicability": "NA_SUPPORTED_BY_OBJECTIVE_REASON",
+        "reason": "package.json declares only test and prepare; no configured lint script. Commit-message tooling is not a substitute for a product lint run."
+      },
+      "formal_gate_limit": "These are bounded applicability justifications for later validator adjudication, not changes to parent gate statuses, which remain pending."
+    }
+  },
+  "quality_evidence_boundaries": {
+    "historical_platform_suite": {
+      "sources": ["platform_suite"],
+      "scope_files": 214,
+      "test_files_per_platform": 27,
+      "cases_per_platform": 1237,
+      "suites_per_platform": 79,
+      "windows": {"passed": 1203, "failed": 0, "skipped": 34},
+      "linux": {"passed": 1223, "failed": 0, "skipped": 14},
+      "windows_report_sha256": "3f8a82ab021c5143d8c8810f420140d2c2fb0e2fe9b0c781f77bbba8fa5978aa",
+      "linux_report_sha256": "beccab68e93cf0ea50da6a256927dcdbe40f31ae0e60c57fcb7ee722615751eb",
+      "limit": "Actual retained platform executions; neither the word FINAL in the historical ledger kind nor a historical zero-failure count makes them the final suite/validator of today's entire candidate. Skips remain skips."
+    },
+    "byte_equivalence": {
+      "sources": ["byte_scope"],
+      "compared": 214,
+      "identical": 209,
+      "changed_document_paths": [
+        "docs/omp-compatibility.md",
+        "specs/specs005-omp-compatible-release/contracts/interface-contract.md",
+        "specs/specs005-omp-compatible-release/plan.md",
+        "specs/specs005-omp-compatible-release/spec.md",
+        "specs/specs005-omp-compatible-release/tasks.md"
+      ],
+      "scope_only": true,
+      "new_suite_run": false,
+      "limit": "Applies only to byte-identical compared source with unchanged criteria/environment. The comparison is dated and excludes separately gated development Native harness modules; it cannot close current docs, Native, security, final integration or final validation."
+    },
+    "historical_source_component": {
+      "sources": ["component_review", "source_preflight"],
+      "reviewer": "AcceptedInvariantFinalPeer",
+      "independent": true,
+      "verdict": "APPROVED",
+      "source_path": "implementation-evidence/native-release/lifecycle.mjs",
+      "source_sha256": "80921469f9c0041ed16e0454c598ee1d53af528ca20cdc69b3ef5659cc6186d0",
+      "retained_provided_results": {"lifecycle_cases_passed": 33, "rpc_cases_passed": 13, "guard_cases_passed": 32},
+      "source_preflight": {"exit": 0, "cases_passed": 6, "native": false},
+      "limit": "Bounded compositional source closure, not task DONE, actual Native success, whole-repository review, final validator or release authorization."
+    },
+    "historical_canonical_documents": {
+      "sources": ["canonical_review"],
+      "reviewer": "CanonicalBudgetFinalPeer",
+      "independent": true,
+      "verdict": "APPROVED",
+      "revision": "26ef0fa2c8cf234a96bf210f1649b18775218727e487cacabfb2aa47985e6222",
+      "limit": "Bounded budget correction and restoration review; not global approval or completed T-013A."
+    },
+    "later_diagnostic_only_correction": {
+      "sources": ["diagnostic_privacy_review", "diagnostic_privacy_green", "assignment"],
+      "predecessor_independent_review": "BLOCKED",
+      "predecessor_source_sha256": "9e75d142738235dc17126f0708ad7f7ca4945a31170b5101e69685c1166605ff",
+      "predecessor_finding": "P1: rejected Root helper path-like argument values could be retained by the general path collector in the failed observation.",
+      "corrected_source_sha256": "d66cd08d6cdd30d81901dfcd38d819266b88658baed8ce48a0a143eca7ee2894",
+      "source_only_probe": {"exit": 0, "cases": 7, "passed": 7, "native": false},
+      "strict_argument_policy_unchanged": true,
+      "independent_review": "PENDING",
+      "historical_native_authorization_remaining": 0,
+      "historical_later_authorization_form": "CANCELLED_AS_REPORTED_BY_PARENT_NO_GRANT_FROM_THAT_FORM",
+      "limit": "Diagnostic privacy correction only; it neither identifies the unretained keys in the failed historical Native invocation nor loosens the argument guard. Seven source cases do not prove Native-09/10/E2E, task completion, independent approval or current full-suite success. Exhaustion/cancellation above belongs to historical windows; the separate fresh unlimited operational permission is recorded below."
+    },
+    "historical_validator_attempt": {
+      "sources": ["ready_gates_manifest", "validator_dependency_recovery", "assignment"],
+      "scope": "17 already peer-approved product/normative tasks; T-011/T-012A/B/T-013A/B excluded from ready gate promotion.",
+      "status": "HISTORICAL_TOOLING_RECOVERY_CHECKPOINT_NOT_CURRENT_RUN",
+      "initial_failure_classification": "TOOLING",
+      "initial_errors": ["Missing repository node_modules", "Wrong security proof path", "Wrong task-state query shape and task-ID handling"],
+      "dependency_recovery_recorded_at": "2026-11-15T20:03:36.349Z",
+      "dependency_lock_sha256": "d36fa3419038ba5ac88134a26a2d381620a27d1c9fffc314c4748063ec4f4c09",
+      "dependency_lock_byte_identity": true,
+      "owned_temporary_junction": true,
+      "install_or_prepare_executed_for_recovery": false,
+      "network_for_recovery": false,
+      "user_files_replaced_for_recovery": false,
+      "temporary_junction_cleanup": "Required after suite by its owner; completion not observed here.",
+      "full_suite_pass_claim": false,
+      "limit": "Historical recovery/in-progress checkpoint, not current validator activity. Official state now contains task-specific reconciliations; current source-only evidence and older actual platform QA are separately scoped below, neither final whole-Native validation nor readiness to publish."
+    },
+    "historical_additional_native": {
+      "sources": ["native_authorization", "native_launch"],
+      "additional_attempt_issued": true,
+      "additional_window_maximum": 1,
+      "additional_window_spent": 1,
+      "additional_window_remaining": 0,
+      "prior_window": {"maximum": 3, "spent": 3, "remaining": 0, "status": "HISTORICAL"},
+      "status_at_updated_receipt": "COMPLETED_BLOCKED",
+      "result": "BLOCKED",
+      "actual_run_id": "3010f28d-e4f4-467c-a9df-6a849a49d68f",
+      "exit": 2,
+      "wall_seconds": 50.18,
+      "started_at": "2026-11-15T19:09:50.551Z",
+      "finished_at": "2026-11-15T19:10:40.386Z",
+      "completion_recorded_at": "2026-11-15T19:14:22.096Z",
+      "observed_progress": {
+        "root_dispatches": 1,
+        "root_task_ends": 1,
+        "child_frames": 96,
+        "child_lifecycle_started": true,
+        "meaning": "Native Root dispatch and SDK child lifecycle were accepted before a later Root helper command guard blocked capture; this is partial execution, not integrated success."
+      },
+      "failure": {
+        "kind": "BLOCKED",
+        "reason_code": "HARNESS_BLOCKED",
+        "message": "root helper command supplied unapproved arguments",
+        "message_sha256": "9b4aec6781e97f820eb137fa2de7bf76765f5a0857cbbc30dff87c53a3047cda",
+        "message_bytes": 49,
+        "unapproved_argument_keys": "UNRETAINED",
+        "cause_limit": "The exact rejected keys were not retained; timeout, cwd or another specific key is not established and must not be inferred."
+      },
+      "preservation": {
+        "source_changed": [],
+        "binary_changed": false,
+        "workload_receipt_stable": true
+      },
+      "native09": {
+        "eligible": false,
+        "observed_origin": null,
+        "technical_retry": null,
+        "reason": "Technical retry was not started after a fatal native capture failure."
+      },
+      "native10": {
+        "status": "PENDING",
+        "evidence_level": "native-capture-halted",
+        "halted": true,
+        "reason": "New native RPC sessions were stopped after a fatal capture failure."
+      },
+      "end_to_end_pass": false,
+      "source_revision": "26ef0fa2c8cf234a96bf210f1649b18775218727e487cacabfb2aa47985e6222",
+      "source_sha256": "80921469f9c0041ed16e0454c598ee1d53af528ca20cdc69b3ef5659cc6186d0",
+      "receipt_scope": "HISTORICAL_ADDITIONAL_ONE_EVALUATION_WINDOW",
+      "limit": "Actual historical result retained by Main and inspected through its local proof. No additional Native/SDK/OMP/model call occurred here. Component AP and accepted partial lifecycle are not Native-09/10/E2E PASS, task DONE or final governance approval. This historical additional window is exhausted; it does not negate the separate fresh unlimited operational permission and this artifact grants no permission itself."
+    },
+    "current_native_operational_window": {
+      "sources": ["native_unlimited_authorization", "native14_integrated", "tdd_automatic_authorization"],
+      "authorization": "APPROVED",
+      "authorized_at": "2026-11-15T21:15:18.012Z",
+      "limit_mode": "UNLIMITED_EVALUATIONS_UNTIL_GOAL_COMPLETE",
+      "maximum_evaluations": null,
+      "spent_at_inspected_receipt": 14,
+      "rpc_operation_timeout_ms": 300000,
+      "evaluation_job_timeout_seconds": 3600,
+      "previous_windows": "Historical spent/cancelled windows remain retained; they are not the current authorization ceiling.",
+      "latest_result": {
+        "evidence": "RETAINED_COMPLETED_PENDING_NATIVE_RECEIPT_INSPECTED",
+        "attempt": 14,
+        "result": "PENDING_NATIVE",
+        "exit": 2,
+        "wall_seconds": 1232.50,
+        "fatal_message": "root helper command START was not the exact approved command",
+        "root_command_mismatch_cause": "UNRETAINED",
+        "route_reader": "INCOMPLETE",
+        "native09_eligible": false,
+        "native10_pass": false,
+        "raw_rejected_command_retained_here": false
+      },
+      "end_to_end_pass": false,
+      "limit": "Operational Native evaluations for this Goal only; no blind retry or guard relaxation, no gate waiver, no global credential/profile/model mutation and no publication or terminal release authorization. Parent owns execution and state. A failed run plus unlimited permission proves neither Native-09/10/E2E success nor task/gate completion."
+    },
+    "current_source_and_privacy": {
+      "sources": ["native15_source157", "native14_reader_source157", "native15_reader_objection", "native15_privacy", "native15_replay_hygiene"],
+      "status": "PASS_SOURCE_ONLY_PEER_RECHECK_ACTIVE",
+      "source_sha256": "31f8cce2d98eed421e8610f2adacd504455cda47c70181786d2bfd42d5fa0591",
+      "route_sha256": "fd83f450ea6b7cab712b0e18e055c3c9572e46c9d6ec87145190984ca5170437",
+      "retry_sha256": "9d3bd7c5b324cbccddf6a33fec4c223b71238386d85346b1276436a4cb89b8a2",
+      "cases_passed": 157,
+      "case_groups": [53, 47, 14, 43],
+      "fixes": ["Root prompt explicitly accepts inline task END.details.results as well as async/wait; inline completion needs no extra wait.", "Reading tag uses exact full observed Root plus one ADDED colon plus exact assignment, preserving opaque component punctuation; no new identifier grammar or guard relaxation."],
+      "privacy": "Independent bounded review found no new P0/P1; personal absolute replay defaults removed, explicit immutable replay inputs required. No independent hash recomputation or universal secrets guarantee is claimed.",
+      "native15_launched": false,
+      "limit": "Source fixes and privacy cleanup do not alter historical Native14 raws, explain its UNRETAINED mismatch cause, or promote INCOMPLETE/Native09/Native10/E2E to PASS. Code-peer recheck is active, not approved here."
+    },
+    "contract07_platform_qa": {
+      "sources": ["contract07_qa"],
+      "manifest_sha256": "87590816b77ab61f7d562eeaac408bcbe37ec3c20cac9e40e0a07b476d9fb48a",
+      "cases_per_platform": 1250,
+      "windows": {"passed": 1216, "failed": 0, "skipped": 34},
+      "linux": {"passed": 1236, "failed": 0, "skipped": 14},
+      "limit": "Actual older 875908/b080e99/9d3bd7 cohort, not current 31f8cc/fd83f4 whole-Native validation, CI or release. Skips remain skips; no speedup or ETA conclusion."
+    },
+    "current_security_scope": {
+      "sources": ["contract07_security", "native15_privacy"],
+      "global_ac019_approved": false,
+      "limit": "Bounded static13 reuse, known-format secret heuristics and exact-input dependency reuse only; later privacy assessment adds scoped review, not a fresh dependency audit or global security guarantee."
+    },
+    "official_state_checkpoint": {
+      "source": "progress",
+      "recorded_at": "2026-11-16T22:13:08.086Z",
+      "assignment_reported_snapshot": "12/22 DONE; 19 green resolved; 18 review registered",
+      "authority": "Only .omp/state/tdd/progress.json governs live task, criterion and gate status. This dated summary is not a public live counter, completion receipt or authority.",
+      "root_serving": "NOT_OBSERVED_ACCEPTED_LIMIT",
+      "ci_gate": "FAIL_REQUIRES_REAL_FEATURE_PR",
+      "no_circularity": "Future feature-PR CI, release PR, user terminal decision and tag/release are downstream delivery evidence, not prerequisites to an authorized prepublication Native evaluation."
+    }
+  },
+  "delivery_state": {
+    "sources": ["assignment", "progress", "github_prerequisites", "github_enforcement", "github_history"],
+    "implementation_commits_created_for_this_delivery": false,
+    "push_performed": false,
+    "feature_pr_created": false,
+    "feature_pr_url": null,
+    "feature_pr_ci": "FAIL_NO_REAL_FEATURE_PR",
+    "feature_merge": "NOT_PERFORMED",
+    "release_pr_created_for_this_delivery": false,
+    "new_tag_or_release_created": false,
+    "terminal_release": "RELEASE_PENDING_USER",
+    "terminal_release_confirmed": false,
+    "local_merge": "NOT_PERFORMED_FORBIDDEN_DELIVERY_PATH",
+    "host_deployment": "NOT_AUTHORIZED_NOT_PERFORMED",
+    "limit": "Historical v0.4.0 release and existing repository CI are not actions performed for issue 47. Broad permission to release after all gates does not replace the explicit terminal release decision. AC-001 remains open while terminal release is pending."
+  },
+  "required_external_flow_not_executed": {
+    "sources": ["spec", "tasks", "github_history", "initial_approval"],
+    "delivery": "external -> main",
+    "canonical_closing_marker": "Closes #47",
+    "closing_marker_rule": "The feature PR body must contain exactly one canonical Closes #47; issue number is not a guessed PR number.",
+    "publication_engine": "ship/bin/ship.mjs ship with .git/ship-review-evidence.md as the reviewed body file",
+    "ordering": [
+      "Complete prepublication source/Native, independent review and applicable local validation evidence; produce the prepublication readiness artifact bound to intended bytes. Do not require future feature-PR CI, release or postrelease DONE before authorized prepublication Native execution.",
+      "Prepare intended implementation commits and independent Ship review against main; resolve real blockers and preserve user-owned work.",
+      "After prepublication readiness approval, publish the feature PR through Ship from feat/47-omp-compatible-release to main; never merge main locally or use host deploy as delivery.",
+      "Immediately return the actual PR URL when Ship produces it; do not invent a URL before creation.",
+      "Require the feature PR's actual quality CI to be green and honor squash-only external merge governance; enabled auto-merge is capability, not proof of completed merge.",
+      "After the feature merge, observe release-please's actual release PR; obtain the user's explicit terminal release authorization before merging that release PR.",
+      "Observe the actual tag/release and record terminal CONFIRMED only with its real identity; then adjudicate postrelease DONE. Otherwise retain RELEASE_PENDING_USER and keep delivery/AC-001 open."
+    ],
+    "readonly_plan_limit": "A readonly Ship plan whose publication steps are NOT_EXECUTED demonstrates no commit, push, PR, merge, CI or release and is never publication readiness by itself."
+  },
+  "remaining_material_prerequisites": [
+    {
+      "id": "INTAKE_CHRONOLOGY_ADJUDICATION",
+      "status": "AUTHENTIC_EVIDENCE_RECOVERED_PENDING_FINAL_ADJUDICATION",
+      "requirement": "Independently adjudicate the authentic 16-event chain, copied approval/intake/branch/cutover artifacts, primary issue creation metadata and original audit/recovery receipts against AC-001. Missing-approval/intake/rename claims and blanket original-snapshot unavailability are superseded; do not omit the attempted restoration or infer its unobserved completion. The original 191 file bytes now have a materialized exact-hash backup, but chronology/recovery does not prove universal later-worktree preservation or a complete .git backup.",
+      "sources": ["spec", "intake_chronology", "issue_creation_primary", "recovered_initial_approval", "recovered_intake", "recovered_branch_decision", "original_audit_receipts", "original191_recovered_exact"]
+    },
+    {
+      "id": "CURRENT_NATIVE_BLOCKER",
+      "status": "NATIVE14_PENDING_NATIVE15_NOT_LAUNCHED",
+      "requirement": "Complete current code-peer recheck of the two prompt corrections and retain any subsequent authorized exact-source Native result. Native14 actually exited 2 after 1232.50 seconds with route Reader INCOMPLETE and Root command mismatch cause UNRETAINED; do not guess the rejected command or relax guards. Unlimited Native permission and automatic bounded TDD renewal remain available, not exhausted blockers. Genuine eligible Native09, correlated Native10 and E2E PASS remain required; downstream feature CI/release is not a pre-Native prerequisite.",
+      "sources": ["native14_integrated", "native15_source157", "native15_reader_objection", "native_unlimited_authorization", "tdd_automatic_authorization"]
+    },
+    {
+      "id": "FINAL_DEPENDENCIES_AND_VALIDATION",
+      "status": "PENDING",
+      "requirement": "Close remaining upstream/integration, current traceability/contract, scoped security and independent validation requirements using official state. Current Source157 PASS is not Native success; actual Windows 1216 PASS/34 SKIP and Linux 1236 PASS/14 SKIP with zero failures cover older 875908 cohort, not current whole-Native. Retain Root-serving NOT_OBSERVED as accepted limit; do not invent runtime, speedup, ETA or global-security claims.",
+      "sources": ["progress", "contract07_documents", "native15_source157", "contract07_qa", "contract07_security", "native15_privacy"]
+    },
+    {
+      "id": "T013A_INDEPENDENT_REVIEW",
+      "status": "PENDING",
+      "requirement": "Independent review/spec-kit-validator must adjudicate this refreshed partial governance artifact and intended revision; official state alone can record actual task/gate results. No T-013A/AC-001 promotion occurs here.",
+      "sources": ["progress", "tasks"]
+    },
+    {
+      "id": "FINAL_PUBLICATION_INVENTORY_AND_COMMIT_REVIEW",
+      "status": "NOT_PERFORMED",
+      "requirement": "Bind the intended commit inventory, including this new artifact, to final review and secret hygiene while preserving unrelated user dirty files; obtain required commit-based Ship review against main. No clean-tree or git-sanity claim is supplied here.",
+      "sources": ["assignment", "candidate", "progress", "github_history"]
+    },
+    {
+      "id": "EXTERNAL_PR_AND_CI",
+      "status": "NOT_EXECUTED",
+      "requirement": "Ship feature PR with exactly one Closes #47, immediate actual PR link, current required quality success and actual external squash merge. Reconfirm any remotely mutable prerequisite required at publication time.",
+      "sources": ["github_enforcement", "github_prerequisites", "github_history"]
+    },
+    {
+      "id": "TERMINAL_RELEASE_AUTHORIZATION_AND_OBSERVATION",
+      "status": "RELEASE_PENDING_USER",
+      "requirement": "After prepublication readiness, actual feature PR quality CI and external squash merge, observe release-please's actual release PR, obtain the user's explicit terminal merge decision, then observe real tag/release and adjudicate postrelease DONE. Original conditional publication authorization is not terminal release-PR merge approval. No local merge, host deployment, fake version bump or implied CONFIRMED.",
+      "sources": ["spec", "tasks", "initial_approval", "github_history", "manifest"]
+    }
+  ],
+  "handoff": {
+    "scope_result": "CONCLUIDO: partial governance evidence refreshed to official state/contract 0.7, current Source157, bounded privacy cleanup and Native14 PENDING; Native15 not launched and code-peer recheck active. Original191 recovery, dirty baseline and GitHub settings remain historical scoped observations. Native/E2E, applicable final review/validation, prepublication readiness, actual feature PR/CI/squash merge and terminal release flow remain uncompleted; no Goal100 claim.",
+    "not_a_completion_receipt": "This artifact neither completes T-013A/AC-001 nor authorizes commits, push, PR, auto-merge, release, deployment or installation.",
+    "checks_executed_here": [],
+    "parent_state_writes_here": false,
+    "independent_review_of_this_artifact": "PENDING"
+  }
+}

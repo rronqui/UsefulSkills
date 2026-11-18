@@ -5,6 +5,40 @@ description: Revisão de código multi-agente — coleta o diff (PR, branch base
 
 # deep-review — revisão de código multi-agente
 
+## Integração: eixos, contexto e especialidades
+
+Leia [dois eixos](references/review-axes.md) e [contexto novo/reuso](references/fresh-review.md)
+antes dos assignments. Eles prevalecem na composição das rodadas: técnica e
+requisitos têm conjuntos próprios; disjunção dentro do eixo, sobreposição válida
+entre eixos. Preserve envelopes/yield e aggregateReview legado; use
+aggregateReviewInstances para IDs únicos/conjunto exato por eixo.
+Critérios a11y usam [acessibilidade](references/accessibility.md); segurança de
+stack usa [aplicação](references/application-security.md): código, dados,
+autenticação/autorização, dependências e segredos são revisados proporcionalmente
+em qualquer plataforma; confirme stack/versão e registre limites fora da cobertura.
+Host-operator é administração Linux específica, não segurança geral. Não criar
+outra review recursiva. [Security-reviewer nativo](references/native-security.md)
+é parecer auxiliar original, nunca DEEP_REVIEW falso; preserve seu modelo e a
+configuração OMP existente, sem incluí-lo no mapa dos perfis geridos. Verifique [runtime/modelos](../tdd-orchestrator/references/omp-runtime.md)
+antes de nova sessão/rota. [Origem/licenças](SOURCE.md).
+
+## Cobertura semântica e segurança
+
+Leia a política única `skill://tdd-orchestrator/references/quality-policy.md` pela
+localização resolvida no OMP. Nos assignments existentes, inclua documentos
+funcionais, critérios, mapeamento AC→teste e risco do escopo. Revisores conferem
+se documentação, código, testes, permissões e exceções correspondem; documento
+desatualizado com efeito concreto é defeito, não nit de estilo. A revisão de
+segurança proporcional integra a mesma rodada. Exclusões de lockfiles e gerados
+do patch não dispensam análise de dependências e scans no gate de segurança.
+
+O dimensionamento abaixo organiza cobertura por risco e localidade; os slots, modelos,
+ferramentas e isolamento efetivamente disponíveis devem ser observados no OMP.
+Se os slots forem menores, despache lotes dentro do limite mantendo a mesma
+cobertura e identidades esperadas. Não simule paralelismo nem declare modelo
+efetivo só pelo frontmatter. Reaproveite prova apenas na revisão, critérios e
+ambiente correspondentes. Preserve `task`/`yield` e os schemas nativos abaixo.
+
 Baseado e adaptado do comando embutido `/review` do omp (can1357/oh-my-pi). O trabalho se
 divide em duas camadas:
 
@@ -35,8 +69,8 @@ can1357/oh-my-pi, renomeado para evitar colisão). Ele define:
   P0–P3 e o formato do achado.
 
 NUNCA use o agente embutido `reviewer` do omp nem qualquer outro revisor: usar o
-`deep-reviewer` garante comportamento idêntico sem conflito de nomes na descoberta
-de agentes. Se a chamada `task` com `agent: "deep-reviewer"` falhar por agente
+`deep-reviewer` preserva o protocolo específico e evita sombrear o builtin;
+comportamento efetivo ainda exige descoberta e validação na sessão. Se a chamada `task` com `agent: "deep-reviewer"` falhar por agente
 desconhecido, tente a resolução nomeada no escopo de projeto e depois de usuário;
 se não houver `deep-reviewer` nesses escopos, tente somente `peer-reviewer`. Se
 nenhum agente nomeado compatível estiver disponível, a rodada é `BLOCKED`; não há
@@ -57,6 +91,26 @@ duplicados, e a identidade esperada nunca é inferida dos resultados. `ok: false
 também é bloqueado e nunca autoriza inferir aprovação. O módulo não acessa GitHub,
 Git, workspace ou agentes: coleta, resolução de fonte e despacho continuam
 responsabilidades do orquestrador.
+
+`validateReviewerResult` também valida o peer TDD nativo quando o caller informa
+explicitamente `expected: {agent:"peer-reviewer", protocol_mode:"TDD_PEER_REVIEW",
+reviewed_revision}` obtido do assignment. Nesse ramo, preserva
+`APROVADO`/`BLOQUEADO`, sem convertê-los para `VALID`. `expected` é obrigatório;
+`ok:true` atesta estrutura/identidade/revisão, não aprovação. Os agregadores deep
+continuam recusando esse modo TDD.
+
+Para rodadas paralelas, use a API aditiva
+`aggregateReviewInstances(results, expectedRevision, assignments)`. Cada
+assignment é `{id, agent, files}`: `id` corresponde ao `name`/ID real da instância
+OMP, `agent` permanece `deep-reviewer` ou `peer-reviewer`, e `files` são caminhos
+relativos canônicos, disjuntos inclusive sem distinguir maiúsculas. Cada saída é
+envolvida pelo coordenador como `{id, result}`; não acrescente o ID ao schema
+`yield` nativo do agente. O conjunto de instâncias deve coincidir exatamente,
+sem ausências, extras ou duplicatas. Findings fora dos arquivos atribuídos
+bloqueiam. Uma rodada usa só o tipo nativo ou só fallback, sem mistura.
+`aggregateReview` permanece para consumidores legados de identidade por tipo;
+não pode representar vários revisores do mesmo tipo. A API por instância retorna
+`reviewers` como IDs e `reviewer_instances` com pares `{id, agent}`.
 
 
 ## FASE 0 — Resolução do escopo (modo)
@@ -89,13 +143,22 @@ por conta própria e ancoram achados nas linhas atuais.
   inventário já restrito; só então a tabela de dimensionamento define a equipe.
 
 - **PR**: colete uma única fonte remota exata em `patch_source`: `gh pr diff <N> -R <owner>/<repo>` com o SHA retornado pelos metadados da PR, ou `pr://<owner>/<repo>/<N>/diff/all` com esse SHA. Registre `kind`, `uri` (quando houver), conteúdo e qualquer alias entre `sha`, `head_sha` e `head-sha`; se mais de um for fornecido, todos devem ser strings não vazias e iguais. Para `pr-uri` e para `gh-pr-diff` quando `uri` existir, a URI deve seguir `pr://owner/repo/<n>/...` e coincidir exatamente com `repository` e `pull_request`; não misture fontes nem recupere um patch local.
-  Se a fonte remota falhar, estiver vazia ou indisponível, a rodada é `BLOCKED` e o erro é preservado; nunca use o workspace como fallback silencioso.
+  Além do patch, obtenha o conteúdo integral dos arquivos atribuídos e dos
+  consumidores pertinentes na mesma revisão remota aprovada. Preserve caminho,
+  SHA e hash da coleta e forneça esse conteúdo ou acesso exato no assignment;
+  o patch parcial não contém necessariamente o arquivo completo. Cópia local
+  só pode ser usada como material dessa coleta após conferir sua igualdade com
+  a fonte remota nesse SHA; a existência do workspace não prova o vínculo.
+  Se patch ou conteúdo remoto necessário falhar, estiver vazio indevidamente ou
+  indisponível, a rodada é `BLOCKED` e o erro é preservado; nunca use outra
+  revisão ou o workspace como fallback silencioso.
 - **Branch/base**: se o chamador informou a branch base (ex.: outra skill
   orquestrando o fluxo), use-a diretamente sem perguntar; caso contrário pergunte
   ao usuário (liste com `git branch -a` se necessário). Resolva a branch atual via
 `git branch --show-current` e registre `local_revision_context` com
-`mode: "BRANCH_BASE"`, `revision` (descritor do par local resolvido),
-`base_ref`, `head_ref`, `base_revision` e `head_revision`. O diff é
+`mode: "BRANCH_BASE"`, `revision` igual a `head_revision`,
+`base_ref`, `head_ref`, `base_revision` e `head_revision` como par base/head
+separado. O diff é
 `git diff <base>...<atual>`. Esses são identificadores locais das duas refs; não crie
 `patch_source` remoto, SHA/head-SHA de PR ou `consumer_context`.
 - **Não commitadas**: primeiro `git status` (vazio → "sem mudanças não commitadas",
@@ -144,15 +207,15 @@ os arquivos foram filtrados → informe "nenhum arquivo revisável (tudo filtrad
 ## FASE 2 — Dimensionamento da equipe
 
 `totalLines` = somatório de adições + remoções dos arquivos não excluídos;
-`fileCount` = quantidade desses arquivos. Número de revisores:
+`fileCount` = quantidade desses arquivos. Estime a divisão por revisores:
 
-| Condição | Revisores |
-|---|---|
-| `totalLines < 100` OU `fileCount <= 2` | 1 |
-| `totalLines < 500` | `min(2, fileCount)` |
-| `totalLines < 2000` | `min(4, ceil(fileCount/3))` |
-| `totalLines < 5000` | `min(8, ceil(fileCount/2))` |
-| `totalLines >= 5000` | `min(16, fileCount)` |
+Use linhas/arquivos como estimativa de carga, não como teto de revisores.
+Um escopo pequeno pode ter uma instância quando suficiente; escopo grande é
+particionado por dependência, risco e localidade. Use o máximo paralelismo útil
+das partições independentes dentro de slots/orçamento observados, sem teto
+arbitrário de equipe. Se houver menos capacidade que partições, mantenha IDs e
+cobertura em lotes; lote lançado não conclui a rodada. Não dividir arquivo só
+para ocupar slot e não concentrar riscos independentes por limite fixo.
 
 **Agrupamento por localidade** (quando há mais de 1 revisor):
 - mesmo diretório/módulo → mesmo agente;
@@ -163,8 +226,18 @@ Cada revisor recebe um conjunto DISJUNTO de arquivos; nada fica sem dono.
 
 ## FASE 3 — Distribuição (ferramenta `task`)
 
-Uma única chamada `task` em lote: `context` compartilhado + um item em `tasks[]` por
-revisor. Agente `deep-reviewer` é resolvido deterministicamente no escopo de projeto
+Leia o schema dinâmico do OMP: `solutionSpace` integra cada item; `name` identifica
+a instância e `agent` seu tipo. Batch desabilitado exige chamadas flat; async
+habilitado exige recolher resultados terminais antes da consolidação. `isolated`
+e opções de output/modelo só podem ser enviadas quando expostas na sessão. Use
+`solutionSpace` para descrever uma revisão aberta a defeitos concretos no escopo,
+sem hipótese ou veredito imposto. Consulte a documentação oficial OMP quando o
+schema da sessão divergir dos exemplos.
+
+Com batch exposto/habilitado, use uma chamada `task` em lote, com `context`
+compartilhado e um item em `tasks[]` por revisor, dentro da capacidade observada.
+Sem batch, use chamadas flat equivalentes conforme o schema atual.
+Agente `deep-reviewer` é resolvido deterministicamente no escopo de projeto
 primeiro e, se ausente, no escopo de usuário depois. Se ambos faltarem, o fallback
 nomeado `peer-reviewer` é tentado; nenhum agente anônimo ou outro nome pode substituir
 esses agentes. No fallback, o dispatcher define explicitamente
@@ -203,8 +276,10 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
    - **Modo PR, qualquer tamanho**: leia o patch somente do `patch_source` remoto coletado
      por `gh pr diff` ou `pr://<owner>/<repo>/<N>/diff/all` (ou seu índice de arquivo).
      NUNCA use `git diff`/`git show` local nem trate o workspace como fonte do patch.
-     O workspace local é somente contexto do consumidor, fixado no mesmo SHA; se a fonte
-     remota falhar ou estiver vazia, bloqueie sem fallback local. Não registre achados
+     O conteúdo integral necessário deve vir da coleta remota fixada no mesmo
+     SHA, por acesso exato ou cópia path/hash conferida; workspace não vinculado
+     não o substitui. Se a fonte remota falhar ou estiver vazia, bloqueie sem
+     fallback local. Não registre achados
      fora dos arquivos atribuídos";
    - **Demais modos**: leia o patch e os arquivos atribuídos pelas fontes locais
      indicadas na coleta e no `local_revision_context`. Não procure ou fabrique
@@ -213,8 +288,10 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
      custom.
 3. "MAY read full file context as needed via `read`": leia sempre os arquivos atribuídos
    e, para cada valor que cruza fronteira, localize e leia também o consumidor/dispatcher
-   antes de concluir; em PR, o patch continua exclusivamente remoto e o workspace é
-   apenas contexto do consumidor;
+   antes de concluir; em PR, patch e conteúdo integral necessário vêm da revisão
+   remota fixada no assignment, inclusive o consumidor, com caminho/SHA/hash.
+   Ausência desse conteúdo mantém revisão incompleta; workspace ou patch parcial
+   não o substituem silenciosamente;
 4. Registro de achados, identidade e veredito somente via seções incrementais nativas
    de `yield` (`type: ["findings"]` quando houver achados; `type: ["agent"]`,
    `type: ["protocol_mode"]`, `type: ["status"]`, `type: ["reviewed_revision"]`,
@@ -223,7 +300,9 @@ modo; divergência, ausência ou não resolvibilidade desse contexto bloqueia.
    `result.data`; não envie JSON externo, objeto completo ou ferramenta separada de
    finding.
 
-Dispare todos em paralelo na mesma chamada; não serialize.
+Com batch habilitado, dispare os revisores de cada lote na mesma chamada; sem
+batch, use chamadas flat. Respeite os slots disponíveis e recolha todos os
+resultados terminais; lotes pendentes mantêm a rodada incompleta.
 
 ## FASE 4 — Protocolo do revisor (o que cada sub-agente executa)
 
@@ -302,7 +381,8 @@ roteamento do consumidor é a principal fonte de bugs de integração perdidos.
 - `explanation`: resumo do veredito em 1–3 frases de texto puro;
 - `confidence`: número entre 0.0 e 1.0.
 
-Estilo/docs/nits NÃO contam: corretude ignora questões não bloqueantes. Todo achado
+Estilo e nits NÃO contam: divergência funcional de documentação com impacto
+comprovável conta como defeito. Todo achado
 DEVE ser ancorado no patch, ou nas linhas atuais do arquivo atribuído em Custom sem
 patch, e sustentado por evidência. O revisor nunca emite JSON ou blocos de código
 como texto final.
@@ -312,7 +392,7 @@ como texto final.
 ### Validação e limiar
 
 Todos os revisores atribuídos devem retornar um resultado estruturado completo. O
-agregador recebe `expectedReviewers` explícitos e exige conjunto exato: revisor
+agregador por instância recebe `assignments` explícitos e exige conjunto exato: revisor
 esperado ausente, inesperado ou duplicado, timeout, resultado sem identidade/protocolo,
 schema inválido, status ausente/diferente de `VALID`, `reviewed_revision` ausente/
 divergente ou finding incompleto produz `BLOCKED`; a identidade esperada não é
@@ -343,15 +423,18 @@ com localização e contagem (e também os P0/P1 para não perder evidência).
 
 O dispatcher tem dois contratos distintos e não os mistura:
 
-1. `TDD_PEER_REVIEW` invoca `peer-reviewer` e exige a saída textual normal
-   **APROVADO** ou **BLOQUEADO**. Essa saída não é validada como resultado
-   normalizado de deep-review.
+1. `TDD_PEER_REVIEW` invoca `peer-reviewer` e consome o yield nativo estruturado
+   com `APROVADO`/`BLOQUEADO`, validado por `validateReviewerResult` com `expected`
+   independente do assignment. Preserve o status real e o retorno original;
+   não o envie aos agregadores deep nem o converta para `VALID` ou texto.
+   Positivo, negativo e malformed continuam exigindo prova NATIVE-05.
 2. `DEEP_REVIEW_FALLBACK` invoca o `peer-reviewer` nomeado somente como fallback e
    exige o objeto normalizado `{ agent: "peer-reviewer", protocol_mode:
    "DEEP_REVIEW_FALLBACK", status: "VALID", reviewed_revision,
    overall_correctness, explanation, confidence, findings }`.
-   O adaptador rejeita status normal sem conversão explícita, valida todos os campos
-   e entrega o objeto ao mesmo agregador usado para `deep-reviewer`.
+   O consumer exige esse modo/status explicitamente, valida todos os campos
+   e entrega o objeto ao mesmo agregador usado para `deep-reviewer`; nunca
+   converte um resultado TDD normal em fallback deep.
 
 O adaptador preserva `reviewed_revision`, findings P0–P3, localização e o limiar:
 somente P0/P1 válidos viram `blockers`; P2/P3 permanecem em `findings` e `counts`.
@@ -390,14 +473,15 @@ por prioridade e arquivos excluídos com motivo. A liberação só é `APPROVED`
 todos os resultados são `VALID`, a revisão é consistente e não há blocker P0/P1;
 P2/P3 permanecem visíveis para decisão posterior.
 
-- Número de revisores segue a tabela da FASE 2 — não invente fan-out maior; 1 revisor
-  é o esperado para diffs pequenos.
+- Dimensione conforme risco, localidade e capacidade observada na FASE 2; uma
+  instância pode bastar em escopo pequeno, sem teto arbitrário para independentes.
 - Nunca inclua diff inteiro inline acima dos limites (50.000 caracteres ou 20
   arquivos) — o prompt estoura e a qualidade cai; use prévia + ordem de leitura.
 - Revisor registra achados apenas nos arquivos atribuídos; pode ler contexto fora deles
   para checagens cross-boundary. Sobreposição de ownership gera achados duplicados.
-- Modo PR nunca usa git local nem trata o workspace como fonte do patch; arquivos inalterados
-   do workspace podem ser lidos apenas como contexto do consumidor para a checagem cross-boundary.
+- Modo PR usa patch remoto e conteúdo integral dos arquivos/consumidores no mesmo
+  SHA remoto, com path/hash da coleta; workspace local sem essa conferência não
+  substitui o material necessário à checagem cross-boundary.
 - Não passe `outputSchema` na chamada `task` para o agente `deep-reviewer`: a saída
   nativa dele (seções incrementais de `yield`) é o contrato que a TUI renderiza
   como veredito + achados.

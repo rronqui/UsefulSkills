@@ -1,0 +1,313 @@
+{
+  "schema": {
+    "name": "usefulskills.post-native48-observations",
+    "version": "1.0.0"
+  },
+  "status": "OBSERVED_PARTIAL_LOCAL_ONLY",
+  "task": "T-015",
+  "requirements": [
+    "RF-012",
+    "AC-020",
+    "PV-017"
+  ],
+  "cutoffSource": {
+    "historical": {
+      "at": "2026-11-15T22:11:52.751Z",
+      "source": "implementation-evidence/metrics/retained-observations.json#/immutable_observation_cutoff",
+      "basis": "Native attempt 2 actual.finished_at; immutable, not extended"
+    },
+    "current": {
+      "native_finished_at": "2026-11-17T23:20:16.852Z",
+      "reinspection_at": "2026-11-17T23:53:27.576Z",
+      "source123_at": "2026-11-17T23:55:20.572Z",
+      "qa_reconciliation_at": "2026-11-18T00:07:59.640Z",
+      "scope": "Selected retained Native48 and current-consumer observations, not all-history telemetry or a fresh run"
+    }
+  },
+  "provenance": {
+    "hash_algorithm": "sha256",
+    "actual_file_hashes": {
+      "implementation-evidence/metrics/guard-startup.mjs": "8e46261960f74dfa090d64d32942abc900588260af1ddc7097bb1ba116541ace",
+      "implementation-evidence/metrics/results.json": "862d226e0e8ca0ccc89b0f349984d8c6486d694a15e8f5f87ca71d4e008cf4b2",
+      "implementation-evidence/metrics/results-prior-capture.json": "60bcc4eb0742957f17f059ae1766d3fd0d8599a8879d65c5e5a08c6aef0a46b9",
+      "implementation-evidence/metrics/retained-observations.json": "9d3ab6d7126c9e88689480e26e6959b0e8aee03d9d74e66320586d958f137c6d",
+      ".omp/state/release-47/proofs/native48-completion-and-reprojection-boundary.json": "14c84a822506672db160cab49b2bcb68d5df0a4fec246b603f7e42b473d7c684",
+      ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json": "5ff086b98ae1ba45c23ee8ea646ebb7b18d95431e557b5cd8a044b8263c80512",
+      ".omp/state/release-47/proofs/post-native48-final-projection-red-green123.json": "600b1f43d260fae3982556f3c526b9847619f62a82e33e8c24f7c887b24252f7",
+      ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json": "a2a37a6e2d354259236991d5daa0c0f53b6e7297ee434eb865ce568d62d3c52a"
+    },
+    "private_refs_are_provenance_only": true,
+    "private_reports_bundled": false,
+    "hash_limit": "Only listed existing files hashed here; source/capture digests below are retained evidence bindings, not newly computed originals"
+  },
+  "historical_cohort": {
+    "preserved_files": [
+      "implementation-evidence/metrics/guard-startup.mjs",
+      "implementation-evidence/metrics/results.json",
+      "implementation-evidence/metrics/results-prior-capture.json",
+      "implementation-evidence/metrics/retained-observations.json"
+    ],
+    "unchanged_policy": "All four historical files remain byte-preserved; this new receipt does not replace their cutoff or original missing-value fields.",
+    "measured_scope": "Five startup samples and five serial guarded Git sessions, wall time and measuring parent-process resources only; not child/system/model resources.",
+    "controlled_probe_ref": "implementation-evidence/metrics/results.json#/measurements",
+    "prior_capture_ref": "implementation-evidence/metrics/results-prior-capture.json#/measurements",
+    "review": {
+      "display_duration": "9m39s",
+      "kind": "COARSE_HOST_DISPLAY",
+      "peer": "ReadUriDiagnosticPeer",
+      "verdict": "BLOQUEADO",
+      "source": "implementation-evidence/metrics/retained-observations.json#/host_review_observation"
+    },
+    "serial_conflict_and_pure_execution": {
+      "source_refs": [
+        "execution_behavior_receipt",
+        "execution_behavior_repository_links"
+      ],
+      "test_file": "scripts/execution.test.mjs",
+      "assertions": 109,
+      "passed": 109,
+      "failed": 0,
+      "kind": "RETAINED_PURE_EXECUTION_ASSERTIONS_NOT_BENCHMARK",
+      "observed_passed_examples": [
+        "AC-011: pure execution projection, schema and DAG is pure with deeply frozen inputs and returns fresh deterministic views",
+        "AC-011: observed resource identity, aliases and capacity reports case alias as a serializable conflict, not structural failure",
+        "AC-011: observed resource identity, aliases and capacity rejects unsafe resource capture: duplicate observation",
+        "AC-011: exact current returns, history and partial visibility rejects duplicate current return with E_RETURN_SET and leaves independent tasks visible",
+        "AC-011: review closure T003-IR-001 running resource occupancy IR001 leaves both idle conflicting tasks individually ready for dispatcher serialization",
+        "AC-002: safe execution locks and filesystem roots keeps a conflicting writer blocked when history is RUNNING and its job is absent",
+        "AC-002: safe execution locks and filesystem roots keeps a conflicting writer blocked when history is RUNNING and its job is UNKNOWN"
+      ],
+      "interpretation": "Separate evidence of pure conflict/duplicate-observation/return/admission-decision behavior. It is not measured external parallel execution, physical dispatcher locking, token deduplication, or performance. In particular, individually ready conflicting tasks still require dispatcher serialization."
+    }
+  },
+  "current_cohort": {
+    "native_evaluation": {
+      "window_evaluation_counter": 48,
+      "counter_meaning": "48 evaluations, NOT 48 successful SDK runs",
+      "wall_seconds": 905.92,
+      "exit_code": 2,
+      "finished_at": "2026-11-17T23:20:16.852Z",
+      "original_status": "PENDING_NATIVE",
+      "original_unchanged": true,
+      "original_sha256_retained": "c17689f5a4a97b2752f875a45ecb8fc324472261b67fb16a55aa5d5df540356b",
+      "source_ref": ".omp/state/release-47/proofs/native48-completion-and-reprojection-boundary.json#/receipt/result"
+    },
+    "current_consumer": {
+      "status": "PASS",
+      "phases": {
+        "SHORT": {
+          "status": "PASS"
+        },
+        "FULL": {
+          "status": "PASS"
+        },
+        "LOCAL": {
+          "status": "PASS"
+        },
+        "EXTERNAL": {
+          "status": "PASS"
+        },
+        "DOC": {
+          "status": "PASS"
+        },
+        "REVIEW": {
+          "status": "PASS"
+        },
+        "VALIDATE": {
+          "status": "PASS"
+        },
+        "RETRO_OWNER": {
+          "status": "PASS"
+        },
+        "RETRO_OPT_OUT": {
+          "status": "PASS"
+        },
+        "FAILURE": {
+          "status": "PASS"
+        },
+        "RESUME": {
+          "status": "PASS"
+        }
+      },
+      "wall_seconds": 2.33,
+      "exit_code": 0,
+      "node": "v22.23.2",
+      "at": "2026-11-17T23:53:27.576Z",
+      "new_sdk_calls": 0,
+      "new_model_calls": 0,
+      "subprocess_count": 0,
+      "product_source_exact_matches": 131,
+      "source_sha256_retained": "7dded9e5a237ae9c735cc9b2730bfb75e8f16e345a909256a7c369db5c3a5859",
+      "raw_sdk_fields_changed": false,
+      "source_ref": ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json"
+    },
+    "retained_routes": {
+      "status": "PASS",
+      "cases": [
+        {
+          "case": "SHORT_LOCAL",
+          "status": "PASS",
+          "native": true
+        },
+        {
+          "case": "FULL_LOCAL",
+          "status": "PASS",
+          "native": true
+        },
+        {
+          "case": "SHORT_GIT",
+          "status": "PASS",
+          "native": true
+        },
+        {
+          "case": "FULL_GIT",
+          "status": "PASS",
+          "native": true
+        }
+      ],
+      "sdk_sessions_reexecuted": false
+    },
+    "repair": {
+      "first_validator_attempt": 1,
+      "first_validator_status": "FAIL",
+      "second_validator_attempt": 2,
+      "second_validator_status": "PASSOU",
+      "backend_write_count": 1,
+      "backend_write_path": "app/bin/quality.mjs",
+      "backend_command_count": 2,
+      "command_scope": "One before-write and one after-write command, not two repairs",
+      "same_identity": true,
+      "distinct_commands": true,
+      "order_valid": true,
+      "same_assignment": true,
+      "same_run": true,
+      "same_revision": true,
+      "distinct_validator_jobs": true,
+      "distinct_validator_instances": true,
+      "independent_peer": {
+        "status": "APROVADO",
+        "independent": true,
+        "subject_sha256": "6d82a2095d9823c427faa5f6a85bb878c69b191f13c0233dfce501485476b44e"
+      },
+      "execution": {
+        "status": "PASS",
+        "complete": true,
+        "resumed": true,
+        "bindings_match": true
+      },
+      "evidence_pointers": [
+        "/technical/causal",
+        "/technical/repair/writes",
+        "/technical/first/attempt",
+        "/technical/second/attempt",
+        "/repair_command_evidence",
+        "/technical/execution"
+      ],
+      "source_ref": ".omp/state/release-47/proofs/native48-current-consumer-reinspection.json",
+      "credit": "Native09TechnicalRetryBackendDeveloper repaired the temporary captured app only. RootCodingAssistant made the current Main two-line canonical binding/case consumer fix; do not attribute that Main implementation to the backend model."
+    },
+    "source123": {
+      "cases": 123,
+      "status": "PASS",
+      "red_expected_failures": [
+        1,
+        1
+      ],
+      "new_sdk_calls": 0,
+      "scope": "Source-controlled producer/consumer regressions, separate from Native evidence",
+      "source_ref": ".omp/state/release-47/proofs/post-native48-final-projection-red-green123.json"
+    },
+    "configured_qa": {
+      "windows": {
+        "total": 1250,
+        "passed": 1216,
+        "failed": 0,
+        "skipped": 34,
+        "success": true
+      },
+      "linux": {
+        "total": 1250,
+        "passed": 1236,
+        "failed": 0,
+        "skipped": 14,
+        "success": true
+      },
+      "exact_public_files": 201,
+      "differences": 0,
+      "method": "Existing actual JSON reports and byte comparison; no suite rerun",
+      "source_ref": ".omp/state/release-47/proofs/post-native48-actual-configured-qa-reconciliation.json",
+      "limit": "Public 201 cohort, not whole 228/private collector; old validator 30-failure attribution was stale-state grep, not these actual reports"
+    }
+  },
+  "duplication_and_serialization": {
+    "current_repair": "One causally bound backend write with one before/after command, first FAIL and second PASSOU; independent APROVADO and execution return bindings demonstrate this task repair was not duplicated.",
+    "current_routes": "Four retained authentic route captures; no SDK rerun during Native48 selective reuse or current reinspection.",
+    "history_limit": "Prior Native45/46 four-route reruns were avoidable and acknowledged. No all-history no-duplicates claim.",
+    "serialization_evidence": "Historical public pure-execution assertions distinguish resource conflicts from independent visibility, reject duplicate observations/returns, and retain conflicting writer occupancy. Current technical execution PASS supplies actual task bindings, not external scheduler timing.",
+    "external_scheduler_parallelism": {
+      "status": "NOT_OBSERVED",
+      "value": null,
+      "reason": "No complete physical dispatcher intervals were measured. PV-017 explicitly excludes a parallel scheduler benchmark and global gain; this unknown is not an added acceptance requirement."
+    },
+    "no_gain_claim": "Model configuration, batch settings and isolation are not efficiency measurements."
+  },
+  "current_unknowns": {
+    "startup": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "No current startup sample retained; historical samples are a separate cohort."
+    },
+    "resources": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "No current parent/child/system resource samples retained."
+    },
+    "tokens": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "No observed current token usage supplied."
+    },
+    "cost": {
+      "status": "NOT_OBSERVED",
+      "value": null,
+      "reason": "No provider billing receipt supplied."
+    },
+    "physical_serving": {
+      "status": "NOT_OBSERVED",
+      "value": null,
+      "reason": "No physical provider/backend routing or fallback telemetry supplied."
+    },
+    "review_duration": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "Current independent peer verdict has no measured duration."
+    },
+    "guard_overhead": {
+      "status": "NOT_MEASURED",
+      "value": null,
+      "reason": "No current isolated guard overhead sample; historical probe is not current."
+    }
+  },
+  "closure": {
+    "task_acceptance_status": "PENDING_INDEPENDENT_VALIDATION",
+    "unmeasured_current_observations_not_new_requirements": [
+      "Current startup samples",
+      "Current resource samples with process scope",
+      "Current guard-overhead samples",
+      "Current measured review duration",
+      "Complete physical dispatcher intervals/resource conflicts; explicitly outside the measured serial subset accepted by PV-017"
+    ],
+    "remaining_conditions": [
+      "Independent formal review and validation of the final local ledger/receipt and intended release packet",
+      "Preserve the explicitly scoped historical measurements and current null/unknown fields required by AC-020/PV-017; neither a new current-cohort benchmark nor complete physical scheduler intervals is mandated by spec.md:502",
+      "External PR/CI/release remains unperformed; no Task DONE, Goal100 or release approval is asserted"
+    ],
+    "unconfigured_gates": {
+      "coverage": "NA: no configured coverage command in retained applicability scope",
+      "lint": "NA: no configured lint command in retained applicability scope",
+      "typecheck": "NA: no configured type-check command in retained applicability scope",
+      "build": "NA: no configured build command in retained applicability scope"
+    },
+    "scope": "Local retained-evidence receipt only; historical prepublication PARTIAL packet is not rewritten"
+  }
+}

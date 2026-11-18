@@ -3,11 +3,12 @@
 // com sh real (o mesmo que o git usa) e cwd na raiz do repo (para o hook
 // commit-msg resolver o commitlint em node_modules/.bin).
 import { execFileSync, spawnSync } from "node:child_process";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { tmpdir } from "node:os";
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -25,13 +26,26 @@ function findSh() {
 
 const sh = findSh();
 
+function copyHookFixtureDependencies(dir) {
+  cpSync(join(repoRoot, "scripts"), join(dir, "scripts"), { recursive: true });
+  mkdirSync(join(dir, "tdd-orchestrator", "lib"), { recursive: true });
+  cpSync(
+    join(repoRoot, "tdd-orchestrator", "lib", "fs-transaction"),
+    join(dir, "tdd-orchestrator", "lib", "fs-transaction"),
+    { recursive: true },
+  );
+}
+function linkFixtureNodeModules(dir) {
+  symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+}
 function initRepo(name) {
   const dir = mkdtempSync(join(tmpdir(), `hooks-${name}-`));
   spawnSync("git", ["init", "-q"], { cwd: dir });
+  mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
   spawnSync("git", ["config", "init.defaultBranch", name], { cwd: dir });
   spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: dir });
-  cpSync(join(repoRoot, "scripts"), join(dir, "scripts"), { recursive: true });
-  symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+  copyHookFixtureDependencies(dir);
+  linkFixtureNodeModules(dir);
   copyFileSync(join(repoRoot, ".commitlintrc.json"), join(dir, ".commitlintrc.json"));
   return dir;
 }
@@ -48,7 +62,7 @@ function createLinkedWorktree() {
   };
   run(["config", "--unset", "core.hooksPath"]);
   writeFileSync(join(main, "tracked.txt"), "worktree fixture\n");
-  run(["add", "scripts", ".commitlintrc.json", "tracked.txt"]);
+  run(["add", "scripts", "tdd-orchestrator/lib/fs-transaction", ".commitlintrc.json", "tracked.txt"]);
   run(["-c", "user.name=UsefulSkills Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "test: linked worktree"]);
   run(["worktree", "add", "--detach", linked]);
   symlinkSync(join(repoRoot, "node_modules"), join(linked, "node_modules"), process.platform === "win32" ? "junction" : "dir");
@@ -71,6 +85,42 @@ function expectChildExit(result, status) {
 }
 
 const managedHookNames = ["commit-msg", "commit-msg.mjs", "pre-push", "pre-push.mjs"];
+// Exact source preimages published in v0.4.0 at the immutable release commit:
+// https://github.com/rronqui/UsefulSkills/tree/02582a867f660bf8aa387fe51f71b7fffd3a7dfd/scripts/hooks
+// SHA-256 and provenance: local://ship-released-hook-payloads-v040.json.
+const publishedHookFixtureDir = join(repoRoot, "scripts", "fixtures", "hooks-v040");
+const generatedMarker = "Gerado por scripts/install-hooks.mjs";
+const publishedHookSources = new Map(
+  ["commit-msg", "pre-push"].map((name) => [
+    name,
+    readFileSync(join(publishedHookFixtureDir, `${name}.mjs`), "utf8"),
+  ]),
+);
+
+function publishedHookBytes(name) {
+  const hookName = name.endsWith(".mjs") ? name.slice(0, -4) : name;
+  const sourceText = publishedHookSources.get(hookName);
+  if (!sourceText) throw new Error(`preimagem publicada ausente para ${name}`);
+  const sidecarText = `// ${generatedMarker} — edite o original em scripts/hooks/${hookName}.mjs.\n${sourceText}`;
+  if (name.endsWith(".mjs")) return Buffer.from(sidecarText);
+  return Buffer.from([
+    "#!/bin/sh",
+    `# ${generatedMarker} — edite o original em scripts/hooks/${hookName}.mjs.`,
+    `exec node "$0.mjs" "$@"`,
+    "",
+    sidecarText,
+  ].join("\n"));
+}
+
+function seedPublishedHooks(directory) {
+  const previous = new Map();
+  for (const name of managedHookNames) {
+    const content = publishedHookBytes(name);
+    writeFileSync(join(directory, name), content);
+    previous.set(name, content);
+  }
+  return previous;
+}
 
 function assertManagedHooksAbsent(directory) {
   for (const name of managedHookNames) {
@@ -78,53 +128,10 @@ function assertManagedHooksAbsent(directory) {
   }
 }
 function installWithFsFault(dir, destination, operation) {
-  if (!["rename", "chmod"].includes(operation)) throw new Error(`falha desconhecida: ${operation}`);
-  const preload = join(dir, `.usefulskills-hooks-fault-${operation}-${Math.random().toString(36).slice(2)}.cjs`);
-  const common = [
-    "const fs = require('node:fs');",
-    "const path = require('node:path');",
-    "const { syncBuiltinESMExports } = require('node:module');",
-    "const target = path.resolve(process.env.USEFULSKILLS_FAULT_DEST);",
-    "let injected = false;",
-    "function inject(kind) {",
-    "  injected = true;",
-    "  const error = new Error(`injected ${kind} failure`);",
-    "  error.code = 'EIO';",
-    "  throw error;",
-    "}",
-  ];
-  const fault = operation === "chmod"
-    ? [
-        "const originalChmodSync = fs.chmodSync;",
-        "fs.chmodSync = (file, mode) => {",
-        "  if (!injected && path.resolve(String(file)) === target) inject('chmod');",
-        "  return originalChmodSync(file, mode);",
-        "};",
-      ]
-    : [
-        "const originalRenameSync = fs.renameSync;",
-        "fs.renameSync = (from, to) => {",
-        "  if (!injected && path.resolve(String(to)) === target && String(from).includes('.usefulskills-hooks-stage-')) {",
-        "    fs.rmSync(to, { force: true });",
-        "    originalRenameSync(from, to);",
-        "    inject('rename');",
-        "  }",
-        "  return originalRenameSync(from, to);",
-        "};",
-      ];
-  writeFileSync(preload, [...common, ...fault, "syncBuiltinESMExports();"].join("\n"));
-  try {
-    return spawnSync(process.execPath, ["--require", preload, "scripts/install-hooks.mjs"], {
-      cwd: dir,
-      encoding: "utf8",
-      env: { ...process.env, USEFULSKILLS_FAULT_DEST: destination },
-    });
-  } finally {
-    rmSync(preload, { force: true });
-  }
-}
-function installWithRollbackFault(dir, destination) {
-  const preload = join(dir, `.usefulskills-hooks-fault-rollback-${Math.random().toString(36).slice(2)}.cjs`);
+  if (!["link", "unlink"].includes(operation)) throw new Error(`falha desconhecida: ${operation}`);
+  const token = `.usefulskills-hooks-fault-${operation}-${Math.random().toString(36).slice(2)}`;
+  const preload = join(dir, `${token}.cjs`);
+  const marker = join(dir, `${token}.marker`);
   writeFileSync(
     preload,
     [
@@ -132,38 +139,342 @@ function installWithRollbackFault(dir, destination) {
       "const path = require('node:path');",
       "const { syncBuiltinESMExports } = require('node:module');",
       "const target = path.resolve(process.env.USEFULSKILLS_FAULT_DEST);",
-      "let commitFailed = false;",
-      "const originalRenameSync = fs.renameSync;",
-      "fs.renameSync = (from, to) => {",
-      "  const source = path.resolve(String(from));",
-      "  const destination = path.resolve(String(to));",
-      "  if (!commitFailed && destination === target && source.includes('.usefulskills-hooks-stage-')) {",
-      "    commitFailed = true;",
-      "    originalRenameSync(from, to);",
-      "    const error = new Error('injected commit failure');",
-      "    error.code = 'EIO';",
-      "    throw error;",
-      "  }",
-      "  if (commitFailed && destination === target && source.includes('.usefulskills-hooks-backup-')) {",
-      "    const error = new Error('injected rollback failure');",
-      "    error.code = 'EIO';",
-      "    throw error;",
-      "  }",
-      "  return originalRenameSync(from, to);",
+      "const marker = path.resolve(process.env.USEFULSKILLS_FAULT_MARKER);",
+      `const operation = ${JSON.stringify(operation)};`,
+      "let injected = false;",
+      "let published = false;",
+      "function inject(kind) {",
+      "  injected = true;",
+      "  fs.writeFileSync(marker, `${kind}\\n`);",
+      "  const error = new Error(`injected ${kind} failure`);",
+      "  error.code = 'EIO';",
+      "  throw error;",
+      "}",
+      "const realLinkSync = fs.linkSync;",
+      "fs.linkSync = function linkSync(...args) {",
+      "  const source = path.resolve(String(args[0]));",
+      "  const destination = path.resolve(String(args[1]));",
+      "  if (!injected && operation === 'link' && destination === target && source.includes('.stage')) inject('link');",
+      "  const result = realLinkSync.apply(this, args);",
+      "  if (destination === target && source.includes('.stage')) published = true;",
+      "  return result;",
+      "};",
+      "const realUnlinkSync = fs.unlinkSync;",
+      "fs.unlinkSync = function unlinkSync(...args) {",
+      "  const file = path.resolve(String(args[0]));",
+      "  const result = realUnlinkSync.apply(this, args);",
+      "  if (!injected && operation === 'unlink' && published && file.includes('.stage')) inject('unlink');",
+      "  return result;",
       "};",
       "syncBuiltinESMExports();",
     ].join("\n"),
   );
   try {
-    return spawnSync(process.execPath, ["--require", preload, "scripts/install-hooks.mjs"], {
+    const result = spawnSync(process.execPath, ["--require", preload, "scripts/install-hooks.mjs"], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, USEFULSKILLS_FAULT_DEST: destination },
+      env: {
+        ...process.env,
+        USEFULSKILLS_FAULT_DEST: destination,
+        USEFULSKILLS_FAULT_MARKER: marker,
+      },
     });
+    return Object.assign(result, { faultMarker: marker });
   } finally {
     rmSync(preload, { force: true });
   }
 }
+function installWithRollbackFault(dir, destination) {
+  const token = `.usefulskills-hooks-fault-rollback-${Math.random().toString(36).slice(2)}`;
+  const preload = join(dir, `${token}.cjs`);
+  const marker = join(dir, `${token}.marker`);
+  writeFileSync(
+    preload,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const { syncBuiltinESMExports } = require('node:module');",
+      "const target = path.resolve(process.env.USEFULSKILLS_FAULT_DEST);",
+      "const marker = path.resolve(process.env.USEFULSKILLS_FAULT_MARKER);",
+      "let commitFailed = false;",
+      "const realLinkSync = fs.linkSync;",
+      "fs.linkSync = function linkSync(...args) {",
+      "  const source = path.resolve(String(args[0]));",
+      "  const destination = path.resolve(String(args[1]));",
+      "  if (!commitFailed && destination === target && source.includes('.stage')) {",
+      "    commitFailed = true;",
+      "    fs.writeFileSync(marker, 'commit\\n');",
+      "    const error = new Error('injected commit failure');",
+      "    error.code = 'EIO';",
+      "    throw error;",
+      "  }",
+      "  if (commitFailed && destination === target && source.includes('.quarantine')) {",
+      "    fs.writeFileSync(marker, 'commit\\nrollback\\n');",
+      "    const error = new Error('injected rollback failure');",
+      "    error.code = 'EIO';",
+      "    throw error;",
+      "  }",
+      "  return realLinkSync.apply(this, args);",
+      "};",
+      "syncBuiltinESMExports();",
+    ].join("\n"),
+  );
+  try {
+    const result = spawnSync(process.execPath, ["--require", preload, "scripts/install-hooks.mjs"], {
+      cwd: dir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        USEFULSKILLS_FAULT_DEST: destination,
+        USEFULSKILLS_FAULT_MARKER: marker,
+      },
+    });
+    return Object.assign(result, { faultMarker: marker });
+  } finally {
+    rmSync(preload, { force: true });
+  }
+}
+// These preload fault seams observe POSIX fs-transaction calls only; Windows
+// commits run in the native worker and are covered by the real-worker races.
+const posixFaultIt = process.platform === "win32" ? it.skip : it;
+function childEnvironmentWithoutNodeOptions() {
+  const environment = { ...process.env };
+  for (const key of Object.keys(environment)) {
+    if (key.toLowerCase() === "node_options") delete environment[key];
+  }
+  return environment;
+}
+
+// The inspection race observes the real validation seam: on POSIX, the
+// post-inspection consumer read; on Windows, the native worker's
+// `fs-transaction.windows.v1` `inspect-complete` response. The child result is
+// forwarded unchanged before the attacker runs.
+function createInspectionRace(fixture, target, consumerBytes, mutation) {
+  const token = `ac008-inspection-race-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload = join(fixture, `${token}.payload`);
+  const marker = join(fixture, `${token}.marker`);
+  const attacker = join(fixture, `${token}.attacker.cjs`);
+  const preload = join(fixture, `${token}.preload.cjs`);
+  writeFileSync(payload, consumerBytes);
+  writeFileSync(
+    attacker,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      `const target = path.resolve(${JSON.stringify(target)});`,
+      `const payload = path.resolve(${JSON.stringify(payload)});`,
+      `const marker = path.resolve(${JSON.stringify(marker)});`,
+      `const mutation = ${JSON.stringify(mutation)};`,
+      "try {",
+      "  const bytes = fs.readFileSync(payload);",
+      "  if (mutation === 'edit') {",
+      "    fs.writeFileSync(target, bytes);",
+      "    fs.writeFileSync(marker, 'edited\\n');",
+      "  } else {",
+      "    fs.writeFileSync(target, bytes);",
+      "    const replacement = `${target}.ac008-replacement-${process.pid}`;",
+      "    fs.writeFileSync(replacement, bytes);",
+      "    try {",
+      "      fs.renameSync(replacement, target);",
+      "      fs.writeFileSync(marker, 'replaced\\n');",
+      "    } catch (error) {",
+      "      fs.rmSync(replacement, { force: true });",
+      "      fs.writeFileSync(target, bytes);",
+      "      fs.writeFileSync(marker, `replacement-denied:${error?.code || 'unknown'}\\n`);",
+      "    }",
+      "  }",
+      "} catch (error) {",
+      "  fs.writeFileSync(marker, `attacker-failed:${error?.code || error?.message || 'unknown'}\\n`);",
+      "  process.exitCode = 2;",
+      "}",
+    ].join("\n"),
+  );
+  writeFileSync(
+    preload,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const childProcess = require('node:child_process');",
+      "const { syncBuiltinESMExports } = require('node:module');",
+      `const target = path.resolve(${JSON.stringify(target)});`,
+      `const attacker = path.resolve(${JSON.stringify(attacker)});`,
+      `const inspectionTargets = ${JSON.stringify(managedHookNames.map(name => join(dirname(target), name)))};`,
+      "let triggered = false;",
+      "const realSpawnSync = childProcess.spawnSync;",
+      "const realOpenSync = fs.openSync;",
+      "const realCloseSync = fs.closeSync;",
+      "const inspectedFds = new Set();",
+      "let inspectedTargets = 0;",
+      "const childEnvironment = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'node_options'));",
+      "const attack = () => {",
+      "  if (triggered) return;",
+      "  triggered = true;",
+      "  const child = realSpawnSync.call(childProcess, process.execPath, [attacker], {",
+      "    cwd: path.dirname(target),",
+      "    env: childEnvironment(),",
+      "    stdio: 'ignore',",
+      "  });",
+      "  if (child.error || child.status !== 0) throw new Error('AC008 inspection race attacker failed');",
+      "};",
+      "if (process.platform === 'win32') {",
+      "  childProcess.spawnSync = function spawnSync() {",
+      "    const result = Reflect.apply(realSpawnSync, this, arguments);",
+      "    if (!triggered && result?.status === 0) {",
+      "      let response = null;",
+      "      try { response = JSON.parse(String(result.stdout ?? '').trim()); } catch {}",
+      "      if (response?.schema === 'fs-transaction.windows.v1' && response.event === 'inspect-complete' && response.ok === true) attack();",
+      "    }",
+      "    return result;",
+      "  };",
+      "} else {",
+      "  fs.openSync = function openSync() {",
+      "    const result = Reflect.apply(realOpenSync, this, arguments);",
+      "    if (typeof result === 'number' && typeof arguments[0] !== 'number' && inspectionTargets.includes(path.resolve(String(arguments[0])))) inspectedFds.add(result);",
+      "    return result;",
+      "  };",
+      "  fs.closeSync = function closeSync() {",
+      "    const tracked = inspectedFds.delete(arguments[0]);",
+      "    const result = Reflect.apply(realCloseSync, this, arguments);",
+      "    if (tracked && !triggered && ++inspectedTargets === inspectionTargets.length) attack();",
+      "    return result;",
+      "  };",
+      "}",
+      "syncBuiltinESMExports();",
+    ].join("\n"),
+  );
+  return { marker, preload };
+}
+
+// The rollback race observes a real publication event. POSIX forwards the
+// publication primitive before the attacker edits the published target;
+// Windows starts a watcher before the native transaction child and observes
+// the first target publication. No rename fault or stage deletion is injected.
+function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
+  const token = `ac008-rollback-race-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload = join(fixture, `${token}.payload`);
+  const before = join(fixture, `${token}.before`);
+  const marker = join(fixture, `${token}.marker`);
+  const attacker = join(fixture, `${token}.attacker.cjs`);
+  const preload = join(fixture, `${token}.preload.cjs`);
+  writeFileSync(payload, consumerBytes);
+  writeFileSync(before, readFileSync(target));
+  writeFileSync(
+    attacker,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      `const target = path.resolve(${JSON.stringify(target)});`,
+      `const transactionRoot = path.join(path.resolve(${JSON.stringify(transactionHome)}), '.omp', 'install-transactions');`,
+      `const payload = path.resolve(${JSON.stringify(payload)});`,
+      `const before = path.resolve(${JSON.stringify(before)});`,
+      `const marker = path.resolve(${JSON.stringify(marker)});`,
+      "const arm = () => {",
+      "  try {",
+      "    fs.writeFileSync(target, fs.readFileSync(payload));",
+      "    fs.writeFileSync(marker, 'armed\\n');",
+      "  } catch (error) {",
+      "    fs.writeFileSync(marker, `attacker-failed:${error?.code || error?.message || 'unknown'}\\n`);",
+      "    process.exitCode = 2;",
+      "  }",
+      "};",
+      "if (process.argv.includes('--direct')) {",
+      "  arm();",
+      "} else {",
+      "  let stageSeen = false;",
+      "  const deadline = Date.now() + 30000;",
+      "  const poll = () => {",
+      "    if (Date.now() >= deadline) {",
+      "      fs.writeFileSync(marker, 'attacker-timeout\\n');",
+      "      process.exitCode = 2;",
+      "      return;",
+      "    }",
+      "    let targetChanged = false;",
+      "    let transactionSeen = false;",
+      "    try { targetChanged = !fs.readFileSync(target).equals(fs.readFileSync(before)); } catch {}",
+      "    try {",
+      "      for (const name of fs.readdirSync(transactionRoot).filter((item) => item.startsWith('install-'))) {",
+      "        transactionSeen = true;",
+      "        if (fs.existsSync(path.join(transactionRoot, name, '0.stage'))) stageSeen = true;",
+      "      }",
+      "    } catch {}",
+      "    if (targetChanged && (stageSeen || transactionSeen)) {",
+      "      arm();",
+      "      return;",
+      "    }",
+      "    setTimeout(poll, 1);",
+      "  };",
+      "  poll();",
+      "}",
+    ].join("\n"),
+  );
+  writeFileSync(
+    preload,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const childProcess = require('node:child_process');",
+      "const { syncBuiltinESMExports } = require('node:module');",
+      `const target = path.resolve(${JSON.stringify(target)});`,
+      `const attacker = path.resolve(${JSON.stringify(attacker)});`,
+      "const childEnvironment = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'node_options'));",
+      "const realSpawnSync = childProcess.spawnSync;",
+      "const realSpawn = childProcess.spawn;",
+      "const runDirectAttacker = () => {",
+      "  const child = realSpawnSync.call(childProcess, process.execPath, [attacker, '--direct'], {",
+      "    cwd: path.dirname(target),",
+      "    env: childEnvironment(),",
+      "    stdio: 'ignore',",
+      "  });",
+      "  if (child.error || child.status !== 0) throw new Error('AC008 rollback race attacker failed');",
+      "};",
+      "if (process.platform === 'win32') {",
+      "  let watcher = null;",
+      "  childProcess.spawnSync = function spawnSync() {",
+      "    let payload = null;",
+      "    try { payload = JSON.parse(String(arguments[2]?.input ?? '')); } catch {}",
+      "    if (!watcher && payload?.inspectOnly === false && Array.isArray(payload.operations)) {",
+      "      watcher = realSpawn.call(childProcess, process.execPath, [attacker], {",
+      "        cwd: path.dirname(target),",
+      "        env: childEnvironment(),",
+      "        stdio: 'ignore',",
+      "      });",
+      "    }",
+      "    const result = Reflect.apply(realSpawnSync, this, arguments);",
+      "    if (watcher && watcher.exitCode === null) watcher.kill();",
+      "    return result;",
+      "  };",
+      "} else {",
+      "  let triggered = false;",
+      "  for (const name of ['linkSync', 'renameSync', 'copyFileSync']) {",
+      "    const real = fs[name];",
+      "    if (typeof real !== 'function') continue;",
+      "    fs[name] = function publicationBoundary() {",
+      "      const result = Reflect.apply(real, this, arguments);",
+      "      const source = path.resolve(String(arguments[0]));",
+      "      const destination = path.resolve(String(arguments[1]));",
+      "      if (!triggered && destination === target && source.includes('.stage')) {",
+      "        triggered = true;",
+      "        runDirectAttacker();",
+      "      }",
+      "      return result;",
+      "    };",
+      "  }",
+      "}",
+      "syncBuiltinESMExports();",
+    ].join("\n"),
+  );
+  return { marker, preload };
+}
+
+function runRealInstallWithPreload(dir, preload) {
+  return spawnSync(process.execPath, ["--require", preload, "scripts/install-hooks.mjs"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: childEnvironmentWithoutNodeOptions(),
+  });
+}
+
+
 
 
 
@@ -253,17 +564,17 @@ describe("install-hooks + wrappers gerados", () => {
     const bloqueia = runHook(dir, "pre-push", { input: "refs/heads/main 0 0 0\n" });
     expect(bloqueia.status).toBe(1);
     const libera = runHook(dir, "pre-push", { input: "refs/heads/feat/1-x abcdef0 refs/heads/topic abcdef1\n" });
-    expect(libera.status).toBe(0);
+    expectChildExit(libera, 0);
     const vazia = runHook(dir, "pre-push", { input: "" });
     expect(vazia.status).toBe(0);
   });
 
   it("sem git no diretório: não instala nada (nem cria .git falso)", () => {
     const noGit = mkdtempSync(join(tmpdir(), "hooks-nogit-"));
-    cpSync(join(repoRoot, "scripts"), join(noGit, "scripts"), { recursive: true });
+    copyHookFixtureDependencies(noGit);
     try {
       const r = install(noGit);
-      expect(r.status).toBe(0);
+      expectChildExit(r, 0);
       expect(existsSync(join(noGit, ".git"))).toBe(false);
     } finally {
       rmSync(noGit, { recursive: true, force: true });
@@ -274,9 +585,10 @@ describe("install-hooks + wrappers gerados", () => {
     const spaced = mkdtempSync(join(tmpdir(), "caminho com espaco "));
     try {
       spawnSync("git", ["init", "-q"], { cwd: spaced });
+      mkdirSync(join(spaced, ".git", "hooks"), { recursive: true });
       spawnSync("git", ["config", "core.hooksPath", ".git/hooks"], { cwd: spaced });
-      cpSync(join(repoRoot, "scripts"), join(spaced, "scripts"), { recursive: true });
-      symlinkSync(join(repoRoot, "node_modules"), join(spaced, "node_modules"), "junction");
+      copyHookFixtureDependencies(spaced);
+      linkFixtureNodeModules(spaced);
       copyFileSync(join(repoRoot, ".commitlintrc.json"), join(spaced, ".commitlintrc.json"));
       const installed = install(spaced);
       expect(installed.status, installed.stdout + installed.stderr).toBe(0);
@@ -522,7 +834,7 @@ describe("install-hooks + wrappers gerados", () => {
     const fakeGit = join(fakeBin, process.platform === "win32" ? "git.exe" : "git");
     const fakePreload = join(fakeBin, "unexpected-git.cjs");
     const sentinel = join(fakeBin, "unexpected-git-sentinel.txt");
-    cpSync(join(repoRoot, "scripts"), join(fixture, "scripts"), { recursive: true });
+    copyHookFixtureDependencies(fixture);
     if (process.platform === "win32") {
       copyFileSync(process.execPath, fakeGit);
       writeFileSync(
@@ -574,7 +886,7 @@ describe("install-hooks + wrappers gerados", () => {
     const fakeGit = join(fakeBin, process.platform === "win32" ? "git.exe" : "git");
     const fakePreload = join(fakeBin, "safe-directory-git.cjs");
     const sentinel = join(fakeBin, "safe-directory-git-sentinel.txt");
-    cpSync(join(repoRoot, "scripts"), join(fixture, "scripts"), { recursive: true });
+    copyHookFixtureDependencies(fixture);
     if (process.platform === "win32") {
       copyFileSync(process.execPath, fakeGit);
       writeFileSync(
@@ -626,7 +938,7 @@ describe("install-hooks + wrappers gerados", () => {
     const fakeGit = join(fakeBin, process.platform === "win32" ? "git.exe" : "git");
     const fakePreload = join(fakeBin, "localized-git.cjs");
     const sentinel = join(fakeBin, "localized-git-sentinel.txt");
-    cpSync(join(repoRoot, "scripts"), join(noGit, "scripts"), { recursive: true });
+    copyHookFixtureDependencies(noGit);
     if (process.platform === "win32") {
       copyFileSync(process.execPath, fakeGit);
       writeFileSync(
@@ -737,62 +1049,53 @@ describe("install-hooks + wrappers gerados", () => {
     }
   });
 
-  for (const operation of ["rename", "chmod"]) {
-    it(`restaura todos os destinos após falha de ${operation} em destino posterior`, () => {
+  for (const operation of ["link", "unlink"]) {
+    posixFaultIt(`restaura todos os destinos após falha de ${operation} em destino posterior`, () => {
       const fixture = initRepo(`hooks-rollback-${operation}`);
       try {
         const first = install(fixture);
         expectChildExit(first, 0);
         const directory = hooksPath(fixture);
-        const previous = new Map();
-        for (const name of managedHookNames) {
-          const content = Buffer.concat([
-            readFileSync(join(directory, name)),
-            Buffer.from(`\nconteúdo anterior ${name}\n`),
-          ]);
-          writeFileSync(join(directory, name), content);
-          previous.set(name, content);
-        }
+        const previous = seedPublishedHooks(directory);
 
         const result = installWithFsFault(fixture, join(directory, "pre-push"), operation);
         expectChildExit(result, 1);
+        expect(existsSync(result.faultMarker)).toBe(true);
+        expect(readFileSync(result.faultMarker, "utf8")).toBe(`${operation}\n`);
         for (const name of managedHookNames) {
           expect(readFileSync(join(directory, name))).toEqual(previous.get(name));
         }
-        const transactionRoot = dirname(directory);
-        expect(readdirSync(transactionRoot).filter((name) => name.startsWith(".usefulskills-hooks-"))).toEqual([]);
+        const transactionRoot = join(fixture, ".omp", "install-transactions");
+        if (existsSync(transactionRoot)) {
+          expect(readdirSync(transactionRoot).every((name) => name.startsWith("install-"))).toBe(true);
+        }
+        expect(readdirSync(dirname(directory)).filter((name) => name.startsWith(".usefulskills-hooks-"))).toEqual([]);
       } finally {
         rmSync(fixture, { recursive: true, force: true });
       }
     });
   }
-  it("reporta estado inseguro quando a restauração do rollback falha", () => {
+  posixFaultIt("reporta estado inseguro quando a restauração do rollback falha", () => {
     const fixture = initRepo("hooks-rollback-unsafe");
     try {
       const first = install(fixture);
       expectChildExit(first, 0);
       const directory = hooksPath(fixture);
-      const previous = new Map();
-      for (const name of managedHookNames) {
-        const content = Buffer.concat([
-          readFileSync(join(directory, name)),
-          Buffer.from(`\nconteúdo anterior ${name}\n`),
-        ]);
-        writeFileSync(join(directory, name), content);
-        previous.set(name, content);
-      }
+      const previous = seedPublishedHooks(directory);
 
       const destination = join(directory, "pre-push");
       const result = installWithRollbackFault(fixture, destination);
       const output = result.stdout + result.stderr;
       expectChildExit(result, 1);
+      expect(existsSync(result.faultMarker)).toBe(true);
+      expect(readFileSync(result.faultMarker, "utf8")).toBe("commit\nrollback\n");
       expect(output).toMatch(/rollback|restaur/i);
-      expect(output).toMatch(/incomplet|insegur|unsafe/i);
+      expect(output).toMatch(/parcial|incomplet|insegur|unsafe/i);
       expect(output).toContain(destination);
       for (const name of managedHookNames.filter((name) => name !== "pre-push")) {
         expect(readFileSync(join(directory, name))).toEqual(previous.get(name));
       }
-      expect(readFileSync(destination)).not.toEqual(previous.get("pre-push"));
+      expect(existsSync(destination) ? readFileSync(destination) : null).not.toEqual(previous.get("pre-push"));
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }
@@ -834,4 +1137,260 @@ describe("install-hooks + wrappers gerados", () => {
     expect(pkgCfg["release-as"]).toBeUndefined(); // override sticky congela releases futuros
     expect(pkgCfg["initial-version"]).toBe("0.1.0"); // sem isso, primeiro release sai v1.0.0
   });
+});
+// Estes casos AC-008 não usam o beforeAll acima: cada cenário cria seu próprio
+// repositório Git privado e invoca o CLI real. Falhas de pré-requisito, inclusive
+// o guard do Git Windows protegido, permanecem visíveis como diagnóstico e não
+// são convertidas em skip ou em RED válido de CAS.
+describe("AC-008 CAS de hooks com CLI Git real", () => {
+  it("AC-008 controle: instalação nova vazia gera os quatro arquivos geridos", () => {
+    const fixture = initRepo("ac008-empty-install");
+    try {
+      const result = install(fixture);
+      expectChildExit(result, 0);
+      for (const name of managedHookNames) {
+        expect(existsSync(join(hooksPath(fixture), name))).toBe(true);
+      }
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  it("AC-008 controle: arquivo preexistente não gerido preserva os bytes do consumidor", () => {
+    const fixture = initRepo("ac008-unmanaged");
+    const directory = hooksPath(fixture);
+    const unrelated = join(directory, "consumer-unmanaged.hook");
+    const consumerBytes = Buffer.from("hook de outro consumidor — não tocar\n");
+    writeFileSync(unrelated, consumerBytes);
+    try {
+      const result = install(fixture);
+      expectChildExit(result, 0);
+      expect(readFileSync(unrelated)).toEqual(consumerBytes);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+
+  for (const mutation of ["edit", "replace"]) {
+    it(`AC-008/AUD-017 preserva bytes após ${mutation} concorrente entre inspeção e commit`, () => {
+      const fixture = initRepo(`ac008-inspection-${mutation}`);
+      try {
+        const first = install(fixture);
+        expectChildExit(first, 0);
+        const target = join(hooksPath(fixture), "commit-msg");
+        const consumerBytes = Buffer.from(`hook do consumidor após ${mutation}\n`);
+        const race = createInspectionRace(fixture, target, consumerBytes, mutation);
+        const result = runRealInstallWithPreload(fixture, race.preload);
+        expectChildExit(result, 1);
+        expect(existsSync(race.marker)).toBe(true);
+        const marker = readFileSync(race.marker, "utf8").trim();
+        if (mutation === "edit") {
+          expect(marker).toBe("edited");
+        } else {
+          expect(marker).toMatch(/^(replaced|replacement-denied:.*)$/);
+        }
+        expect(readFileSync(target)).toEqual(consumerBytes);
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    });
+  }
+
+  it("AC-008/AUD-017 protege publicações contra edição concorrente após a primeira escrita", () => {
+    const fixture = initRepo("ac008-rollback-concurrent-edit");
+    try {
+      const first = install(fixture);
+      expectChildExit(first, 0);
+      const directory = hooksPath(fixture);
+      const target = join(directory, "commit-msg");
+      const expectedPublication = new Map(
+        managedHookNames.map((name) => [name, readFileSync(join(directory, name))]),
+      );
+      const previous = seedPublishedHooks(directory);
+      const consumerBytes = Buffer.from("edição do consumidor durante rollback\n");
+      const race = createRollbackRace(fixture, target, fixture, consumerBytes);
+      const result = runRealInstallWithPreload(fixture, race.preload);
+      expect(existsSync(race.marker)).toBe(true);
+      const marker = readFileSync(race.marker, "utf8").trim();
+      const output = `${result.stdout || ""}${result.stderr || ""}`;
+
+      if (process.platform === "win32" && marker === "attacker-failed:EBUSY") {
+        expectChildExit(result, 0);
+        for (const name of managedHookNames) {
+          const published = readFileSync(join(directory, name));
+          expect(published).toEqual(expectedPublication.get(name));
+          expect(published).not.toEqual(consumerBytes);
+        }
+      } else if (marker === "armed") {
+        expectChildExit(result, 1);
+        expect(readFileSync(target)).toEqual(consumerBytes);
+        expect(readFileSync(target)).not.toEqual(expectedPublication.get("commit-msg"));
+        for (const name of managedHookNames.filter((name) => name !== "commit-msg")) {
+          expect(readFileSync(join(directory, name))).toEqual(previous.get(name));
+        }
+      } else {
+        throw new Error(`resultado de corrida não controlado: ${marker}`);
+      }
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+});
+
+const windowsGitWrapperDescribe = process.platform === "win32" ? describe : describe.skip;
+
+windowsGitWrapperDescribe("AC-008/AUD-019 wrappers Git Windows não confiáveis", () => {
+  for (const extension of ["cmd", "bat"]) {
+    it(`rejeita git.${extension} com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper`, () => {
+      const fixture = initRepo(`ac008-git-wrapper-${extension}`);
+      const wrapperDirectory = mkdtempSync(join(tmpdir(), `ac008-git-wrapper-${extension}-`));
+      const wrapper = join(wrapperDirectory, `git.${extension}`);
+      writeFileSync(wrapper, "@echo off\r\nexit /b 0\r\n");
+      const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+      try {
+        const result = spawnSync(process.execPath, ["scripts/install-hooks.mjs"], {
+          cwd: fixture,
+          encoding: "utf8",
+          env: {
+            ...childEnvironmentWithoutNodeOptions(),
+            [pathKey]: `${wrapperDirectory}${delimiter}${process.env[pathKey] ?? ""}`,
+          },
+        });
+        const output = `${result.stdout || ""}${result.stderr || ""}`;
+        expectChildExit(result, 1);
+        expect(output).toMatch(/E_UNSAFE_GIT_EXECUTABLE/);
+        assertManagedHooksAbsent(join(fixture, ".git", "hooks"));
+      } finally {
+        rmSync(wrapperDirectory, { recursive: true, force: true });
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+
+// Costura focal de AUD-018: executa a fonte real diretamente, sem o beforeAll
+// que instala hooks via Git. O caso CMD é deliberadamente separado para que
+// `vitest -t "AC-008 fallback commit-msg direto"` não dispare esse setup.
+const windowsFallbackDescribe = process.platform === "win32" ? describe : describe.skip;
+
+windowsFallbackDescribe("AC-008 fallback commit-msg direto sem setup do instalador", () => {
+  const hook = join(repoRoot, "scripts", "hooks", "commit-msg.mjs");
+  const realCli = join(repoRoot, "node_modules", "@commitlint", "cli", "cli.js");
+  const runWhenCommitlintIsProvisioned = existsSync(realCli) ? it : it.skip;
+
+  function createFallbackFixture() {
+    const fixture = mkdtempSync(join(tmpdir(), "commit-msg fallback á & %HOOK_SENTINEL% "));
+    try {
+      const gitInit = spawnSync("git", ["init", "-q"], {
+        cwd: fixture,
+        encoding: "utf8",
+        env: { ...childEnvironmentWithoutNodeOptions(), GIT_CONFIG_NOSYSTEM: "1" },
+      });
+      expectChildExit(gitInit, 0);
+      const binDirectory = join(fixture, "node_modules", ".bin");
+      mkdirSync(binDirectory, { recursive: true });
+      writeFileSync(
+        join(fixture, ".commitlintrc.json"),
+        `${JSON.stringify(
+          {
+            rules: {
+              "type-empty": [2, "never"],
+              "type-enum": [2, "always", ["feat", "fix"]],
+              "subject-empty": [2, "never"],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      writeFileSync(
+        join(binDirectory, "commitlint.cmd"),
+        [
+          "@echo off",
+          "setlocal",
+          '"%USEFULSKILLS_REAL_NODE%" "%USEFULSKILLS_REAL_COMMITLINT_CLI%" %*',
+          "exit /b %errorlevel%",
+        ].join("\r\n"),
+      );
+      return fixture;
+    } catch (error) {
+      rmSync(fixture, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  function isolatedHookEnvironment() {
+    const env = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (
+        /^(NODE_OPTIONS|COMSPEC|HOOK_SENTINEL|COMMITLINT_BIN|COMMIT_MSG_FILE|USEFULSKILLS_REAL_|COMMAND_EXTRA_SENTINEL)$/i.test(
+          key,
+        )
+      ) {
+        continue;
+      }
+      env[key] = value;
+    }
+    const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
+    env.ComSpec = join(systemRoot, "System32", "cmd.exe");
+    env.USEFULSKILLS_REAL_NODE = process.execPath;
+    env.USEFULSKILLS_REAL_COMMITLINT_CLI = realCli;
+    env.NO_COLOR = "1";
+    return env;
+  }
+
+  function runCommitMsg(fixture, message) {
+    const commandExtraSentinel = "COMMIT_MSG_COMMAND_EXTRA_SENTINEL.txt";
+    const messageFile = join(
+      fixture,
+      `mensagem Unicode á %HOOK_SENTINEL% & copy nul ${commandExtraSentinel}`,
+    );
+    writeFileSync(messageFile, `${message}\n`);
+    const result = spawnSync(process.execPath, [hook, messageFile], {
+      cwd: fixture,
+      encoding: "utf8",
+      env: isolatedHookEnvironment(),
+    });
+    return { commandExtraSentinel, result };
+  }
+
+  runWhenCommitlintIsProvisioned(
+    "AC-008/AUD-018 aceita Conventional válido pelo fallback .cmd em cwd e mensagem com Unicode, espaços e metacaracteres",
+    () => {
+      const fixture = createFallbackFixture();
+      try {
+        expect(existsSync(join(fixture, "node_modules", "@commitlint", "cli", "cli.js"))).toBe(false);
+        expect(existsSync(join(fixture, "node_modules", ".bin", "commitlint.cmd"))).toBe(true);
+        const { commandExtraSentinel, result } = runCommitMsg(fixture, "feat: caminho fallback");
+        const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+        expect(result.error, output).toBeUndefined();
+        expect(result.status, output).toBe(0);
+        expect(output).not.toContain(commandExtraSentinel);
+        expect(existsSync(join(fixture, commandExtraSentinel))).toBe(false);
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    },
+  );
+
+  runWhenCommitlintIsProvisioned(
+    "AC-008/AUD-018 rejeita Conventional inválido pelo fallback .cmd sem executar comando extra",
+    () => {
+      const fixture = createFallbackFixture();
+      try {
+        expect(existsSync(join(fixture, "node_modules", "@commitlint", "cli", "cli.js"))).toBe(false);
+        expect(existsSync(join(fixture, "node_modules", ".bin", "commitlint.cmd"))).toBe(true);
+        const { commandExtraSentinel, result } = runCommitMsg(fixture, "chore: tipo não permitido");
+        const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+        expect(result.error, output).toBeUndefined();
+        expect(result.status, output).toBe(1);
+        expect(output).toMatch(/type-(?:empty|enum)|subject-empty/i);
+        expect(output).not.toContain(commandExtraSentinel);
+        expect(existsSync(join(fixture, commandExtraSentinel))).toBe(false);
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    },
+  );
 });

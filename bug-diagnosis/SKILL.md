@@ -6,6 +6,24 @@ description: Disciplina de diagnóstico para bugs difíceis e regressões de per
 
 # bug-diagnosis — disciplina de diagnóstico de bugs
 
+## Integração seletiva
+
+Para busca dependente de estrutura, leia [AST](references/ast-search.md); texto usa
+rg. Preserve reprodução → hipótese falsificável → instrumentação → regressão;
+retorne ao chamador a mesma prova, sem outro ciclo TDD. O diagnóstico não agenda
+publicação. Use [recursos/retomada](../tdd-orchestrator/references/execution-and-resume.md)
+se houver frentes; não criar outro scheduler. Redaction não comprovada mantém
+bloqueio, e indisponibilidade de harness não vira aprovação. [Origem](SOURCE.md).
+
+Para impacto funcional, documentação durável e segurança da correção, leia
+`skill://tdd-orchestrator/references/quality-policy.md` na localização resolvida
+pelo OMP. Classifique o delta desde a baseline antes do fix e reporte ao chamador
+os vínculos AC→teste→documento e o risco. Uma restauração do comportamento já
+documentado pode justificar impacto `none`; mudança de regra, permissão ou fluxo
+exige atualização funcional. O diagnóstico preserva seu próprio loop de
+reprodução; a revisão e o gate de entrega pertencem ao fluxo chamador. Um harness
+indisponível não torna uma verificação obrigatória de segurança inaplicável.
+
 Uma disciplina para bugs difíceis. Pule fases apenas com justificativa explícita.
 
 ## Redação de segredos
@@ -39,7 +57,7 @@ Gaste esforço desproporcional aqui. Seja agressivo, criativo; recuse desistir.
 9. **Loop diferencial.** Rode a mesma entrada na versão antiga vs nova (ou duas configs) e diffe as saídas.
 10. **Script bash humano-em-circulo.** Último recurso. Se um humano precisa clicar, dirija-o com `skill://bug-diagnosis/scripts/hitl-loop.template.sh` para o loop continuar estruturado. Em ambiente sem bash, conduza o loop com perguntas diretas ao usuário (ferramenta `ask`), registrando cada resposta.
 
-Construa o feedback loop certo e o bug está 90% resolvido.
+Um feedback loop específico reduz a incerteza; não garante tempo de solução.
 
 ### Apertar o loop
 
