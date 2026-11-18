@@ -947,27 +947,45 @@ function operationalResult(value) {
   if (typeof success === "boolean") summary.success = success;
   return summary;
 }
+function trustedBooleanState(nodes, keys) {
+  const values = [];
+  for (const node of nodes) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+    for (const key of keys) if (typeof node[key] === "boolean") values.push(node[key]);
+  }
+  return {
+    present: values.length > 0,
+    positive: values.includes(true),
+    negative: values.includes(false),
+    contradictory: values.includes(true) && values.includes(false),
+  };
+}
+
 
 function summarizeToolEvent(frame) {
-  const completed = findRawField(frame, ["completed"]);
   const result = {
     type: frame.type,
     toolCallId: eventCorrelationId(frame),
     toolName: eventToolName(frame),
     path: findRawField(frame, ["path"]),
     resolvedPath: findRawField(frame, ["resolvedPath", "resolved_path"]),
-    completed: completed === undefined && frame.type === "tool_execution_end" ? true : completed,
   };
   if (frame.type === "tool_execution_end") {
     const resultValue = frame.result ?? frame.output ?? frame.error;
+    const completed = trustedBooleanState([frame, resultValue], ["completed"]);
+    const failed = trustedBooleanState([frame, resultValue], ["failed", "isError", "is_error"]);
+    const success = trustedBooleanState([frame, resultValue], ["success"]);
     if (resultValue !== undefined) {
       result.resultHash = opaqueError(resultValue).sha256;
       result.resultMeta = operationalResult(resultValue);
     }
     if (typeof frame.code === "string") result.code = frame.code.slice(0, 128);
-    if (frame.error !== undefined) result.failed = true;
-    if (typeof frame.success === "boolean") result.success = frame.success;
+    if (completed.present) result.completed = completed.positive && !completed.negative && !completed.contradictory;
+    if (failed.present) result.failed = failed.positive || failed.contradictory;
     if (typeof frame.isError === "boolean") result.isError = frame.isError;
+    if (failed.positive || failed.contradictory) result.isError = true;
+    if (success.present) result.success = success.positive && !success.negative && !success.contradictory;
+    if (frame.error !== undefined) result.failed = true;
   }
   return Object.fromEntries(Object.entries(result).filter(([, value]) => value !== undefined && value !== null));
 }
@@ -1312,7 +1330,9 @@ class RpcSession {
       return;
     }
     if (frame.type === "tool_execution_start" || frame.type === "tool_execution_end") {
-      this.evidence.tool_events.push(summarizeToolEvent(frame));
+      const event = summarizeToolEvent(frame);
+      event.sequence = this.evidence.tool_events.length + 1;
+      this.evidence.tool_events.push(event);
       return;
     }
     if (frame.type === "message_end") {
@@ -1626,34 +1646,51 @@ function normalizeReadToolPath(value) {
   return normalizeObservedPath(String(value).replace(/:raw$/i, ""));
 }
 
-function pathMatchesSource(pathValue, sourceRoot, relativePath) {
-  const observed = normalizeReadToolPath(pathValue);
+function pathMatchesSource(pathValue, sourceRoot, relativePath, trustedOverlayRoot = null) {
+  if (typeof pathValue !== "string" || pathValue.trim() === "") return false;
+  const raw = pathValue.trim();
+  const observed = normalizeReadToolPath(raw);
   const expectedAbsolute = normalizeObservedPath(join(sourceRoot, "alignment", relativePath));
-  const expectedCopied = `/.omp/skills/alignment/${relativePath}`.toLowerCase();
-  return observed === expectedAbsolute || observed === expectedCopied.slice(1) || observed.endsWith(expectedCopied);
+  const expectedCopied = normalizeObservedPath(`/.omp/skills/alignment/${relativePath}`);
+  const trustedOverlay = trustedOverlayRoot
+    ? normalizeObservedPath(join(trustedOverlayRoot, "skills", "alignment", relativePath))
+    : null;
+  if (observed === expectedAbsolute || observed === expectedCopied || observed === expectedCopied.slice(1) || observed === trustedOverlay) return true;
+  const pathWithoutSelector = raw.replace(/:raw$/i, "");
+  const absoluteInput = isAbsolute(pathWithoutSelector) || /^[a-z]:[\\/]/i.test(pathWithoutSelector) || /^\\\\/.test(pathWithoutSelector);
+  if (absoluteInput) return false;
+  const sourceRelative = normalizeObservedPath(resolve(sourceRoot, pathWithoutSelector));
+  if (sourceRelative === expectedAbsolute) return true;
+  const relativeOverlay = observed.replace(/^\.\/+/, "");
+  return relativeOverlay === expectedCopied.slice(1);
 }
 
-function assertToolReadEvidence(sessionEvidence, label, sourceRoot) {
+function assertToolReadEvidence(sessionEvidence, label, sourceRoot, trustedOverlayRoot = null) {
   const toolEvents = sessionEvidence.tool_events ?? [];
   const starts = toolEvents.filter((event) => event.type === "tool_execution_start");
   const ends = toolEvents.filter((event) => event.type === "tool_execution_end");
   const observed = { source: false, route: false, pairs: 0 };
   for (const start of starts) {
     const startName = eventToolName(start);
-    if (startName && !/(?:^|[.:/_-])read$/i.test(startName)) continue;
+    if (!startName || !/(?:^|[.:/_-])read$/i.test(startName)) continue;
     const id = eventCorrelationId(start);
     if (!id) continue;
-    const end = ends.find((candidate) => eventCorrelationId(candidate) === id);
+    const end = ends.find((candidate) =>
+      eventCorrelationId(candidate) === id
+      && Number.isSafeInteger(candidate.sequence)
+      && Number.isSafeInteger(start.sequence)
+      && candidate.sequence > start.sequence
+    );
     if (!end) continue;
     const endName = eventToolName(end);
     if (endName && !/(?:^|[.:/_-])read$/i.test(endName)) continue;
-    if (end.completed !== true || end.isError === true || end.failed === true || end.success === false) continue;
+    if (end.isError !== false || end.completed === false || end.failed === true || end.success === false) continue;
     const paths = [
       ...collectPathValues(start),
       ...collectPathValues(end),
     ];
-    if (paths.some((value) => pathMatchesSource(value, sourceRoot, "SKILL.md"))) observed.source = true;
-    if (paths.some((value) => pathMatchesSource(value, sourceRoot, "references/routing-and-persistence.md"))) observed.route = true;
+    if (paths.some((value) => pathMatchesSource(value, sourceRoot, "SKILL.md", trustedOverlayRoot))) observed.source = true;
+    if (paths.some((value) => pathMatchesSource(value, sourceRoot, "references/routing-and-persistence.md", trustedOverlayRoot))) observed.route = true;
   }
   if (!observed.source || !observed.route) {
     assertion(`${label} lacks correlated read-tool evidence for the alignment source and route`, {
@@ -1670,11 +1707,16 @@ function assertToolReadPaths(sessionEvidence, label, expectedPaths) {
   const observed = new Set();
   for (const start of starts) {
     const startName = eventToolName(start);
-    if (startName && !/(?:^|[.:/_-])read$/i.test(startName)) continue;
+    if (!startName || !/(?:^|[.:/_-])read$/i.test(startName)) continue;
     const id = eventCorrelationId(start);
     if (!id) continue;
-    const end = ends.find((candidate) => eventCorrelationId(candidate) === id);
-    if (!end || end.completed !== true || end.isError === true || end.failed === true || end.success === false) continue;
+    const end = ends.find((candidate) =>
+      eventCorrelationId(candidate) === id
+      && Number.isSafeInteger(candidate.sequence)
+      && Number.isSafeInteger(start.sequence)
+      && candidate.sequence > start.sequence
+    );
+    if (!end || end.isError !== false || end.completed === false || end.failed === true || end.success === false) continue;
     const endName = eventToolName(end);
     if (endName && !/(?:^|[.:/_-])read$/i.test(endName)) continue;
     for (const value of [...collectPathValues(start), ...collectPathValues(end)]) {
@@ -1732,7 +1774,7 @@ async function executeCase({ context, fixture, overlay, label, worktree, mode, r
   try {
     await session.execute(promptMessage ?? buildPrompt({ requestId, runId, mode, reason, scope, sourceRoot: context.source, expectBlocked }));
     if (expectBlocked) assertTerminalSignal(session.evidence, label, "blocked");
-    assertToolReadEvidence(session.evidence, label, context.source);
+    assertToolReadEvidence(session.evidence, label, context.source, join(worktree, ".omp"));
     await session.close();
     caseEvidence.session = session.evidence;
   } catch (error) {
@@ -2418,7 +2460,7 @@ function bindSecondaryResumeEvidence(context, primaryCapture, secondaryPath, wor
   }
   const scenario = captureScenario(secondary, "GREEN-resume-capture-B");
   assertCapturedScenarioSettled(scenario, "secondary B resume");
-  assertToolReadEvidence(scenario.session, "secondary B resume", secondary.source_root);
+  assertToolReadEvidence(scenario.session, "secondary B resume", secondary.source_root, join(worktree, ".omp"));
   if (
     scenario.request_id !== initialB.record.request_id
     || scenario.run_id !== initialB.record.run_id
@@ -2450,7 +2492,7 @@ function assertCapturedControl(capture, lab, label, expected) {
   assertCapturedScenarioSettled(scenario, `${label} historical replay`);
   const worktree = existingDirectory(`${label} historical worktree`, scenario.worktree);
   assertInside(lab, worktree, `${label} historical worktree`);
-  assertToolReadEvidence(scenario.session, `${label} historical replay`, capture.source_root);
+  assertToolReadEvidence(scenario.session, `${label} historical replay`, capture.source_root, join(worktree, ".omp"));
   const captured = captureCheckpointEvidence(capture, label);
   assertInside(lab, captured.path, `${label} historical checkpoint`);
   const checkpoint = readJsonFile(captured.path, `${label} historical checkpoint`);
@@ -2530,7 +2572,7 @@ function bindExistingCollisionCapture(context, primaryFile, initialA, initialB, 
   ) {
     blocked("collision capture does not bind its actual prompt to A", { code: "COLLISION_PROMPT_BINDING", phase: "collision_binding" });
   }
-  assertToolReadEvidence(scenario.session, "collision native replay", capture.source_root);
+  assertToolReadEvidence(scenario.session, "collision native replay", capture.source_root, join(initialA.worktree, ".omp"));
   const readNamespace = (parent, identity, side, withCollision) => {
     const namespace = existingDirectory(`collision ${side} namespace`, dirname(parent.path));
     assertInside(common, namespace, `collision ${side} common directory`);
@@ -2636,16 +2678,16 @@ function prepareResumeCapture(context, sourceEntries, capturePath) {
   assertCapturedScenarioSettled(initialA, "GREEN-resume-A-initial");
   assertCapturedScenarioSettled(initialB, "GREEN-resume-B-initial");
   assertCapturedScenarioSettled(resumedA, "GREEN-resume-A");
-  assertToolReadEvidence(initialA.session, "GREEN-resume-A-initial captured replay", capture.source_root);
-  assertToolReadEvidence(initialB.session, "GREEN-resume-B-initial captured replay", capture.source_root);
-  assertToolReadEvidence(resumedA.session, "GREEN-resume-A captured replay", capture.source_root);
-  if (resumedA.request_id !== initialA.request_id || resumedA.run_id !== initialA.run_id) {
-    blocked("resume capture A successor session used different request/run identities", { code: "RESUME_IDENTITY", phase: "capture_binding" });
-  }
   const worktreeAPath = existingDirectory("resume A worktree", initialA.worktree);
   const worktreeBPath = existingDirectory("resume B worktree", initialB.worktree);
   assertInside(context.lab, worktreeAPath, "resume A worktree lab");
   assertInside(context.lab, worktreeBPath, "resume B worktree lab");
+  assertToolReadEvidence(initialA.session, "GREEN-resume-A-initial captured replay", capture.source_root, join(worktreeAPath, ".omp"));
+  assertToolReadEvidence(initialB.session, "GREEN-resume-B-initial captured replay", capture.source_root, join(worktreeBPath, ".omp"));
+  assertToolReadEvidence(resumedA.session, "GREEN-resume-A captured replay", capture.source_root, join(worktreeAPath, ".omp"));
+  if (resumedA.request_id !== initialA.request_id || resumedA.run_id !== initialA.run_id) {
+    blocked("resume capture A successor session used different request/run identities", { code: "RESUME_IDENTITY", phase: "capture_binding" });
+  }
   if (!isAbsolute(initialA.worktree) || !isAbsolute(initialB.worktree) || !isAbsolute(resumedA.worktree) || !samePath(worktreeAPath, resumedA.worktree)) {
     blocked("resume capture worktree identities are not absolute and stable", { code: "RESUME_WORKTREE_IDENTITY", phase: "capture_binding" });
   }

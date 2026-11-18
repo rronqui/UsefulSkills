@@ -38,6 +38,8 @@ const EXPECTED_FIXTURE_SUFFIX = "ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b86
 const DEFAULT_TIMEOUT_MS = 900_000;
 const MAX_PHYSICAL_FRAME_BYTES = 1024 * 1024;
 const MAX_REASSEMBLED_FRAME_BYTES = 64 * 1024 * 1024;
+const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
+const OPERATIONAL_PROMPT_FIELDS = Object.freeze({ type: "string", id: "string", status: "string", agentInvoked: "boolean", sessionSettled: "boolean" });
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const DECODER = new TextDecoder("utf-8", { fatal: true });
@@ -53,7 +55,11 @@ const RPC_EVENTS = Object.freeze([
   "subagent_event",
 ]);
 const ALLOWED_ROOT_TOOL = /^(?:read|grep|glob|wait|todo|task|tasks)(?:$|[_.:])/i;
+const PEER_WIRE_ROOT_TOOL = /^(?:read|grep|glob|wait)(?:$|[_.:])/i;
 const FORBIDDEN_TOOL = /(?:bash|shell|powershell|cmd(?:\.exe)?|ssh|host|write|edit|apply[_-]?patch|install|publish|deploy|service|git|curl|fetch|http|network|web|browser|get[_-]?subagents|workpool|settings|config|login|auth)/i;
+const PEER_WIRE_PROBE = "peer-wire-malformed";
+const PEER_WIRE_PROBE_SCHEMA = "native05-peer-wire-probe-v1";
+const MAX_PROBE_OUTPUT_BYTES = 64 * 1024;
 const TASK_FORBIDDEN_KEYS = new Set([
   "model", "modeloverride", "model_override", "thinkinglevel", "thinking_level", "effort",
   "structured", "task.structured", "task_structured", "outputschema", "output_schema",
@@ -167,6 +173,30 @@ function sanitizeValue(value, depth = 0, key = "") {
     return result;
   }
   return String(value);
+}
+
+function serializeOperationalEvidence(value) {
+  // Diagnostic previews must not discard operational authority or settlement.
+  const text = JSON.stringify(value, (key, item) => {
+    if (key === "prompt_result") {
+      if (item === null) return null;
+      if (!item || typeof item !== "object" || Array.isArray(item)) return "<redacted>";
+      const terminal = {};
+      for (const [field, type] of Object.entries(OPERATIONAL_PROMPT_FIELDS)) {
+        if (Object.hasOwn(item, field) && typeof item[field] === type) terminal[field] = item[field];
+      }
+      return terminal;
+    }
+    // This exact SDK field is observed effort metadata, not hidden reasoning.
+    if (key !== "resolvedThinkingLevel" && sensitiveKey(key)) return "<redacted>";
+    if (typeof item === "string") return scrubText(item, MAX_CAPTURE_BYTES + 1);
+    if (item === null || ["object", "boolean", "number"].includes(typeof item)) return item;
+    return String(item);
+  }, 2) + "\n";
+  if (Buffer.byteLength(text, "utf8") > MAX_CAPTURE_BYTES) {
+    throw new DriverError("BLOCKED", "operational evidence exceeded physical limit");
+  }
+  return text;
 }
 
 function opaque(value) {
@@ -429,7 +459,7 @@ function publicReviewData(value) {
   return result;
 }
 
- 
+
 function publicAggregateData(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const result = {};
@@ -446,7 +476,7 @@ function publicAggregateData(value) {
   if (Array.isArray(value.blockers)) result.blockers = value.blockers.map(publicFinding).filter(Boolean);
   return result;
 }
- 
+
 function safeYieldEntries(value) {
   if (!Array.isArray(value)) return null;
   return value.slice(0, 96).map((item) => {
@@ -605,11 +635,168 @@ function taskCallShape(frame) {
 function stringsForRead(value, output = [], depth = 0) {
   return collectReadStrings(value, READ_ARGUMENT_KEYS, output, depth);
 }
+function explicitExitCode(value, depth = 0) {
+  if (depth > 8 || !value || typeof value !== "object") return undefined;
+  for (const key of ["exitCode", "exit_code"]) if (Number.isInteger(value[key])) return value[key];
+  for (const key of ["result", "details", "event", "payload", "data"]) {
+    const found = explicitExitCode(value[key], depth + 1);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+function probeTextCandidates(value, output = [], depth = 0) {
+  if (depth > 6 || value === null || value === undefined || output.length >= 48) return output;
+  if (typeof value === "string") {
+    if (Buffer.byteLength(value, "utf8") <= MAX_PROBE_OUTPUT_BYTES) output.push(value);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value.slice(0, 32)) probeTextCandidates(item, output, depth + 1);
+    return output;
+  }
+  if (typeof value !== "object") return output;
+  for (const key of ["content", "text", "stdout", "output", "result", "data", "details"]) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) probeTextCandidates(value[key], output, depth + 1);
+  }
+  return output;
+}
+
+function publicProbeOutcome(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const outcome = {
+    ok: value.ok === true,
+    errors: Array.isArray(value.errors) ? value.errors.filter((item) => typeof item === "string").slice(0, 8).map((item) => scrubText(item, 512)) : [],
+    status: typeof value.status === "string" ? scrubText(value.status, 64) : null,
+  };
+  const actual = value.value && typeof value.value === "object" && !Array.isArray(value.value) ? value.value : null;
+  if (actual) outcome.actual = publicReviewData(actual);
+  return outcome;
+}
+
+function publicChildExecution(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const spawnError = value.spawn_error;
+  return {
+    origin: value.origin === "observed-node-child" ? value.origin : null,
+    executable: typeof value.executable === "string" ? scrubText(value.executable, 1024) : null,
+    script_path: typeof value.script_path === "string" ? scrubText(value.script_path, 1024) : null,
+    script_sha256: SHA256.test(String(value.script_sha256 ?? "")) ? String(value.script_sha256).toLowerCase() : null,
+    argv_sha256: SHA256.test(String(value.argv_sha256 ?? "")) ? String(value.argv_sha256).toLowerCase() : null,
+    exit_code: Number.isInteger(value.exit_code) ? value.exit_code : null,
+    exit_code_observed: value.exit_code_observed === true,
+    signal: value.signal === null || typeof value.signal === "string" ? value.signal : null,
+    signal_observed: value.signal_observed === true && Object.hasOwn(value, "signal") && (value.signal === null || typeof value.signal === "string"),
+    spawn_error: spawnError === null
+      ? null
+      : {
+        name: typeof spawnError?.name === "string" ? scrubText(spawnError.name, 128) : null,
+        code: typeof spawnError?.code === "string" ? scrubText(spawnError.code, 128) : null,
+      },
+  };
+}
+
+function validateObservedChildExecution(output, probe) {
+  const child = output?.child_execution;
+  const helper = probe.files.find((entry) => samePath(entry.path, probe.helperPath));
+  if (!child || child.origin !== "observed-node-child"
+    || child.exit_code_observed !== true || child.exit_code !== 0
+    || child.signal_observed !== true || child.signal !== null || child.spawn_error !== null
+    || typeof child.executable !== "string" || typeof probe.executable !== "string"
+    || typeof child.script_path !== "string" || !samePath(child.executable, probe.executable)
+    || !samePath(child.script_path, probe.helperPath)
+    || !helper || child.script_sha256 !== helper.sha256
+    || child.argv_sha256 !== probe.child_argv_sha256
+    || !Array.isArray(probe.child_argv)
+    || probe.child_argv_sha256 !== sha256Text(JSON.stringify(probe.child_argv))) {
+    blocked("Native05 helper did not expose an independently bound successful child execution");
+  }
+  return child;
+}
+
+function publicProbePayload(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value.schema !== PEER_WIRE_PROBE_SCHEMA) return null;
+  const output = { schema: PEER_WIRE_PROBE_SCHEMA };
+  if (value.source && typeof value.source === "object") {
+    output.source = {
+      path: typeof value.source.path === "string" ? scrubText(value.source.path, 1024) : null,
+      bytes: Number.isSafeInteger(value.source.bytes) ? value.source.bytes : null,
+      sha256: SHA256.test(String(value.source.sha256 ?? "")) ? String(value.source.sha256).toLowerCase() : null,
+    };
+  }
+  if (value.inputs && typeof value.inputs === "object") {
+    output.inputs = {};
+    for (const key of ["valid", "malformed"]) {
+      const item = value.inputs[key];
+      if (!item || typeof item !== "object") continue;
+      output.inputs[key] = {
+        path: typeof item.path === "string" ? scrubText(item.path, 1024) : null,
+        bytes: Number.isSafeInteger(item.bytes) ? item.bytes : null,
+        sha256: SHA256.test(String(item.sha256 ?? "")) ? String(item.sha256).toLowerCase() : null,
+        payload_sha256: SHA256.test(String(item.payload_sha256 ?? "")) ? String(item.payload_sha256).toLowerCase() : null,
+      };
+    }
+  }
+  if (value.expected && typeof value.expected === "object") {
+    output.expected = {
+      agent: typeof value.expected.agent === "string" ? scrubText(value.expected.agent, 64) : null,
+      protocol_mode: typeof value.expected.protocol_mode === "string" ? scrubText(value.expected.protocol_mode, 64) : null,
+      reviewed_revision: typeof value.expected.reviewed_revision === "string" ? scrubText(value.expected.reviewed_revision, 128) : null,
+      receipt_sha256: SHA256.test(String(value.expected.receipt_sha256 ?? "")) ? String(value.expected.receipt_sha256).toLowerCase() : null,
+    };
+  }
+  if (value.outcomes && typeof value.outcomes === "object") {
+    output.outcomes = {
+      valid: publicProbeOutcome(value.outcomes.valid),
+      malformed: publicProbeOutcome(value.outcomes.malformed),
+    };
+  }
+  output.controlled_corruption = value.controlled_corruption && typeof value.controlled_corruption === "object"
+    ? {
+      kind: typeof value.controlled_corruption.kind === "string" ? scrubText(value.controlled_corruption.kind, 96) : null,
+      field: typeof value.controlled_corruption.field === "string" ? scrubText(value.controlled_corruption.field, 96) : null,
+    }
+    : null;
+  output.producer_malformed = value.producer_malformed === false ? false : null;
+  output.owned_input_origin = value.owned_input_origin === "controlled-local-fixture" ? value.owned_input_origin : null;
+  if (Object.hasOwn(value, "child_execution")) output.child_execution = publicChildExecution(value.child_execution);
+  return output;
+}
+
+function parseProbePayload(value) {
+  const direct = publicProbePayload(value);
+  if (direct) return direct;
+  for (const text of probeTextCandidates(value)) {
+    try {
+      const body = text.trim().replace(/\r?\n(?:\r?\n)+Wall time: \d+\.\d{2} seconds$/u, "");
+      const parsed = JSON.parse(body);
+      const output = publicProbePayload(parsed);
+      if (output) return output;
+    } catch {
+      // Only bounded JSON plus the pinned SDK timing notice is transport; arbitrary prose is not evidence.
+    }
+  }
+  return null;
+}
+
+function probeFileRecord(file, label) {
+  ensureRegular(file, label);
+  const bytes = readFileSync(file);
+  return { path: file, bytes: bytes.byteLength, sha256: sha256Bytes(bytes) };
+}
+
+function shellCommandArgument(value) {
+  const text = String(value);
+  if (/^[A-Za-z0-9_./:\\-]+$/.test(text)) return text.replaceAll("\\", "/");
+  return "'" + text.replaceAll("'", "'\\''") + "'";
+}
 
 function safeToolResult(value) {
   if (!value || typeof value !== "object") return { kind: typeof value, raw: opaque(value) };
   const result = {};
-  for (const key of ["status", "success", "isError", "aborted", "code", "toolName"]) if (Object.prototype.hasOwnProperty.call(value, key)) result[key] = sanitizeValue(value[key]);
+  for (const key of ["status", "success", "isError", "failed", "aborted", "code", "exitCode", "exit_code", "toolName"]) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) result[key] = sanitizeValue(value[key]);
+  }
   const raw = opaque(value);
   result.result_sha256 = raw.sha256;
   result.result_bytes = raw.bytes;
@@ -637,10 +824,38 @@ function safeToolResult(value) {
     result.text_sha256 = sha256Text(text);
     result.text_bytes = Buffer.byteLength(text, "utf8");
   }
+  const probe = parseProbePayload(value);
+  if (probe) result.probe_output = probe;
   result.disabled_agent = textCandidates.some((item) => /(?:agent|task|deep[-_ ]?reviewer).{0,80}(?:disabled|not available)|(?:disabled|not available).{0,80}(?:agent|task|deep[-_ ]?reviewer)|(?:e[_-]?)?agent[_-]?disabled|disabled[_-]?agent/i.test(item));
   result.preflight_error = textCandidates.some((item) => /(?:preflight|cannot spawn|not available|unknown agent|disabled[_-]?(?:agent|task))/i.test(item));
   return result;
 }
+function trustedBooleanState(nodes, keys) {
+  const values = [];
+  for (const node of nodes) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+    for (const key of keys) if (typeof node[key] === "boolean") values.push(node[key]);
+  }
+  return {
+    present: values.length > 0,
+    positive: values.includes(true),
+    negative: values.includes(false),
+    contradictory: values.includes(true) && values.includes(false),
+  };
+}
+
+function successfulReadEnd(frame) {
+  if (frame?.type !== "tool_execution_end" || !/^read(?:$|[_.:])/i.test(String(extractToolName(frame) ?? ""))) return false;
+  const result = frame.result ?? frame.output ?? frame.error;
+  const success = trustedBooleanState([frame, result], ["success"]);
+  const failure = trustedBooleanState([frame, result], ["isError", "is_error", "failed"]);
+  return frame.isError === false
+    && !success.contradictory
+    && !success.negative
+    && !failure.positive
+    && !failure.contradictory;
+}
+
 
 function findNested(value, predicate, depth = 0) {
   if (depth > 6 || value === null || value === undefined) return null;
@@ -700,14 +915,23 @@ function withTimeout(promise, timeoutMs, label) {
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
+function validateProbeInvocation(args, probe, cwd) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) blocked("configured probe Bash call omitted an object argument envelope");
+  const keys = Object.keys(args);
+  if (keys.some((key) => !["command", "cwd"].includes(key))) blocked("configured probe Bash call contained an unapproved argument override");
+  if (args.command !== probe.command) blocked("configured probe Bash command was not the exact approved absolute command");
+  if (args.cwd !== undefined && (!samePath(args.cwd, cwd) || !samePath(args.cwd, probe.cwd))) blocked("configured probe Bash cwd did not match the private project");
+  return { command: probe.command, cwd: probe.cwd, cwd_observed: args.cwd ?? cwd };
+}
 
 class RpcSession {
-  constructor({ omp, cwd, env, timeoutMs, evidence }) {
+  constructor({ omp, cwd, env, timeoutMs, evidence, probe = null }) {
     this.omp = omp;
     this.cwd = cwd;
     this.env = env;
     this.timeoutMs = timeoutMs;
     this.evidence = evidence;
+    this.probe = probe;
     this.child = null;
     this.buffer = Buffer.alloc(0);
     this.chunk = null;
@@ -881,11 +1105,30 @@ class RpcSession {
     }
     if (frame.type === "tool_execution_start" || frame.type === "tool_execution_end") {
       const toolName = extractToolName(frame);
-      if (!toolName || FORBIDDEN_TOOL.test(toolName) || !ALLOWED_ROOT_TOOL.test(toolName)) throw new DriverError("BLOCKED", `forbidden or unknown native root tool ${toolName ?? "<unknown>"}`);
+      const isProbeBash = /^bash(?:$|[_.:])/i.test(String(toolName ?? ""));
+      if (!toolName || (!isProbeBash && (FORBIDDEN_TOOL.test(toolName) || !ALLOWED_ROOT_TOOL.test(toolName))) || (isProbeBash && !this.probe)) {
+        throw new DriverError("BLOCKED", `forbidden or unknown native root tool ${toolName ?? "<unknown>"}`);
+      }
+      if (this.probe && !isProbeBash && !PEER_WIRE_ROOT_TOOL.test(toolName)) {
+        throw new DriverError("BLOCKED", `tool is outside the peer-wire allowlist: ${toolName}`);
+      }
+      if (this.probe && frame.type === "tool_execution_start" && this.evidence.probe_bash_start) {
+        throw new DriverError("BLOCKED", "peer-wire Root started another operation after the approved Bash START");
+      }
       const callId = extractToolCallId(frame);
       const item = { sequence, event: frame.type, toolName, toolCallId: callId };
       if (frame.type === "tool_execution_start") {
         const args = extractToolArgs(frame);
+        if (isProbeBash) {
+          if (this.evidence.probe_bash_start) throw new DriverError("BLOCKED", "configured probe Bash was invoked more than once");
+          item.probe = validateProbeInvocation(args, this.probe, this.cwd);
+          this.evidence.probe_bash_start = {
+            sequence,
+            tool_call_id: callId,
+            command: this.probe.command,
+            cwd: this.probe.cwd,
+          };
+        }
         const task = /^tasks?(?:$|[_:.])/i.test(toolName) ? taskCallShape(frame) : null;
         if (task) {
           item.taskCall = { ...task, sequence };
@@ -894,23 +1137,53 @@ class RpcSession {
         if (/^read(?:$|[_:.])/i.test(toolName)) {
           const paths = stringsForRead(args ?? {});
           item.readPaths = paths.map((value) => scrubText(value));
-          this.evidence.read_events.push({ sequence, call_id: callId, paths: item.readPaths, success: null });
+          this.evidence.read_events.push({ sequence, call_id: callId, paths: item.readPaths, success: null, end_sequence: null });
         }
         this.openTools.set(callId ?? `sequence:${sequence}`, item);
+        this.evidence.tool_events.push(item);
+        const details = safeTaskDetails(frame.result ?? frame.output ?? frame.error);
+        if (details) this.evidence.task_details.push({ sequence, origin: "tool_execution", details });
       } else {
-        const result = frame.result ?? frame.output ?? frame.error;
-        item.result = safeToolResult(result);
         const start = this.openTools.get(callId ?? "");
+        if (isProbeBash && (!start?.probe || !this.evidence.probe_bash_start || this.evidence.probe_bash_start.tool_call_id !== callId)) {
+          throw new DriverError("BLOCKED", "configured probe Bash END was not correlated to its START");
+        }
+        const exitCode = explicitExitCode(frame);
+        const rawIsError = typeof frame.isError === "boolean" ? frame.isError : null;
+        const result = frame.result ?? frame.output ?? frame.error;
+        const safe = safeToolResult(result);
+        if (isProbeBash) {
+          item.probe_end = {
+            sequence,
+            tool_call_id: callId,
+            is_error: rawIsError,
+            is_error_observed: rawIsError !== null,
+            exit_code: Number.isInteger(exitCode) ? exitCode : null,
+            exit_code_observed: Number.isInteger(exitCode),
+            output: safe.probe_output ?? null,
+          };
+          this.evidence.probe_bash_end = item.probe_end;
+        }
+        item.result = safe;
         if (start?.readPaths) {
-          for (const event of this.evidence.read_events.filter((entry) => entry.call_id === (callId ?? null) && entry.success === null)) event.success = result && result.success === false ? false : true;
+          for (const event of this.evidence.read_events.filter((entry) => entry.call_id === (callId ?? null) && entry.success === null)) {
+            event.success = successfulReadEnd(frame);
+            event.end_sequence = sequence;
+          }
         }
         if (start?.taskCall && item.result) start.taskResult = item.result;
         this.openTools.delete(callId ?? "");
+        this.evidence.tool_events.push(item);
+        const details = safeTaskDetails(frame.result ?? frame.output ?? frame.error);
+        if (details) this.evidence.task_details.push({ sequence, origin: "tool_execution", details });
+        if (isProbeBash) {
+          if (rawIsError !== false) throw new DriverError("BLOCKED", "configured probe Bash END did not expose raw isError:false");
+          if (Number.isInteger(exitCode) && exitCode !== 0) throw new DriverError("BLOCKED", "configured probe helper exited nonzero");
+          if (!safe.probe_output) throw new DriverError("BLOCKED", "configured probe Bash stdout did not contain the bounded helper JSON");
+          if (!Number.isInteger(exitCode) && !safe.probe_output.child_execution) throw new DriverError("BLOCKED", "configured probe Bash END omitted both SDK exitCode and observed child execution");
+        }
+        return;
       }
-      this.evidence.tool_events.push(item);
-      const details = safeTaskDetails(frame.result ?? frame.output ?? frame.error);
-      if (details) this.evidence.task_details.push({ sequence, origin: "tool_execution", details });
-      return;
     }
     if (frame.type === "subagent_lifecycle" || frame.type === "subagent_progress" || frame.type === "subagent_event") {
       const payload = frame.payload && typeof frame.payload === "object" ? frame.payload : frame.event && typeof frame.event === "object" ? frame.event : frame.data && typeof frame.data === "object" ? frame.data : frame;
@@ -1055,7 +1328,7 @@ function normalizeReadTarget(projectRoot, raw) {
   return comparePath(resolve(projectRoot, value));
 }
 
-function expectedReadSet(projectRoot, fixture, manifest) {
+function expectedReadSet(projectRoot, fixture, manifest, extraPaths = []) {
   const expected = new Set(DOC_URLS);
   expected.add(comparePath(join(projectRoot, ".omp/config.yml")));
   expected.add(comparePath(join(projectRoot, ".omp/skills/deep-review/lib/protocol.mjs")));
@@ -1063,6 +1336,7 @@ function expectedReadSet(projectRoot, fixture, manifest) {
   expected.add(comparePath(join(projectRoot, ".omp/state/t009c/git-source-receipt.json")));
   expected.add(comparePath(join(projectRoot, ".omp/state/t009c/actual-diff.patch")));
   for (const entry of fixture.files) expected.add(comparePath(join(projectRoot, entry.relativePath)));
+  for (const extra of extraPaths) expected.add(/^https?:\/\//i.test(extra) ? extra : comparePath(extra));
   return expected;
 }
 
@@ -1127,11 +1401,256 @@ function buildPrompt(projectRoot, fixture, manifest, config) {
     JSON.stringify({ context: `${reviewInput(projectRoot, fixture)}\nRoot discovery must read the pinned OMP docs and all bound paths before task fanout.`, tasks: [disabled] }, null, 2),
     "Only after the disabled preflight result is observed, dispatch exactly the two named peer-reviewer fallback assignments below. Use one batch call when batch is exposed, or equivalent flat calls when it is not. Keep their assignments disjoint and preserve the exact revision. Do not dispatch deep-reviewer again.",
     JSON.stringify({ context: `${reviewInput(projectRoot, fixture)}\nNamed fallback round: DEEP_REVIEW_FALLBACK; same independently bound revision and files.`, tasks: assignments }, null, 2),
-    "Wait for both real peer terminal progress records and the root prompt/session settlement. A background acknowledgement, lifecycle event, root prompt_result, or narrative is not a reviewer result. Never synthesize a missing return.",
+    "After dispatching both peers, yield the current Root turn promptly when native async work is pending and no independent Root work remains; let native async delivery resume the Root. Never wait for your own future prompt_result or session_settled event.",
+    "Once both real peer terminal progress records are available, finish the Root turn immediately. The host driver alone checks final Root prompt/session settlement. A background acknowledgement, lifecycle event, or narrative is not a reviewer result; never synthesize a missing return.",
     "Report only operational metadata and the public typed yield fields. Do not expose prompts, task text, provider diagnostics, credentials, hidden reasoning, or COT.",
   ].join("\n\n");
 }
 
+// Encode template-only spaces to keep emitted helper bytes identical to retained Native captures.
+function peerWireHelperSource() {
+  return `#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+
+const SCHEMA = "native05-peer-wire-probe-v1";
+const MAX_BYTES = 64 * 1024;
+const allowed = new Set(["protocol", "valid", "malformed", "receipt", "revision"]);
+const invocation = process.argv.slice(2);
+const worker = invocation[0] === "--worker";
+const requestedArgs = worker ? invocation.slice(1) : invocation;
+const canonicalArgs = requestedArgs.map((value, index) => index % 2 === 1 && requestedArgs[index - 1] !== "--revision" ? resolve(value) : value);
+const digest = (value) => createHash("sha256").update(value).digest("hex");
+const args = {};
+if (!worker) {
+  const scriptPath = fileURLToPath(import.meta.url);
+  const childArgv = [scriptPath, "--worker", ...canonicalArgs];
+  const child = spawnSync(process.execPath, childArgv, {
+    shell: false,
+    timeout: 300000,
+    maxBuffer: MAX_BYTES,
+    windowsHide: true,
+    encoding: "utf8",
+  });
+  const childExecution = {
+    origin: "observed-node-child",
+    executable: process.execPath,
+    script_path: scriptPath,
+    script_sha256: digest(readFileSync(scriptPath)),
+    argv_sha256: digest(JSON.stringify(childArgv)),
+    exit_code: Number.isInteger(child.status) ? child.status : null,
+    exit_code_observed: Number.isInteger(child.status),
+    signal: Object.hasOwn(child, "signal") && (child.signal === null || typeof child.signal === "string") ? child.signal : null,
+    signal_observed: Object.hasOwn(child, "signal") && (child.signal === null || typeof child.signal === "string"),
+    spawn_error: child.error
+      ? {
+        name: typeof child.error.name === "string" ? child.error.name.slice(0, 128) : null,
+        code: typeof child.error.code === "string" ? child.error.code.slice(0, 128) : null,
+      }
+      : null,
+  };
+  let childOutput = null;
+  try {
+    const stdout = String(child.stdout ?? "");
+    if (Buffer.byteLength(stdout, "utf8") <= MAX_BYTES && stdout.trim() !== "") {
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) childOutput = parsed;
+    }
+  } catch {
+    childOutput = null;
+  }
+  const published = childOutput ?? {
+    schema: SCHEMA,
+    producer_malformed: false,
+    owned_input_origin: "controlled-local-fixture",
+    failure: { kind: "worker-json-unavailable" },
+  };
+  published.child_execution = childExecution;
+  process.stdout.write(JSON.stringify(published, null, 2) + "\\n");
+  process.exitCode = Number.isInteger(child.status) ? child.status : 1;
+} else {
+\x20
+\x20
+for (let index = 0; index < canonicalArgs.length; index += 2) {
+  const token = canonicalArgs[index];
+  const key = token?.startsWith("--") ? token.slice(2) : "";
+  const value = canonicalArgs[index + 1];
+  if (!allowed.has(key) || !value || value.startsWith("--") || Object.hasOwn(args, key)) process.exitCode = 64;
+  else args[key] = value;
+}
+if (process.exitCode || [...allowed].some((key) => !args[key])) process.exit(64);
+const bytes = (file) => {
+  const value = readFileSync(file);
+  if (value.byteLength > MAX_BYTES) process.exit(65);
+  return value;
+};
+\x20
+const protocolBytes = bytes(args.protocol);
+const receiptBytes = bytes(args.receipt);
+const receipt = JSON.parse(receiptBytes.toString("utf8"));
+const validBytes = bytes(args.valid);
+const malformedBytes = bytes(args.malformed);
+const valid = JSON.parse(validBytes.toString("utf8"));
+const malformed = JSON.parse(malformedBytes.toString("utf8"));
+if (receipt?.schema !== "git-fixture-receipt-v1" || receipt.head_revision !== args.revision || !valid.explanation || Object.hasOwn(malformed, "explanation")) process.exit(66);
+const expected = { agent: "peer-reviewer", protocol_mode: "TDD_PEER_REVIEW", reviewed_revision: receipt.head_revision };
+const protocol = await import(pathToFileURL(args.protocol).href + "?native05=" + digest(protocolBytes));
+if (typeof protocol.validateReviewerResult !== "function") process.exit(67);
+const validResult = protocol.validateReviewerResult(valid, expected);
+const malformedResult = protocol.validateReviewerResult(malformed, expected);
+const outcome = (result) => ({
+  ok: result?.ok === true,
+  errors: Array.isArray(result?.errors) ? result.errors.filter((item) => typeof item === "string").slice(0, 8) : [],
+  status: typeof result?.status === "string" ? result.status : typeof result?.value?.status === "string" ? result.value.status : null,
+  actual: result?.value && typeof result.value === "object" && !Array.isArray(result.value) ? result.value : null,
+});
+const output = {
+  schema: SCHEMA,
+  source: { path: args.protocol, bytes: protocolBytes.byteLength, sha256: digest(protocolBytes) },
+  inputs: {
+    valid: { path: args.valid, bytes: validBytes.byteLength, sha256: digest(validBytes), payload_sha256: digest(Buffer.from(JSON.stringify(valid))) },
+    malformed: { path: args.malformed, bytes: malformedBytes.byteLength, sha256: digest(malformedBytes), payload_sha256: digest(Buffer.from(JSON.stringify(malformed))) },
+  },
+  expected: { ...expected, receipt_sha256: digest(receiptBytes) },
+  outcomes: { valid: outcome(validResult), malformed: outcome(malformedResult) },
+  controlled_corruption: { kind: "missing-required-field", field: "explanation" },
+  producer_malformed: false,
+  owned_input_origin: "controlled-local-fixture",
+};
+const serialized = JSON.stringify(output);
+if (Buffer.byteLength(serialized, "utf8") > MAX_BYTES) process.exit(69);
+if (worker) {
+  process.stdout.write(serialized);
+  if (!(output.outcomes.valid.ok === true && output.outcomes.malformed.ok === false)) process.exitCode = 68;
+}
+}
+`;
+}
+
+function createPeerWireProbeArtifacts(projectRoot, fixtureInfo) {
+  const root = join(projectRoot, ".omp/state/native05-peer-wire");
+  mkdirSync(root, { recursive: false });
+  const helperPath = join(root, "peer-wire-malformed-helper.mjs");
+  const validPath = join(root, "valid.json");
+  const malformedPath = join(root, "malformed-missing-explanation.json");
+  const protocolPath = join(projectRoot, ".omp/skills/deep-review/lib/protocol.mjs");
+  const receiptPath = join(projectRoot, ".omp/state/t009c/git-source-receipt.json");
+  const valid = {
+    agent: "peer-reviewer",
+    protocol_mode: "TDD_PEER_REVIEW",
+    status: "APROVADO",
+    reviewed_revision: fixtureInfo.revision,
+    overall_correctness: "correct",
+    explanation: "Owned valid TDD peer-review fixture.",
+    confidence: 1,
+    findings: [],
+  };
+  const malformed = { ...valid };
+  delete malformed.explanation;
+  const helper = peerWireHelperSource();
+  writeFreshFile(helperPath, Buffer.from(helper, "utf8"), "Native05 immutable helper");
+  writeFreshFile(validPath, Buffer.from(`${JSON.stringify(valid)}\n`, "utf8"), "Native05 valid fixture");
+  writeFreshFile(malformedPath, Buffer.from(`${JSON.stringify(malformed)}\n`, "utf8"), "Native05 malformed fixture");
+  const files = [
+    probeFileRecord(helperPath, "Native05 helper"),
+    probeFileRecord(validPath, "Native05 valid input"),
+    probeFileRecord(malformedPath, "Native05 malformed input"),
+    probeFileRecord(protocolPath, "Native05 copied protocol consumer"),
+    probeFileRecord(receiptPath, "Native05 copied fixture receipt"),
+  ];
+  const canonicalArgs = [
+    "--protocol", protocolPath,
+    "--valid", validPath,
+    "--malformed", malformedPath,
+    "--receipt", receiptPath,
+    "--revision", fixtureInfo.revision,
+  ];
+  const childArgv = [helperPath, "--worker", ...canonicalArgs];
+  const command = [process.execPath, helperPath, ...canonicalArgs].map(shellCommandArgument).join(" ");
+  return {
+    root,
+    helperPath,
+    validPath,
+    malformedPath,
+    protocolPath,
+    receiptPath,
+    command,
+    cwd: projectRoot,
+    executable: process.execPath,
+    child_argv: childArgv,
+    child_argv_sha256: sha256Text(JSON.stringify(childArgv)),
+    readPaths: files.map((entry) => entry.path),
+    files,
+    source_sha256: files.find((entry) => samePath(entry.path, protocolPath))?.sha256 ?? null,
+    input_origin: "controlled-local-fixture",
+    corruption: { kind: "missing-required-field", field: "explanation" },
+  };
+}
+
+function buildPeerWireProbePrompt(projectRoot, fixture, manifest, config, probe) {
+  const rootReads = [
+    ...DOC_URLS,
+    config.path,
+    probe.protocolPath,
+    ...INSTALLER_AGENTS.map(([, , file]) => join(projectRoot, ".omp/agents", file)),
+    join(projectRoot, ".omp/state/t009c/git-source-receipt.json"),
+    join(projectRoot, ".omp/state/t009c/actual-diff.patch"),
+    ...fixture.files.map((entry) => join(projectRoot, entry.relativePath)),
+    probe.helperPath,
+    probe.validPath,
+    probe.malformedPath,
+  ];
+  return [
+    "Run exactly one bounded private Native05 malformed-wire control in this fresh project workspace.",
+    `Project workspace: ${projectRoot}`,
+    `Project-only settings: ${config.path}; do not change settings, models, profiles, environment, or SDK arguments.`,
+    `Read every pinned item with the Root before Bash: ${rootReads.join(", ")}`,
+    "Use only read, grep, glob, and wait before the one configured Bash call. Do not use tasks, nested calls, write, edit, Git, network, host, auth, or any other shell.",
+    `After all reads, invoke exactly this Bash command with cwd ${projectRoot}: ${probe.command}`,
+    "Do not add env, cwd overrides, timeout overrides, or any other argument. Observe the matching Bash START and END and require raw isError:false. The SDK outer exitCode may be absent: record exit_code:null and exit_code_observed:false, never infer zero. Require the helper's child_execution to bind the real observed child status, signal, spawn error, executable, script hash, and worker argv hash.",
+    "The helper stdout is bounded JSON from the copied protocol consumer plus the private child_execution witness. Do not accept prose or synthesize results. After the correlated Bash END, finish the Root turn immediately; do not await a future continuation or its own session_settled event. The host alone verifies session settlement.",
+  ].join("\n\n");
+}
+
+function validatePeerWireProbe(sessionEvidence, projectRoot, fixture, manifest, probe) {
+  const readEvidence = validateReadOrder(sessionEvidence, projectRoot, fixture, manifest, probe.readPaths, false);
+  const start = sessionEvidence.tool_events.find((event) => event.event === "tool_execution_start" && /^bash$/i.test(event.toolName));
+  const end = sessionEvidence.tool_events.find((event) => event.event === "tool_execution_end" && /^bash$/i.test(event.toolName) && event.toolCallId === start?.toolCallId && event.sequence > (start?.sequence ?? 0));
+  if (!start || !end || !sessionEvidence.probe_bash_start || !sessionEvidence.probe_bash_end) blocked("Native05 probe did not expose one correlated Bash START/END");
+  if (sessionEvidence.read_events.some((event) =>
+    event.success !== true
+    || !Number.isSafeInteger(event.sequence)
+    || !Number.isSafeInteger(event.end_sequence)
+    || event.end_sequence <= event.sequence
+    || event.end_sequence >= start.sequence
+  )) blocked("Native05 Root READ ENDs did not all precede the approved Bash START");
+  if (sessionEvidence.tool_events.some((event) =>
+    (!/^bash$/i.test(event.toolName) && !PEER_WIRE_ROOT_TOOL.test(event.toolName))
+    || (event.event === "tool_execution_start" && event.sequence > start.sequence)
+  )) blocked("Native05 peer-wire proof contains an extra or out-of-phase Root operation");
+  const output = sessionEvidence.probe_bash_end.output;
+  const terminal = sessionEvidence.probe_bash_end;
+  if (terminal.is_error !== false || terminal.is_error_observed !== true) blocked("Native05 probe Bash terminal metadata was not an observed raw isError:false execution");
+  if (typeof terminal.exit_code_observed !== "boolean" || (terminal.exit_code_observed ? terminal.exit_code !== 0 : terminal.exit_code !== null)) blocked("Native05 probe Bash terminal did not preserve observed SDK exit metadata");
+  validateObservedChildExecution(output, probe);
+  if (!output || output.schema !== PEER_WIRE_PROBE_SCHEMA || output.producer_malformed !== false || output.owned_input_origin !== "controlled-local-fixture") blocked("Native05 helper output did not expose the bounded controlled-fixture provenance");
+  if (output.expected?.agent !== "peer-reviewer" || output.expected?.protocol_mode !== "TDD_PEER_REVIEW" || output.expected?.reviewed_revision !== fixture.revision) blocked("Native05 helper expected tuple was not independently bound to the fixture receipt/revision");
+  if (output.source?.sha256 !== probe.source_sha256) blocked("Native05 helper did not hash the copied canonical protocol consumer");
+  const receipt = probe.files.find((entry) => samePath(entry.path, probe.receiptPath));
+  if (!receipt || output.expected.receipt_sha256 !== receipt.sha256) blocked("Native05 helper did not preserve the independent fixture receipt hash");
+  for (const key of ["valid", "malformed"]) {
+    const expected = probe.files.find((entry) => samePath(entry.path, probe[`${key}Path`]));
+    const actual = output.inputs?.[key];
+    if (!expected || !actual || actual.sha256 !== expected.sha256 || actual.bytes !== expected.bytes || !SHA256.test(String(actual.payload_sha256 ?? ""))) blocked(`Native05 ${key} input hash was not preserved`);
+  }
+  if (output.outcomes?.valid?.ok !== true || output.outcomes?.malformed?.ok !== false) blocked("Native05 actual protocol consumer did not accept valid and reject malformed counterfactuals");
+  if (output.controlled_corruption?.kind !== probe.corruption.kind || output.controlled_corruption?.field !== probe.corruption.field) blocked("Native05 malformed input was not the explicit owned corruption");
+  if (sessionEvidence.prompt_result?.status !== "completed" || sessionEvidence.prompt_result?.agentInvoked !== true || sessionEvidence.session_settled !== true) blocked("Native05 Root prompt did not complete and settle after the correlated helper END");
+  return { read: readEvidence, bash_start: sessionEvidence.probe_bash_start, bash_end: sessionEvidence.probe_bash_end, output, producer_malformed: false, owned_input_origin: "controlled-local-fixture", authentic_native_caller_execution_origin: "root-bash-correlated-start-end" };
+}
 function assembleFallback(record) {
   const items = Array.isArray(record?.yield) ? record.yield : [];
   if (items.length === 0) return undefined;
@@ -1200,18 +1719,21 @@ function matchReadTarget(projectRoot, expected, raw) {
   return null;
 }
 
-function validateReadOrder(sessionEvidence, projectRoot, fixture, manifest) {
-  const expected = expectedReadSet(projectRoot, fixture, manifest);
+function validateReadOrder(sessionEvidence, projectRoot, fixture, manifest, extraPaths = [], requireTask = true) {
+  const expected = expectedReadSet(projectRoot, fixture, manifest, extraPaths);
   const taskStarts = sessionEvidence.tool_events.filter((event) => event.event === "tool_execution_start" && /^tasks?(?:$|[_:.])/i.test(event.toolName));
-  if (taskStarts.length === 0) blocked("native task dispatch was not observed");
-  const firstTask = Math.min(...taskStarts.map((event) => event.sequence));
+  if (requireTask && taskStarts.length === 0) blocked("native task dispatch was not observed");
+  const firstTask = requireTask ? Math.min(...taskStarts.map((event) => event.sequence)) : null;
   const seen = new Map();
   for (const event of sessionEvidence.read_events) {
+    if (event.success !== true || !Number.isSafeInteger(event.end_sequence)) continue;
     for (const raw of event.paths ?? []) {
       const normalized = matchReadTarget(projectRoot, expected, raw);
       if (normalized === null) continue;
       const current = seen.get(normalized);
-      if (!current || event.sequence < current.sequence) seen.set(normalized, { sequence: event.sequence, success: event.success });
+      if (!current || event.end_sequence < current.end_sequence) {
+        seen.set(normalized, { sequence: event.sequence, end_sequence: event.end_sequence, success: true });
+      }
     }
   }
   const missing = [];
@@ -1219,8 +1741,7 @@ function validateReadOrder(sessionEvidence, projectRoot, fixture, manifest) {
   for (const path of expected) {
     const event = seen.get(path);
     if (!event) missing.push(path);
-    else if (event.sequence >= firstTask) late.push(path);
-    else if (event.success === false) missing.push(`${path} (read failed)`);
+    else if (requireTask && event.end_sequence >= firstTask) late.push(path);
   }
   if (missing.length > 0 || late.length > 0) blocked("root did not read every pinned source/fixture/document before task fanout", { missing: missing.slice(0, 32), late: late.slice(0, 32) });
   return { expected: expected.size, observed: seen.size, first_task_sequence: firstTask };
@@ -1233,27 +1754,42 @@ function validateTaskCalls(sessionEvidence) {
   const disabled = items.filter((item) => item.name === "DeepDisabledPreflight" && item.agent === "deep-reviewer");
   if (disabled.length !== 1) blocked("native caller did not expose exactly one named deep-reviewer disabled preflight assignment", { observed: disabled.map(({ call, ...item }) => item) });
   if (disabled[0].call.hasModelField || disabled[0].call.items.some((item) => item.hasForbiddenField) || !disabled[0].hasSolutionSpace) blocked("disabled preflight task wire contained forbidden fields or omitted solutionSpace");
+  const disabledCall = disabled[0].call;
+  const disabledCallId = disabledCall.call_id;
+  if (typeof disabledCallId !== "string" || disabledCallId.trim() === "") blocked("disabled preflight task call did not expose an exact correlation ID");
+  const disabledEnd = sessionEvidence.tool_events.find((event) =>
+    event.event === "tool_execution_end"
+    && event.toolCallId === disabledCallId
+    && Number.isSafeInteger(event.sequence)
+    && event.sequence > disabledCall.sequence
+    && /^tasks?(?:$|[_:.])/i.test(event.toolName),
+  );
+  if (!disabledEnd) blocked("disabled preflight terminal END was not observed with its exact task-call identity");
   const fallbackById = new Map();
   for (const assignment of FALLBACK_ASSIGNMENTS) {
     const matches = items.filter((item) => item.name === assignment.id && item.agent === "peer-reviewer");
     if (matches.length !== 1) blocked(`native caller did not expose exactly one named fallback assignment for ${assignment.id}`, { count: matches.length });
     if (matches[0].call.hasModelField || matches[0].hasForbiddenField || !matches[0].hasSolutionSpace) blocked(`fallback task ${assignment.id} contained forbidden fields or omitted solutionSpace`);
+    if (matches[0].call.sequence <= disabledEnd.sequence) blocked(`fallback dispatch ${assignment.id} preceded the disabled preflight END`);
     fallbackById.set(assignment.id, matches[0]);
   }
   const unknown = items.filter((item) => !["DeepDisabledPreflight", ...FALLBACK_ASSIGNMENTS.map((assignment) => assignment.id)].includes(item.name));
   if (unknown.length > 0) blocked("native root dispatched an unexpected task assignment", { assignments: unknown.map(({ call, ...item }) => item) });
-  for (const assignment of FALLBACK_ASSIGNMENTS) {
-    if (fallbackById.get(assignment.id).call.sequence <= disabled[0].call.sequence) blocked(`fallback dispatch ${assignment.id} preceded the disabled deep preflight`);
-  }
   return { disabled: disabled[0], fallback: fallbackById };
 }
 
 function disabledPreflightObservation(sessionEvidence, disabledItem) {
   const callId = disabledItem.call.call_id;
-  const exactEnds = sessionEvidence.tool_events.filter((event) => event.event === "tool_execution_end" && event.toolCallId === callId && event.sequence > disabledItem.call.sequence);
-  const correlatedEnds = exactEnds.length > 0 ? exactEnds : sessionEvidence.tool_events.filter((event) => event.event === "tool_execution_end" && event.sequence > disabledItem.call.sequence);
-  const disabled = correlatedEnds.find((event) => event.result?.disabled_agent === true && (event.result.success === false || event.result.isError === true || event.result.preflight_error === true || /^(?:error|failed|blocked)$/i.test(String(event.result.status ?? ""))));
-  if (!disabled) blocked("no safe native disabled-agent preflight result was observed before peer fallback", { matching_end_count: correlatedEnds.length });
+  if (typeof callId !== "string" || callId.trim() === "") blocked("disabled preflight did not expose an exact task-call identity");
+  const exactEnds = sessionEvidence.tool_events.filter((event) =>
+    event.event === "tool_execution_end"
+    && event.toolCallId === callId
+    && Number.isSafeInteger(event.sequence)
+    && event.sequence > disabledItem.call.sequence
+    && /^tasks?(?:$|[_:.])/i.test(event.toolName),
+  );
+  const disabled = exactEnds.find((event) => event.result?.disabled_agent === true && (event.result.success === false || event.result.isError === true || event.result.preflight_error === true || /^(?:error|failed|blocked)$/i.test(String(event.result.status ?? ""))));
+  if (!disabled) blocked("no safe native disabled-agent preflight result was observed before peer fallback", { matching_end_count: exactEnds.length });
   return {
     status: "OBSERVED",
     evidence_level: "NATIVE",
@@ -1380,7 +1916,7 @@ function loadProtocolCopy(sourceManifestInfo, runRoot) {
 
 function parseArgs(argv) {
   const values = {};
-  const allowed = new Set(["source", "lab", "fixture", "omp", "timeout-ms"]);
+  const allowed = new Set(["source", "lab", "fixture", "omp", "timeout-ms", "probe"]);
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!token.startsWith("--") || !allowed.has(token.slice(2))) throw new DriverError("USAGE", `unsupported argument ${token}`);
@@ -1391,9 +1927,10 @@ function parseArgs(argv) {
     index += 1;
   }
   for (const required of ["source", "lab", "fixture", "omp"]) if (!values[required]) throw new DriverError("USAGE", `required option missing: --${required}`);
+  if (values.probe !== undefined && values.probe !== PEER_WIRE_PROBE) throw new DriverError("USAGE", `unsupported probe ${values.probe}`);
   const timeoutMs = values["timeout-ms"] === undefined ? DEFAULT_TIMEOUT_MS : Number(values["timeout-ms"]);
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 30_000 || timeoutMs > DEFAULT_TIMEOUT_MS) throw new DriverError("USAGE", "--timeout-ms must be an integer from 30000 through 900000");
-  return { source: values.source, lab: values.lab, fixture: values.fixture, omp: values.omp, timeoutMs };
+  return { source: values.source, lab: values.lab, fixture: values.fixture, omp: values.omp, timeoutMs, probe: values.probe ?? null };
 }
 
 function preservation(before, after, label) {
@@ -1410,7 +1947,7 @@ function preservation(before, after, label) {
 function writeEvidence(runRoot, evidence) {
   const target = join(runRoot, "evidence.json");
   const temporary = join(runRoot, `.evidence-${randomUUID()}.tmp`);
-  writeFileSync(temporary, `${JSON.stringify(sanitizeValue(evidence), null, 2)}\n`, "utf8");
+  writeFileSync(temporary, serializeOperationalEvidence(evidence), "utf8");
   renameSync(temporary, target);
   return target;
 }
@@ -1440,9 +1977,11 @@ async function main() {
     run_root: runRoot,
     native: {
       evidence_level: "NATIVE",
+      mode: options.probe ?? "fallback",
       rpc: null,
       root_reads: null,
       disabled_preflight: null,
+      probe: null,
       fallback: null,
       derived_consumer_controls: [],
       native_progress_terminal: [],
@@ -1467,6 +2006,7 @@ async function main() {
   let fixtureBefore;
   let binaryBefore;
   let projectBefore = null;
+  let probeBinding = null;
   try {
     sourceManifestInfo = sourceManifest(source);
     fixtureInfo = fixtureDescriptor(fixture);
@@ -1480,8 +2020,9 @@ async function main() {
     const copiedFixture = copyFixtureToProject(fixtureInfo, projectRoot);
     const overlayCopies = installSourceOverlay(sourceManifestInfo, projectRoot);
     const config = createProjectConfig(projectRoot);
-    projectBefore = fingerprintTree(projectRoot, "private project before native session");
     const protocol = await loadProtocolCopy(sourceManifestInfo, runRoot);
+    if (options.probe === PEER_WIRE_PROBE) probeBinding = createPeerWireProbeArtifacts(projectRoot, fixtureInfo);
+    projectBefore = fingerprintTree(projectRoot, "private project before native session");
     evidence.fixture = {
       source_root: fixtureInfo.root,
       copied_root: projectRoot,
@@ -1505,6 +2046,22 @@ async function main() {
       config: { path: config.path, bytes: config.bytes, sha256: config.sha256, scope: "project-only", disabledAgents: ["deep-reviewer"] },
       before_files: projectBefore.length,
     };
+    if (probeBinding) {
+      evidence.native.probe = {
+        name: PEER_WIRE_PROBE,
+        helper: probeFileRecord(probeBinding.helperPath, "Native05 helper"),
+        inputs: {
+          valid: probeFileRecord(probeBinding.validPath, "Native05 valid input"),
+          malformed: probeFileRecord(probeBinding.malformedPath, "Native05 malformed input"),
+        },
+        consumer: probeFileRecord(probeBinding.protocolPath, "Native05 copied protocol consumer"),
+        command: { executable: process.execPath, command: probeBinding.command, cwd: probeBinding.cwd },
+        input_origin: probeBinding.input_origin,
+        corruption: probeBinding.corruption,
+        producer_malformed: false,
+        authentic_native_caller_execution_origin: "root-bash-correlated-start-end",
+      };
+    }
     evidence.binary = { before: binaryBefore, expected_sha256: EXPECTED_BINARY_SHA256 };
     sessionEvidence = {
       rpc: { argv: null, protocol: null, event_filter: null, subagent_subscription: null },
@@ -1517,12 +2074,15 @@ async function main() {
       subagent_frames: [],
       native_progress_terminal: [],
       prompt: null,
-      prompt_result: null,
+      probe_bash_start: null,
+      probe_bash_end: null,
       session_settled: false,
     };
-    session = new RpcSession({ omp, cwd: projectRoot, env, timeoutMs: options.timeoutMs, evidence: sessionEvidence });
+    session = new RpcSession({ omp, cwd: projectRoot, env, timeoutMs: options.timeoutMs, evidence: sessionEvidence, probe: probeBinding ? { command: probeBinding.command, cwd: probeBinding.cwd } : null });
     evidence.native.rpc = sessionEvidence.rpc;
-    const prompt = buildPrompt(projectRoot, fixtureInfo, sourceManifestInfo, config);
+    const prompt = probeBinding
+      ? buildPeerWireProbePrompt(projectRoot, fixtureInfo, sourceManifestInfo, config, probeBinding)
+      : buildPrompt(projectRoot, fixtureInfo, sourceManifestInfo, config);
     try {
       await session.execute(prompt);
       await session.close();
@@ -1538,22 +2098,30 @@ async function main() {
     evidence.native.native_progress_terminal = sessionEvidence.native_progress_terminal;
     evidence.native.prompt_result = sessionEvidence.prompt_result;
     evidence.native.session_settled = sessionEvidence.session_settled;
-    const readEvidence = validateReadOrder(sessionEvidence, projectRoot, fixtureInfo, sourceManifestInfo);
-    evidence.native.root_reads = readEvidence;
-    const calls = validateTaskCalls(sessionEvidence);
-    const disabledEvidence = disabledPreflightObservation(sessionEvidence, calls.disabled);
-    evidence.native.disabled_preflight = disabledEvidence;
-    verifyNoNativeDeep(sessionEvidence);
-    const callerById = calls.fallback;
-    const fallback = consumerFallback(protocol.api, fixtureInfo, FALLBACK_ASSIGNMENTS, sessionEvidence, callerById);
-    evidence.native.fallback = {
-      native_instances: fallback.cases,
-      assignments: fallback.assignments,
-      aggregate: fallback.aggregate,
-      derived_consumer_controls: fallback.controls,
-    };
-    evidence.native.derived_consumer_controls = fallback.controls;
-    finalStatus = "PASS";
+    evidence.native.probe_bash_start = sessionEvidence.probe_bash_start;
+    evidence.native.probe_bash_end = sessionEvidence.probe_bash_end;
+    if (probeBinding) {
+      evidence.native.probe.observation = validatePeerWireProbe(sessionEvidence, projectRoot, fixtureInfo, sourceManifestInfo, probeBinding);
+      evidence.native.root_reads = evidence.native.probe.observation.read;
+      finalStatus = "PASS";
+    } else {
+      const readEvidence = validateReadOrder(sessionEvidence, projectRoot, fixtureInfo, sourceManifestInfo);
+      evidence.native.root_reads = readEvidence;
+      const calls = validateTaskCalls(sessionEvidence);
+      const disabledEvidence = disabledPreflightObservation(sessionEvidence, calls.disabled);
+      evidence.native.disabled_preflight = disabledEvidence;
+      verifyNoNativeDeep(sessionEvidence);
+      const callerById = calls.fallback;
+      const fallback = consumerFallback(protocol.api, fixtureInfo, FALLBACK_ASSIGNMENTS, sessionEvidence, callerById);
+      evidence.native.fallback = {
+        native_instances: fallback.cases,
+        assignments: fallback.assignments,
+        aggregate: fallback.aggregate,
+        derived_consumer_controls: fallback.controls,
+      };
+      evidence.native.derived_consumer_controls = fallback.controls;
+      finalStatus = "PASS";
+    }
   } catch (error) {
     if (sessionEvidence) {
       evidence.native.task_calls = sessionEvidence.task_calls;
@@ -1564,6 +2132,8 @@ async function main() {
       evidence.native.native_progress_terminal = sessionEvidence.native_progress_terminal;
       evidence.native.prompt_result = sessionEvidence.prompt_result;
       evidence.native.session_settled = sessionEvidence.session_settled;
+      evidence.native.probe_bash_start = sessionEvidence.probe_bash_start;
+      evidence.native.probe_bash_end = sessionEvidence.probe_bash_end;
     }
     evidence.failure = {
       kind: error?.kind ?? "BLOCKED",
@@ -1584,6 +2154,11 @@ async function main() {
         binary: { before: binaryBefore, after: binaryAfter, unchanged: Boolean(binaryBefore && binaryBefore.sha256 === binaryAfter.sha256 && binaryBefore.bytes === binaryAfter.bytes) },
       };
       if (!evidence.preservation.source.unchanged || !evidence.preservation.fixture.unchanged || !evidence.preservation.binary.unchanged) finalStatus = "BLOCKED";
+      if (probeBinding && evidence.native.probe) {
+        const probeAfter = probeBinding.files.map((entry) => probeFileRecord(entry.path, "Native05 bound artifact after"));
+        evidence.native.probe.preservation = preservation(probeBinding.files, probeAfter, "Native05 helper/input/consumer files");
+        if (!evidence.native.probe.preservation.unchanged) finalStatus = "BLOCKED";
+      }
       if (projectBefore && evidence.project) {
         const projectAfter = fingerprintTree(evidence.project.root, "private project after native session");
         evidence.preservation.project = preservation(projectBefore, projectAfter, "private project");

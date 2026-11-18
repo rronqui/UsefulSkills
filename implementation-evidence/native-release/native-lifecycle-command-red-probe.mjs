@@ -3,16 +3,17 @@
  * Disposable behavioral RED probe for T-011 / AC-016.
  *
  * This probe deliberately executes the configured validator command from a
- * copied Source650 private project.  It does not import or mock the lifecycle
- * implementation, does not edit the checkout, and never launches OMP/SDK.
- * Every fixture is an owned child of a new temporary root.  The command under
- * test is relative to that fixture so a successful run proves its cwd contract.
+ * copied Source650 private project or a freshly generated owned boundary
+ * fixture.  It does not import or mock the lifecycle implementation, does not
+ * edit the checkout, and never launches OMP/SDK.  Every fixture is an owned
+ * child of a new temporary root.  The command under test is relative to that
+ * fixture so a successful run proves its cwd contract.
  */
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,7 @@ const ACCEPTANCE = "AC-016";
 const THIS_FILE = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(THIS_FILE), "../..");
 const LIFECYCLE_MODULE = path.join(path.dirname(THIS_FILE), "lifecycle.mjs");
+const LIFECYCLE_VALIDATOR = path.join(path.dirname(THIS_FILE), "lifecycle-validator.mjs");
 const DEFAULT_OMP = "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/omp-18.18.6-pinned.exe";
 const DEFAULT_RETAINED_PRIVATE = "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/resumed-final-source-GyVVkX/ship-native-lifecycle-650da54f-7b94-45d7-833b-f498fcf04002/private-project";
 const QUALITY_CLI = ".omp/skills/tdd-orchestrator/bin/quality.mjs";
@@ -33,6 +35,8 @@ const DOC_OUTSIDE_METADATA = "docs/native10-doc-handoff.md";
 const DOC_PRIVATE_METADATA = ".omp/state/native-observation/native10-doc-handoff.md";
 const PLAN_STEPS = Object.freeze(["issue", "branch", "commit", "push", "pull_request", "ci", "release"]);
 const COMMAND = Object.freeze([".omp/state/native-tooling/lifecycle-check.mjs"]);
+const CASE_ALL = "all";
+const CASE_VALIDATOR_SYMLINK = "validator-symlink";
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -85,11 +89,20 @@ function parseArgs(argv) {
     original_snapshot: null,
     original_manifest: null,
     prepare_source: false,
+    selected_case: CASE_ALL,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--prepare-source") {
       values.prepare_source = true;
+      continue;
+    }
+    if (token === "--case") {
+      const value = argv[++index];
+      if (!value || value.startsWith("--") || ![CASE_ALL, CASE_VALIDATOR_SYMLINK].includes(value)) {
+        throw new Error(`${token} requires one of: ${CASE_ALL}, ${CASE_VALIDATOR_SYMLINK}`);
+      }
+      values.selected_case = value;
       continue;
     }
     if (token === "--retained-private" || token === "--root" || token === "--node" || token === "--omp" || token === "--original-snapshot" || token === "--original-manifest") {
@@ -372,6 +385,151 @@ function writeHandoff(project, relative, revision) {
     "",
   ].join("\n"), "utf8");
 }
+function readonlyShipPlanFixture() {
+  return {
+    schema_version: 1,
+    mode: "external",
+    dry_run: true,
+    status: "PLANNED",
+    merge_target: "main",
+    quality: { status: "PASS", legacy: false },
+    steps: PLAN_STEPS.map((step) => ({ step, status: "NOT_EXECUTED" })),
+  };
+}
+
+function validatorSymlinkFixture(root, variant) {
+  const project = path.join(root, `validator-symlink-${variant}`, "private-project");
+  const outside = path.join(root, `validator-symlink-${variant}`, "outside");
+  const marker = path.join(outside, "ship-executed.marker");
+  mkdirSync(project, { recursive: true });
+  mkdirSync(outside, { recursive: true });
+
+  const source = path.join(project, "src", "tiny.mjs");
+  const test = path.join(project, "tests", "tiny.test.mjs");
+  if (variant === "workload-source" || variant === "workload-test") {
+    const externalWorkload = path.join(outside, variant);
+    mkdirSync(externalWorkload, { recursive: true });
+    if (variant === "workload-source") {
+      writeFileSync(path.join(externalWorkload, "tiny.mjs"), "export function answer() { return 2; }\n", "utf8");
+      mkdirSync(path.dirname(test), { recursive: true });
+      writeFileSync(test, "process.exitCode = 0;\n", "utf8");
+      symlinkSync(externalWorkload, path.dirname(source), "junction");
+    } else {
+      mkdirSync(path.dirname(source), { recursive: true });
+      writeFileSync(source, "export function answer() { return 2; }\n", "utf8");
+      writeFileSync(path.join(externalWorkload, "tiny.test.mjs"), "process.exitCode = 0;\n", "utf8");
+      symlinkSync(externalWorkload, path.dirname(test), "junction");
+    }
+  } else {
+    mkdirSync(path.dirname(source), { recursive: true });
+    mkdirSync(path.dirname(test), { recursive: true });
+    writeFileSync(source, "export function answer() { return 2; }\n", "utf8");
+    writeFileSync(test, "process.exitCode = 0;\n", "utf8");
+  }
+  regular(source, `${variant} workload source leaf`);
+  regular(test, `${variant} workload test leaf`);
+
+  const omp = path.join(project, ".omp");
+  mkdirSync(omp, { recursive: true });
+  const state = path.join(omp, "state");
+  const validatorState = variant === "binding" ? path.join(omp, "validator-runtime") : state;
+  const stateTarget = path.join(outside, "state-target");
+  if (variant === "binding") {
+    mkdirSync(stateTarget, { recursive: true });
+    symlinkSync(stateTarget, state, "junction");
+    mkdirSync(path.join(validatorState, "native-tooling"), { recursive: true });
+  } else {
+    mkdirSync(path.join(state, "native-tooling"), { recursive: true });
+  }
+  const skills = path.join(omp, "skills");
+  mkdirSync(skills, { recursive: true });
+  const ship = path.join(skills, "ship");
+  const shipTarget = path.join(outside, "ship-target");
+  if (variant === "ship") {
+    mkdirSync(path.join(shipTarget, "bin"), { recursive: true });
+    symlinkSync(shipTarget, ship, "junction");
+  } else {
+    mkdirSync(path.join(ship, "bin"), { recursive: true });
+  }
+
+  const shipFile = path.join(ship, "bin", "ship.mjs");
+  const shipOutput = JSON.stringify(readonlyShipPlanFixture());
+  writeFileSync(
+    path.join(variant === "ship" ? shipTarget : ship, "bin", "ship.mjs"),
+    `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(marker)}, "executed\\n");\nprocess.stdout.write(${JSON.stringify(shipOutput)});\n`,
+    "utf8",
+  );
+  regular(shipFile, `${variant} Ship CLI leaf`);
+
+  const validatorFile = path.join(validatorState, "native-tooling", "lifecycle-validator.mjs");
+  writeFileSync(validatorFile, readFileSync(LIFECYCLE_VALIDATOR), "utf8");
+  regular(validatorFile, `${variant} validator source`);
+  const binding = {
+    nonce: `symlink-boundary-${variant}`,
+    run_id: `run-symlink-boundary-${variant}`,
+    assignment_id: "Native10Validator",
+    source: "src/tiny.mjs",
+    test: "tests/tiny.test.mjs",
+    revision: sha256File(source),
+  };
+  writeJson(path.join(state, "native10-workload.json"), { binding });
+  regular(path.join(state, "native10-workload.json"), `${variant} workload binding leaf`);
+  return { project, outside, marker, source, test, shipFile, validatorFile };
+}
+
+function caseValidatorAcceptsConfinedPrivateAncestors(node, root) {
+  const fixture = validatorSymlinkFixture(root, "confined");
+  const localAncestors = [
+    path.dirname(fixture.source),
+    path.dirname(fixture.test),
+    path.dirname(fixture.validatorFile),
+    path.dirname(fixture.shipFile),
+  ];
+  for (const ancestor of localAncestors) {
+    assert.equal(lstatSync(ancestor).isSymbolicLink(), false, `confined fixture ancestor must be local: ${ancestor}`);
+  }
+  const run = runChild(node, [fixture.validatorFile], fixture.project);
+  const report = parseJsonOutput(run);
+  assert.equal(run.status, 0, `confined validator must execute successfully: ${run.stderr || run.stdout}`);
+  assert.equal(run.signal, null, "confined validator must not time out or receive a signal");
+  assert.equal(run.error, null, "confined validator must start as a real Node child");
+  assert.equal(report?.status, "PASSOU", "confined validator must emit PASSOU");
+  assert.equal(report?.actual, 2, "confined validator must report the observed workload answer");
+  assert.equal(report?.expected, 2, "confined validator must report the expected workload answer");
+  const external = reportExternal(report);
+  assertPlanReceipt(external, "confined validator readonly Ship plan");
+  assertNoExternalEffects(report, "confined validator");
+  assert.equal(inside(fixture.project, fixture.marker), false, "the marker observation must remain outside the private project");
+  // The local Ship child writes this marker as an actual invocation observation; the receipt above is the read-only publication assertion.
+  assert.equal(existsSync(fixture.marker), true, "the confined Ship plan must be observed through the real marker");
+  regular(fixture.marker, "confined Ship invocation marker");
+}
+
+
+function caseValidatorRejectsSymlinkedPrivateAncestors(node, root, variants = ["workload-source", "workload-test", "binding", "ship"]) {
+  for (const variant of variants) {
+    const fixture = validatorSymlinkFixture(root, variant);
+    assert.equal(inside(fixture.project, fixture.outside), false, `${variant}: the symlink target must be outside the private project boundary`);
+    const run = runChild(node, [fixture.validatorFile], fixture.project);
+    const report = parseJsonOutput(run);
+    const markerObserved = existsSync(fixture.marker);
+    assert.notEqual(
+      run.status,
+      0,
+      `${variant}: validator must reject an escaping ancestor (observed node status=${run.status}, signal=${run.signal}, marker=${markerObserved})`,
+    );
+    assert.equal(report?.status, "FAIL", `${variant}: validator must emit a bounded failure report`);
+    assert.ok(
+      report?.code || report?.failure_origin,
+      `${variant}: symlinked-ancestor rejection must identify a validation failure`,
+    );
+    assert.equal(markerObserved, false, `${variant}: rejection must occur before a Ship CLI outside the project executes`);
+  }
+}
+
+
+
+
 
 
 function casePositive(node, project) {
@@ -459,8 +617,9 @@ function runCase(name, fn, failures) {
     fn();
     return { name, status: "PASS" };
   } catch (error) {
-    failures.push({ name, message: String(error?.message ?? error), stack: error?.stack ?? null });
-    return { name, status: "FAIL", message: String(error?.message ?? error) };
+    const failureReasonExpected = error?.code === "ERR_ASSERTION" || error?.name === "AssertionError";
+    failures.push({ name, failure_reason_expected: failureReasonExpected, message: String(error?.message ?? error), stack: error?.stack ?? null });
+    return { name, status: "FAIL", failure_reason_expected: failureReasonExpected, message: String(error?.message ?? error) };
   }
 }
 
@@ -473,43 +632,80 @@ function saveEvidence(root, evidence) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  const selectedCase = options.selected_case;
   const retained = options.retained;
-  assert.ok(existsSync(retained), `retained Source650 private fixture is unavailable: ${retained}`);
-  regular(path.join(retained, WORKLOAD_RECEIPT), "retained workload receipt");
-  regular(path.join(retained, QUALITY_REPORT), "retained quality report");
-  regular(path.join(retained, QUALITY_CONTEXT), "retained quality context");
   const root = createRoot(options.root);
-  const preparation = options.prepare_source ? prepareSourceProject(options, root) : null;
-  const seed = preparation?.privateProject ?? retained;
-  regular(path.join(seed, WORKLOAD_RECEIPT), "seed workload receipt");
-  regular(path.join(seed, QUALITY_REPORT), "seed quality report");
-  regular(path.join(seed, QUALITY_CONTEXT), "seed quality context");
   const cases = [];
   const failures = [];
-  const positive = fixtureFrom(seed, root, "positive");
-  const workloadMutation = fixtureFrom(seed, root, "workload-mutation");
-  const staleContext = fixtureFrom(seed, root, "stale-quality-context");
-  const missingContext = fixtureFrom(seed, root, "missing-quality-context");
-  const docsOutside = fixtureFrom(seed, root, "docs-handoff-outside-metadata");
-  const docsPrivate = fixtureFrom(seed, root, "docs-handoff-private-metadata");
-  cases.push(runCase("AC-016 positive actual lifecycle command computes fresh workload and readonly receipts", () => casePositive(options.node, positive), failures));
-  cases.push(runCase("AC-016 mutated workload returns an actual behavioral failure", () => caseWorkloadMutation(options.node, workloadMutation), failures));
-  cases.push(runCase("AC-016 stale quality context returns an actual quality failure", () => caseStaleContext(options.node, staleContext), failures));
-  cases.push(runCase("AC-016 missing quality context returns an actual quality failure", () => caseMissingContext(options.node, missingContext), failures));
-  cases.push(runCase("AC-016 public DOC handoff is caught by the real quality inventory", () => caseDocumentationInventory(options.node, docsOutside), failures));
-  cases.push(runCase("AC-016 private DOC handoff remains outside the real quality inventory", () => casePrivateDocumentation(options.node, docsPrivate), failures));
+  let preparation = null;
+  let fixtures = [];
+  let validatorVariants = [];
+
+  if (selectedCase === CASE_VALIDATOR_SYMLINK) {
+    assert.equal(options.prepare_source, false, `--${CASE_VALIDATOR_SYMLINK} does not use --prepare-source`);
+    cases.push(runCase(
+      "AC-016 confined validator executes the actual current lifecycle validator with a readonly receipt",
+      () => caseValidatorAcceptsConfinedPrivateAncestors(options.node, root),
+      failures,
+    ));
+    cases.push(runCase(
+      "AC-016 validator rejects workload, binding, and Ship reads through escaping symlinked ancestors",
+      () => caseValidatorRejectsSymlinkedPrivateAncestors(options.node, root),
+      failures,
+    ));
+    validatorVariants = ["confined", "workload-source", "workload-test", "binding", "ship"];
+    fixtures = validatorVariants.map((variant) => path.join(root, `validator-symlink-${variant}`, "private-project"));
+  } else {
+    assert.ok(existsSync(retained), `retained Source650 private fixture is unavailable: ${retained}`);
+    regular(path.join(retained, WORKLOAD_RECEIPT), "retained workload receipt");
+    regular(path.join(retained, QUALITY_REPORT), "retained quality report");
+    regular(path.join(retained, QUALITY_CONTEXT), "retained quality context");
+    const preparationResult = options.prepare_source ? prepareSourceProject(options, root) : null;
+    preparation = preparationResult;
+    const seed = preparation?.privateProject ?? retained;
+    regular(path.join(seed, WORKLOAD_RECEIPT), "seed workload receipt");
+    regular(path.join(seed, QUALITY_REPORT), "seed quality report");
+    regular(path.join(seed, QUALITY_CONTEXT), "seed quality context");
+    const positive = fixtureFrom(seed, root, "positive");
+    const workloadMutation = fixtureFrom(seed, root, "workload-mutation");
+    const staleContext = fixtureFrom(seed, root, "stale-quality-context");
+    const missingContext = fixtureFrom(seed, root, "missing-quality-context");
+    const docsOutside = fixtureFrom(seed, root, "docs-handoff-outside-metadata");
+    const docsPrivate = fixtureFrom(seed, root, "docs-handoff-private-metadata");
+    fixtures = [positive, workloadMutation, staleContext, missingContext, docsOutside, docsPrivate];
+    cases.push(runCase("AC-016 positive actual lifecycle command computes fresh workload and readonly receipts", () => casePositive(options.node, positive), failures));
+    cases.push(runCase("AC-016 mutated workload returns an actual behavioral failure", () => caseWorkloadMutation(options.node, workloadMutation), failures));
+    cases.push(runCase("AC-016 stale quality context returns an actual quality failure", () => caseStaleContext(options.node, staleContext), failures));
+    cases.push(runCase("AC-016 missing quality context returns an actual quality failure", () => caseMissingContext(options.node, missingContext), failures));
+    cases.push(runCase("AC-016 public DOC handoff is caught by the real quality inventory", () => caseDocumentationInventory(options.node, docsOutside), failures));
+    cases.push(runCase("AC-016 private DOC handoff remains outside the real quality inventory", () => casePrivateDocumentation(options.node, docsPrivate), failures));
+    cases.push(runCase("AC-016 confined validator executes the actual current lifecycle validator with a readonly receipt", () => caseValidatorAcceptsConfinedPrivateAncestors(options.node, root), failures));
+    cases.push(runCase("AC-016 validator rejects workload, binding, and Ship reads through escaping symlinked ancestors", () => caseValidatorRejectsSymlinkedPrivateAncestors(options.node, root), failures));
+    validatorVariants = ["confined", "workload-source", "workload-test", "binding", "ship"];
+  }
+
   const evidence = {
     status: failures.length ? "RED" : "PASS",
     task: "T-011",
     acceptance_criteria: [ACCEPTANCE],
     contract: CONTRACT_VERSION,
     command: [options.node, ...COMMAND],
-    command_cwd_semantics: "relative configured command executed with cwd equal to each owned private project",
-    retained_fixture: retained,
-    fixture_source: options.prepare_source ? "actual lifecycle source preparation" : "retained Source650 private-project byte copy",
+    case_commands: selectedCase === CASE_VALIDATOR_SYMLINK
+      ? validatorVariants.map((variant) => [
+        options.node,
+        path.join(root, `validator-symlink-${variant}`, "private-project", ".omp", "state", "native-tooling", "lifecycle-validator.mjs"),
+      ])
+      : null,
+    command_cwd_semantics: "each command under test executes with cwd equal to its owned private project",
+    case_selection: selectedCase,
+    retained_fixture: selectedCase === CASE_ALL ? retained : null,
+    fixture_source: selectedCase === CASE_ALL
+      ? (options.prepare_source ? "actual lifecycle source preparation" : "retained Source650 private-project byte copy")
+      : "fresh validatorSymlinkFixture boundary fixtures",
     source_preparation: preparation ? { command: preparation.run.command, cwd: preparation.run.cwd, status: preparation.run.status, evidence: preparation.evidencePath, summary: preparation.summary } : null,
     owned_root: root,
-    fixtures: [positive, workloadMutation, staleContext, missingContext, docsOutside, docsPrivate],
+    fixtures,
+    validator_symlink_variants: validatorVariants,
     cases,
     failures,
     external_effects: "none authorized; actual Ship plan is readonly and every publication step must be NOT_EXECUTED",

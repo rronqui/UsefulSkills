@@ -629,12 +629,12 @@ function bindRetainedRoutes(sourceRoot, capturePath, routeApi, binaryBefore) {
   const pending = (reason) => ({ status: "PENDING", reason, sdk_sessions_reexecuted: false });
   if (!capturePath) return { status: "NOT_SUPPLIED", sdk_sessions_reexecuted: false };
   try {
-    const captureFile = regular(capturePath, "retained Native27 route evidence");
+    const captureFile = regular(capturePath, "retained Native49 route evidence");
     const bytes = fs.readFileSync(captureFile);
     const captureSha = sha256Bytes(bytes);
-    if (captureSha !== "1a3e8eedb5289f3b6fb2af387fddc9cd9060646bca962515a978a8160fc885b0") return pending("retained route evidence bytes changed");
+    if (captureSha !== "7f3873b1e639767fa394912134717ffdf00d56a7306d3815d54453144553bb13") return pending("retained route evidence bytes changed");
     const evidence = JSON.parse(bytes.toString("utf8"));
-    if (evidence.run_id !== "f56da48f-48d4-4785-8319-aeb5bee0313f"
+    if (evidence.run_id !== "27aa0fb6-193c-4a8b-abc5-398e315b66e0"
       || evidence.preservation?.source_changed?.length !== 0 || evidence.preservation.binary_changed !== false
       || evidence.preservation.workload_receipt_stable !== true) return pending("retained source/binary preservation is not bound");
     if (binaryBefore?.sha256 !== "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7"
@@ -2386,6 +2386,12 @@ class NativeRpcSession {
       assignment_id: value.assignment_id ?? binding.assignment_name,
       agent: value.agent ?? binding.agent,
       agentSource: value.agentSource ?? binding.agentSource,
+      ...(Object.hasOwn(value, "role") || Object.hasOwn(value, "role_source")
+        ? {
+          role: binding.accepted === true ? binding.agent : null,
+          role_source: binding.accepted === true ? "observed-root-dispatch-lifecycle" : null,
+        }
+        : {}),
     });
     const planned = [
       ...pending.subagent_frames.map((item) => ["subagent_frames", replaceBinding(item)]),
@@ -4574,6 +4580,7 @@ class NativeRpcSession {
     this.evidence.terminal = { ...(this.evidence.terminal ?? {}), status: receipt.prompt_result_status, session_settled: receipt.session_settled, root_binding: { root_session: receipt.root_session_id, root_session_source: this.evidence.root_session.source, prompt_request_id: receipt.prompt_request_id, prompt_result_id: this.evidence.terminal?.prompt_result?.id ?? null, prompt_result_id_source: this.evidence.terminal?.prompt_result?.id ? "prompt_result.id/RPC request correlation" : "outstanding-prompt-waiter" } };
     if (this.readCalls?.size) blocked("settled Root retained read START without a correlated END");
     if (this.yieldCalls?.size) blocked("settled Root retained child yield lifecycle without a correlated END");
+    if (this.validatorCalls?.size) blocked("settled Root retained validator START without a correlated END");
     if (this.writeCalls?.size) blocked("settled Root retained child write START without a correlated END");
     if (this.rootWriteCalls?.size) blocked("settled Root retained Root write START without a correlated END");
     await this.close(); return this.evidence;
@@ -5929,7 +5936,16 @@ async function runNativeTechnicalRetry(options, fixture, retryApi, prepared, exe
   if (!contractBefore.ok) return { status: "BLOCKED", failure_eligible: false, definition, reason: contractBefore.reason, contract: contractBefore };
   const retryFixture = { ...fixture, project: definition.cwd, readRoot: fixture.readRoot ?? fixture.project, sharedRoot: fixture.readRoot ?? fixture.project, logicalRunId: definition.run_id, retryDefinition: definition };
   const captureOptions = options;
-  const privateReadBoundary = `\nPhase GREEN. Command/application cwd ${JSON.stringify(definition.cwd)} is nested under the approved private project sharedRoot ${JSON.stringify(retryFixture.sharedRoot)}. The actual private interface contract is ${JSON.stringify(contractBefore.path)} (version ${JSON.stringify(contractBefore.version)}, SHA-256 ${JSON.stringify(contractBefore.sha256)}). Pass this actual sharedRoot, contract path/version/hash, and any host-written proof/read location through task context only; never add invented SDK fields or change canonical task text. That project already contains the frozen .omp/agents and .omp/skills; the SDK profile bootstrap can address them with parent-relative filesystem paths. Use only these project filesystem assets, not global skills, collision aliases or resource catalogs. Commands and role write allowlists remain confined to the scenario cwd.`;
+  const projectAssets = {
+    cwd: definition.cwd,
+    shared_root: retryFixture.sharedRoot,
+    shared_root_from_cwd: path.relative(definition.cwd, retryFixture.sharedRoot).replaceAll("\\", "/") || ".",
+    profiles: path.join(retryFixture.sharedRoot, ".omp", "agents"),
+    profiles_from_cwd: path.relative(definition.cwd, path.join(retryFixture.sharedRoot, ".omp", "agents")).replaceAll("\\", "/"),
+    skills: path.join(retryFixture.sharedRoot, ".omp", "skills"),
+    skills_from_cwd: path.relative(definition.cwd, path.join(retryFixture.sharedRoot, ".omp", "skills")).replaceAll("\\", "/"),
+  };
+  const privateReadBoundary = `\nPhase GREEN. Command/application cwd ${JSON.stringify(definition.cwd)} is nested under the approved private project sharedRoot ${JSON.stringify(retryFixture.sharedRoot)}. Host-provided project filesystem locations: ${JSON.stringify(projectAssets)}. Resolve relative read paths from the stated cwd, not from sharedRoot; use the exact absolute or cwd-relative project locations above instead of guessing ancestor traversal or searching outside sharedRoot. The actual private interface contract is ${JSON.stringify(contractBefore.path)} (version ${JSON.stringify(contractBefore.version)}, SHA-256 ${JSON.stringify(contractBefore.sha256)}). Pass this actual sharedRoot, contract path/version/hash, and any host-written proof/read location through task context only; never add invented SDK fields or change canonical task text. The frozen profiles and skills already exist at those project locations. Use only these project filesystem assets, not global skills, collision aliases or resource catalogs. Commands and role write allowlists remain confined to the scenario cwd.`;
   const installedBefore = fingerprintInstalledPackage(options.installedPackageRoot, "installed package before retry", options.installedPackageRuntimeState === true);
   const firstCapture = await executeNativeCapture(captureOptions, retryFixture, [definition.tasks.first_validator], "native09-technical-retry-first", definition.prompts.first_validator + privateReadBoundary);
   const firstObservation = technicalRetryTerminalObservation(firstCapture, definition, definition.roles.first_validator.name);

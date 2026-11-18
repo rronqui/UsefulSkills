@@ -1131,6 +1131,73 @@ function withTimeout(promise, timeoutMs, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+function toolCallCorrelationId(frame) {
+  const candidates = [
+    frame?.toolCallId,
+    frame?.tool_call_id,
+    frame?.toolExecutionId,
+    frame?.tool_execution_id,
+    frame?.callId,
+    frame?.call_id,
+    frame?.toolCall?.toolCallId,
+    frame?.toolCall?.tool_call_id,
+    frame?.tool_call?.toolCallId,
+    frame?.tool_call?.tool_call_id,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.trim() !== "") ?? null;
+}
+
+function trustedBooleanState(nodes, keys) {
+  const values = [];
+  for (const node of nodes) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+    for (const key of keys) if (typeof node[key] === "boolean") values.push(node[key]);
+  }
+  return {
+    present: values.length > 0,
+    positive: values.includes(true),
+    negative: values.includes(false),
+    contradictory: values.includes(true) && values.includes(false),
+  };
+}
+
+function successfulReadEnd(event) {
+  if (event?.type !== "tool_execution_end") return false;
+  if (event.isError !== false || event.completed === false || event.failed === true || event.success === false) return false;
+  return true;
+}
+
+function firstPathSequence(toolEvents, expectedPath, sourceRoot, executionRoot = sourceRoot, completion = false) {
+  const expected = comparePath(expectedPath);
+  let first = null;
+  const starts = toolEvents.filter((event) =>
+    event.type === "tool_execution_start"
+    && /^read(?:$|[_.:])/i.test(event.tool ?? event.toolName ?? "")
+    && typeof (event.toolCallId ?? event.tool_call_id) === "string",
+  );
+  for (const start of starts) {
+    const callId = start.toolCallId ?? start.tool_call_id;
+    const end = toolEvents.find((candidate) =>
+      successfulReadEnd(candidate)
+      && (candidate.toolCallId ?? candidate.tool_call_id) === callId
+      && Number.isSafeInteger(candidate.sequence)
+      && Number.isSafeInteger(start.sequence)
+      && candidate.sequence > start.sequence
+      && /^read(?:$|[_.:])/i.test(candidate.tool ?? candidate.toolName ?? ""),
+    );
+    if (!end) continue;
+    for (const raw of [...(start.paths ?? []), ...(end.paths ?? [])]) {
+      if (typeof raw !== "string" || raw === "") continue;
+      const candidate = isAbsolute(raw) ? resolve(raw) : resolve(executionRoot, raw);
+      if (comparePath(candidate) === expected) {
+        const sequence = completion ? end.sequence : start.sequence;
+        first = first === null ? sequence : Math.min(first, sequence);
+        break;
+      }
+    }
+  }
+  return first;
+}
 class NativeRpcSession {
   constructor({ omp, cwd, timeoutMs, contexts, protocolConsumer }) {
     this.omp = omp;
@@ -1311,6 +1378,7 @@ class NativeRpcSession {
     if (/login|auth|host|ui/i.test(String(frame.type ?? ""))) blocked("OMP requested an unauthorized boundary");
   }
 
+
   recordTool(frame) {
     const sequence = ++this.eventSequence;
     const directName = [frame.toolName, frame.tool_name, frame.tool, frame.name].find((value) => typeof value === "string" && value.trim() !== "");
@@ -1319,7 +1387,26 @@ class NativeRpcSession {
     const rawArgs = frame.arguments ?? frame.args ?? frame.input ?? frame.toolCall?.arguments ?? frame.tool_call?.arguments ?? frame.tool?.arguments ?? findObjectField(frame, new Set(["arguments", "args", "input"]));
     const observed = rawArgs && typeof rawArgs === "object" ? rawArgs : frame;
     const paths = collectStringsByKey(observed, new Set(["path", "file", "filename", "filePath", "file_path", "target"])).filter((value) => value.length < 2048);
-    const summary = { sequence, type: frame.type, tool: scrubText(name, 96), paths: [...new Set(paths.map((item) => scrubText(item, 1024)))].slice(0, 64) };
+    const toolCallId = toolCallCorrelationId(frame);
+    const summary = {
+      sequence,
+      type: frame.type,
+      tool: scrubText(name, 96),
+      toolCallId,
+      paths: [...new Set(paths.map((item) => scrubText(item, 1024)))].slice(0, 64),
+    };
+    if (frame.type === "tool_execution_end") {
+      const resultValue = frame.result ?? frame.output ?? frame.error;
+      const completed = trustedBooleanState([frame, resultValue], ["completed"]);
+      const failed = trustedBooleanState([frame, resultValue], ["failed", "isError", "is_error"]);
+      const success = trustedBooleanState([frame, resultValue], ["success"]);
+      if (completed.present) summary.completed = completed.positive && !completed.negative && !completed.contradictory;
+      if (failed.present) summary.failed = failed.positive || failed.contradictory;
+      if (typeof frame.isError === "boolean") summary.isError = frame.isError;
+      if (failed.positive || failed.contradictory) summary.isError = true;
+      if (success.present) summary.success = success.positive && !success.negative && !success.contradictory;
+      if (frame.error !== undefined) summary.failed = true;
+    }
     this.evidence.tool_events.push(summary);
     if (FORBIDDEN_TOOL.test(name) || !ALLOWED_TOOL.test(name)) blocked("native caller used a forbidden or unapproved tool", { tool: scrubText(name) });
     if (/^tasks?(?:$|[_.:])/i.test(name) && frame.type === "tool_execution_start") {
@@ -1535,23 +1622,6 @@ function absoluteObservedPaths(boundContexts, sourceRoot) {
 }
 
 
-function firstPathSequence(toolEvents, expectedPath, sourceRoot, executionRoot = sourceRoot) {
-  const expected = comparePath(expectedPath);
-  let first = null;
-  for (const event of toolEvents) {
-    if (event.type !== "tool_execution_start" || !/^read(?:$|[_.:])/i.test(event.tool)) continue;
-    for (const raw of event.paths ?? []) {
-      if (typeof raw !== "string" || raw === "") continue;
-      const candidates = [isAbsolute(raw) ? resolve(raw) : resolve(executionRoot, raw)];
-      for (const candidate of candidates) {
-        if (comparePath(candidate) === expected && Number.isSafeInteger(event.sequence)) {
-          first = first === null ? event.sequence : Math.min(first, event.sequence);
-        }
-      }
-    }
-  }
-  return first;
-}
 
 function inspectNativeEvidence(evidence, contexts, sourceRoot, executionRoot) {
   const failures = [];
@@ -1561,7 +1631,7 @@ function inspectNativeEvidence(evidence, contexts, sourceRoot, executionRoot) {
   const firstTaskSequence = dispatches.map((call) => call.sequence).filter(Number.isSafeInteger).sort((left, right) => left - right)[0] ?? null;
   if (firstTaskSequence === null) failures.push("native task dispatch was not observed");
   for (const expectedPath of absoluteObservedPaths(contexts, sourceRoot)) {
-    const sequence = firstPathSequence(evidence.tool_events, expectedPath, sourceRoot, executionRoot);
+    const sequence = firstPathSequence(evidence.tool_events, expectedPath, sourceRoot, executionRoot, true);
     if (sequence === null) failures.push(`native root read evidence missing ${expectedPath}`);
     else if (firstTaskSequence !== null && sequence >= firstTaskSequence) failures.push(`native root source read occurred after task dispatch: ${expectedPath}`);
   }

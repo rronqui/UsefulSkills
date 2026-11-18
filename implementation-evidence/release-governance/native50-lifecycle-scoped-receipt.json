@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0",
+  "kind": "goal47-actual-native-lifecycle-scoped-receipt",
+  "at": "2026-11-18T14:51:19.483Z",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "status": "PASS",
+  "scope": "Native50 lifecycle and technical retry only; NOT wholeNative01-10, T011DONE, CI or release approval",
+  "whole_t011_approved": false,
+  "goal_complete": false,
+  "contract": {
+    "goal": "0.7.0",
+    "immutable_driver_private_scenario_label": "0.6.0",
+    "relabelled": false,
+    "semantic_assessment": "Independent normalpeer accepted concreteNative09kind/RootTuple/write/hash/cap3/review/secondvalidator semantics0.7; wholeproofreviewBLOCKEDonlymissingNative05/06.",
+    "normative_document_bindings": [
+      {
+        "path": "specs/specs005-omp-compatible-release/spec.md",
+        "bytes": 84909,
+        "sha256": "540de72e167cf1cc465c7785720d7675687a1222ac16808055c95b587776daf6"
+      },
+      {
+        "path": "specs/specs005-omp-compatible-release/plan.md",
+        "bytes": 55983,
+        "sha256": "bbb54381966278299dc48665bf3ab1bf84ea58e68ad1430c9d7e546de62eaeb9"
+      },
+      {
+        "path": "specs/specs005-omp-compatible-release/tasks.md",
+        "bytes": 41525,
+        "sha256": "772e22afe89047b3fbf9ef926102fb429d765e4116b8aba094c7aad6ef845f8a"
+      },
+      {
+        "path": "specs/specs005-omp-compatible-release/contracts/interface-contract.md",
+        "bytes": 66680,
+        "sha256": "2bfe04e9d7eb15ceee8a189c9e8c05974415129e8aede52c7dc0026c034df477"
+      },
+      {
+        "path": "docs/functional.md",
+        "bytes": 22396,
+        "sha256": "f77b12214c600116c4b309a11f699717ea332d9b9a9103098944f2cc3792f073"
+      },
+      {
+        "path": "docs/omp-compatibility.md",
+        "bytes": 23289,
+        "sha256": "c71102ab4eb9f9551af0e958daa70a46062b2e90bb9de4a687fcada9c8baae7e"
+      },
+      {
+        "path": "tdd-orchestrator/SOURCE.md",
+        "bytes": 4227,
+        "sha256": "71e70e2470dcdee6c3a77c373769b0e8f2a2033bb4cc580ebb5229e5e04d66c1"
+      }
+    ]
+  },
+  "capture": {
+    "run_id": "922a76bc-5082-4fa7-9a8c-2f70415b73b2",
+    "started_at": "2026-11-18T13:10:09.493Z",
+    "finished_at": "2026-11-18T13:27:15.057Z",
+    "bytes": 13604539,
+    "sha256": "3147c87138b783404c2e8321d4991b2a12853758600be11d0f34e18bef994067",
+    "private_receipt": ".omp/state/release-47/proofs/native50-actual-current-outcome.json",
+    "raw_retained_locally": true,
+    "raw_published": false,
+    "launcher_wall_seconds": 1026.05,
+    "launcher_exit_code": null,
+    "launcher_exit_code_limit": "Not exposed in retained completion notice; no exit0 inference."
+  },
+  "source": {
+    "private_lifecycle_sha256": "d63a62f2ba5ccf2dad953324bd55df5fa66bf0d07d6acb3200bd16face2e8076",
+    "native_input_count": 131,
+    "native_source_changed": [],
+    "frozen_file_count": 253,
+    "frozen_after_drift": [],
+    "binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "binary_bytes": 249985024,
+    "binary_changed": false,
+    "workload_receipt_stable": true,
+    "source_pin_method": "Actualcapturebefore/after131 plus parentruntimepreservation253; currentlaterprivateprobe edits are NOT retroactively covered as Native50driver changes."
+  },
+  "phases": {
+    "SHORT": "PASS",
+    "FULL": "PASS",
+    "LOCAL": "PASS",
+    "EXTERNAL": "PASS",
+    "DOC": "PASS",
+    "REVIEW": "PASS",
+    "VALIDATE": "PASS",
+    "RETRO_OWNER": "PASS",
+    "RETRO_OPT_OUT": "PASS",
+    "FAILURE": "PASS",
+    "RESUME": "PASS"
+  },
+  "uncovered": [],
+  "native09": {
+    "first": "actual eligible SOLUTION failure, validator exit17",
+    "repair": "actual unique backend write END with observedfalseerror and independentnormalpeerAP",
+    "second": "actual validatorPASSOU with observedfalseerror, distinctpublicjobs/instances and causalorder",
+    "execution_consumer": "PASS"
+  },
+  "routes": {
+    "source": "authentic retainedNative49, notnewSDK50routeexecutions",
+    "capture_sha256": "7f3873b1e639767fa394912134717ffdf00d56a7306d3815d54453144553bb13",
+    "run_id": "27aa0fb6-193c-4a8b-abc5-398e315b66e0",
+    "source_inputs": 131,
+    "checks": 576,
+    "sdk_sessions_reexecuted": false,
+    "cases": [
+      {
+        "case": "SHORT_LOCAL",
+        "status": "PASS",
+        "checks": 70,
+        "failed_checks": 0
+      },
+      {
+        "case": "FULL_LOCAL",
+        "status": "PASS",
+        "checks": 129,
+        "failed_checks": 0
+      },
+      {
+        "case": "SHORT_GIT",
+        "status": "PASS",
+        "checks": 77,
+        "failed_checks": 0
+      },
+      {
+        "case": "FULL_GIT",
+        "status": "PASS",
+        "checks": 300,
+        "failed_checks": 0
+      }
+    ]
+  },
+  "independent_review": {
+    "status": "BLOQUEADO",
+    "private_receipt": ".omp/state/release-47/proofs/native50-whole-proof-peer-blocked.json",
+    "remaining": "Native05/06 authenticated negative/malformed/fallback/aggregrationcoverage; no promotionfromsource-onlycontrols"
+  },
+  "qa_relation": {
+    "current_public_files": 214,
+    "unchanged_from_current_configured_qa": true,
+    "versioned_qa_ledger": "implementation-evidence/release-governance/reviewed-final-public-full-qa.json",
+    "rerun_for_private_only_changes": false
+  },
+  "limits": [
+    "This data receipt is not an SDK wire schema or a universal security assertion.",
+    "ActualnormalreviewBLOCKED is preserved, not converted to APROVADO or VALID.",
+    "Native51 separatefallback deadline failure remains private evidence; it does not undo Native50 lifecycle facts.",
+    "No malformedproducer, modelserving, providermodelfallback, cost or performancegain is inferred.",
+    "No actualfeaturePR/CI/merge/release or globalprofileinstallation is claimed.",
+    "Rawprivatecaptures are not in this publicreceipt; hashes and truthfulscope are retained."
+  ]
+}

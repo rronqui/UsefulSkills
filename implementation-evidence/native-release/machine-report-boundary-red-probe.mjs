@@ -2470,6 +2470,206 @@ async function rootSessionIdExecuteBoundary(lifecycle, root) {
     }
   });
 }
+async function executeRejectsOutstandingValidatorStart(lifecycle, root) {
+  return withReferencedTimer(async () => {
+    const label = "execute-outstanding-validator-start";
+    const item = {
+      name: "NativeBoundaryValidator",
+      agent: "validator",
+      task: "Run one complete validator command and settle only after its observed terminal state.",
+      solutionSpace: "Read-only source-derived lifecycle settlement regression.",
+    };
+    const childId = "child|native-boundary|validator-open|allocated";
+    const rootToolCallId = "task|native-boundary|validator-open|root";
+    const completeCallId = "bash|native-boundary|validator-open|complete";
+    const orphanCallId = "bash|native-boundary|validator-open|orphan";
+    const command = "node .omp/state/native-tooling/lifecycle-check.mjs";
+    const report = {
+      status: "PASSOU",
+      code: "VALIDATOR_OK",
+      actual: 1,
+      expected: 1,
+      assignment_id: item.name,
+      revision: "validator-open-revision",
+      run_id: "validator-open-run",
+      workload: { run_id: "validator-open-run", source: "fixture", revision: "validator-open-revision", test: "validator-command" },
+    };
+
+    const prepare = (includeOrphan) => {
+      const session = makeReadSession(lifecycle, root, label, [item]);
+      session.recordTool(rootTaskStartForYield(rootToolCallId, item));
+      session.recordTool(rootTaskProgressForYield(rootToolCallId, item, childId));
+      session.consumeLogical({
+        type: "subagent_lifecycle",
+        payload: {
+          id: childId,
+          index: 0,
+          agent: item.agent,
+          agentSource: "project",
+          parentToolCallId: rootToolCallId,
+          status: "started",
+        },
+      });
+      session.consumeLogical(subagentProgressForYield(childId, item, rootToolCallId, "running"));
+      for (const event of pendingValidatorFrames(item, completeCallId, report)) {
+        session.consumeLogical(nestedChildToolEvent(childId, item, event));
+      }
+      if (includeOrphan) {
+        const [orphanStart] = pendingValidatorFrames(item, orphanCallId, report);
+        session.consumeLogical(nestedChildToolEvent(childId, item, orphanStart));
+      }
+      session.recordTool(rootTaskSuccessEndForYield(rootToolCallId, item, childId));
+      assert.equal(session.evidence.task_records.length, 1, `${includeOrphan ? "orphan" : "complete"} fixture must retain one authoritative Root task record`);
+      assert.equal(session.evidence.task_records[0].status, "completed", "Root task record must retain the actual completed status");
+      assert.equal(session.evidence.task_records[0].exitCode, 0, "Root task record must retain the actual zero exit code");
+      assert.equal(session.evidence.task_records[0].isError, false, "Root task record must retain the actual successful isError flag");
+      return session;
+    };
+
+    const assertCompleteValidatorCommand = (session, expectedOutstanding, fixtureLabel) => {
+      assert.equal(session.validatorCalls.size, expectedOutstanding, `${fixtureLabel} must retain only the expected validator correlations`);
+      const records = session.evidence.command_results.filter((record) => record.correlation?.tool_call_id === completeCallId);
+      assert.equal(records.length, 2, `${fixtureLabel} must retain the complete validator START and END`);
+      assert.deepEqual(records.map((record) => record.phase), ["start", "end"], `${fixtureLabel} must retain validator START before END`);
+      const terminal = records.at(-1);
+      assert.equal(terminal.tool, "bash", `${fixtureLabel} must retain the actual validator tool`);
+      assert.equal(terminal.command_label, command, `${fixtureLabel} must retain the actual validator command`);
+      assert.equal(terminal.correlation.status, "matched", `${fixtureLabel} must correlate the validator END to its START`);
+      assert.equal(terminal.correlation.tool_call_id, completeCallId, `${fixtureLabel} must retain the complete validator call identity`);
+      assert.equal(terminal.correlation.public_identity, childId, `${fixtureLabel} must retain the allocated child identity`);
+      assert.equal(terminal.correlation.task_match, true, `${fixtureLabel} must retain the matching task correlation`);
+      assert.equal(terminal.correlation.identity_match, true, `${fixtureLabel} must retain the matching identity correlation`);
+      assert.equal(terminal.guard.reason_code, null, `${fixtureLabel} complete validator command must have no guard failure`);
+      assert.equal(terminal.observed.present, true, `${fixtureLabel} validator END must be an observed command result`);
+      assert.equal(terminal.exit_code, 0, `${fixtureLabel} validator END must retain the actual zero exit code`);
+      assert.equal(terminal.exit_code_observed, true, `${fixtureLabel} validator END must mark its exit code observed`);
+      assert.equal(terminal.is_error, false, `${fixtureLabel} validator END must retain the actual non-error result`);
+      assert.equal(terminal.is_error_observed, true, `${fixtureLabel} validator END must mark isError observed`);
+      assert.equal(terminal.report.status, "PASSOU", `${fixtureLabel} must retain the validator's actual PASSOU report status`);
+      assert.equal(terminal.report.code, "VALIDATOR_OK", `${fixtureLabel} must retain the validator report code`);
+      assert.equal(terminal.report.actual, 1, `${fixtureLabel} must retain the validator report actual value`);
+      assert.equal(terminal.report.expected, 1, `${fixtureLabel} must retain the validator report expected value`);
+      assert.equal(terminal.report.assignment_id, item.name, `${fixtureLabel} must retain the validator assignment identity`);
+      assert.equal(terminal.report.workload.test, "validator-command", `${fixtureLabel} must retain structured validator workload data`);
+      assert.ok(Number.isSafeInteger(terminal.host_arrival_ordinal) && terminal.host_arrival_ordinal > 0, `${fixtureLabel} validator END must retain a host arrival ordinal`);
+      assert.ok(Number.isSafeInteger(terminal.host_workflow_ordinal) && terminal.host_workflow_ordinal > 0, `${fixtureLabel} validator END must retain a host workflow ordinal`);
+      assert.equal(terminal.root_session_id, session.evidence.root_session.session_id, `${fixtureLabel} validator END must retain the current Root session identity`);
+      return terminal;
+    };
+
+    const configureHostReceipt = (session) => {
+      const rootSessionId = session.evidence.root_session.session_id;
+      session.promptResults.clear();
+      session.start = () => Promise.resolve();
+      session.configure = async () => {};
+      session.prepareRootReads = async () => {};
+      session.response = async (request) => {
+        if (request.type === "get_state") {
+          return {
+            type: "response",
+            command: "get_state",
+            success: true,
+            id: request.id,
+            data: { sessionId: rootSessionId },
+          };
+        }
+        if (request.type === "prompt") {
+          session.consumeLogical({
+            type: "prompt_result",
+            id: request.id,
+            status: "completed",
+            agentInvoked: true,
+            sessionSettled: false,
+          });
+          session.consumeLogical({ type: "agent_end", yielded: false, isTerminal: true });
+          session.consumeLogical({ type: "session_settled" });
+          return { type: "response", command: "prompt", success: true, id: request.id };
+        }
+        throw new Error(`unexpected execute response command ${request.type}`);
+      };
+      session.close = async () => {};
+    };
+
+    const assertCurrentHostReceipt = (session, evidence, fixtureLabel, finalized) => {
+      const rootSession = evidence.root_session;
+      const rootPrompt = evidence.root_prompt;
+      const hostObservation = evidence.host_observation;
+      const terminal = evidence.terminal;
+      assert.ok(rootSession && typeof rootSession.session_id === "string", `${fixtureLabel} must retain the actual Root session receipt`);
+      assert.equal(rootSession.observed, true, `${fixtureLabel} Root session receipt must be host-observed`);
+      assert.equal(rootSession.source, "get_state.data.sessionId", `${fixtureLabel} Root session receipt must retain its current host source`);
+      assert.equal(rootSession.response_id, rootSession.state_request_id, `${fixtureLabel} Root session receipt must retain the correlated state response`);
+      assert.ok(rootPrompt && typeof rootPrompt.request_id === "string", `${fixtureLabel} must retain the actual prompt receipt`);
+      assert.equal(hostObservation.root_session_id, rootSession.session_id, `${fixtureLabel} host observation must retain the current Root session`);
+      assert.equal(hostObservation.root_prompt.request_id, rootPrompt.request_id, `${fixtureLabel} host observation must retain the current prompt`);
+      assert.equal(hostObservation.waiter.request_id, rootPrompt.request_id, `${fixtureLabel} host observation must retain the actual outstanding waiter identity`);
+      assert.equal(terminal.prompt_result.status, "completed", `${fixtureLabel} host receipt must retain prompt_result completed`);
+      assert.equal(terminal.prompt_result.agentInvoked, true, `${fixtureLabel} host receipt must retain prompt_result agent invocation`);
+      assert.equal(terminal.prompt_result.sessionSettled, false, `${fixtureLabel} host receipt must retain the prompt's pre-settlement state`);
+      assert.equal(terminal.prompt_result.id, rootPrompt.request_id, `${fixtureLabel} host receipt must retain prompt/result correlation`);
+      assert.equal(terminal.prompt_result.error_observed, false, `${fixtureLabel} host receipt must retain the absence of a prompt error`);
+      assert.equal(terminal.agent_end.isTerminal, true, `${fixtureLabel} host receipt must retain terminal agent_end`);
+      assert.notEqual(terminal.agent_end.awaitingAsyncWork, true, `${fixtureLabel} host receipt must not report pending async work`);
+      assert.equal(terminal.session_settled, true, `${fixtureLabel} host receipt must retain session_settled`);
+      assert.ok(Number.isSafeInteger(terminal.prompt_result.host_workflow_ordinal) && terminal.prompt_result.host_workflow_ordinal > 0, `${fixtureLabel} prompt_result must retain a host workflow ordinal`);
+      assert.ok(Number.isSafeInteger(terminal.agent_end.host_workflow_ordinal) && terminal.agent_end.host_workflow_ordinal > 0, `${fixtureLabel} agent_end must retain a host workflow ordinal`);
+      assert.ok(Number.isSafeInteger(terminal.session_settled_host_workflow_ordinal) && terminal.session_settled_host_workflow_ordinal > terminal.prompt_result.host_workflow_ordinal, `${fixtureLabel} session_settled must follow the current prompt_result`);
+      if (finalized) {
+        assert.equal(terminal.status, "completed", `${fixtureLabel} finalized terminal must retain the completed status`);
+        assert.equal(terminal.root_binding.root_session, rootSession.session_id, `${fixtureLabel} finalized terminal must retain the Root binding`);
+        assert.equal(terminal.root_binding.prompt_request_id, rootPrompt.request_id, `${fixtureLabel} finalized terminal must retain the prompt binding`);
+        assert.equal(terminal.root_binding.prompt_result_id, rootPrompt.request_id, `${fixtureLabel} finalized terminal must retain the prompt result identity`);
+      }
+    };
+
+    const complete = prepare(false);
+    assertCompleteValidatorCommand(complete, 0, "complete validator control");
+    configureHostReceipt(complete);
+    const completeEvidence = await complete.execute("Bounded execute settlement with only a complete validator command.");
+    assertCurrentHostReceipt(complete, completeEvidence, "complete validator control", true);
+    assert.equal(complete.settled, true, "a complete validator command must allow the Root session to settle");
+    assert.equal(complete.promptResults.size, 0, "a complete validator command must release the prompt waiter");
+    assert.equal(complete.responses.size, 0, "a complete validator command must retain no outstanding RPC response");
+    assert.equal(complete.validatorCalls.size, 0, "a complete validator command must release its correlation before settlement");
+    assert.equal(complete.readCalls?.size ?? 0, 0, "a complete validator command must retain no outstanding read correlation");
+    assert.equal(complete.yieldCalls.size, 0, "a complete validator command must retain no outstanding yield correlation");
+    assert.equal(complete.writeCalls.size, 0, "a complete validator command must retain no outstanding child write correlation");
+    assert.equal(complete.rootWriteCalls.size, 0, "a complete validator command must retain no outstanding Root write correlation");
+    assertCompleteValidatorCommand(complete, 0, "settled validator control");
+
+    const orphan = prepare(true);
+    const orphanTerminal = assertCompleteValidatorCommand(orphan, 1, "orphan validator control");
+    assert.equal(orphanTerminal.report.status, "PASSOU", "the complete command beside the orphan must retain PASSOU, not a yield or review status");
+    const orphanStart = orphan.evidence.command_results.find((record) => record.correlation?.tool_call_id === orphanCallId);
+    assert.ok(orphanStart, "the orphan fixture must retain the actual validator START before execute settlement");
+    assert.equal(orphanStart.phase, "start", "the orphan fixture must retain the validator START phase");
+    assert.equal(orphanStart.correlation.status, "start", "the orphan fixture must retain the outstanding START correlation");
+    assert.equal(orphanStart.command_label, command, "the orphan fixture must use the exact approved validator command");
+    configureHostReceipt(orphan);
+    let orphanExecutionError = null;
+    let orphanSettledEvidence = null;
+    try {
+      orphanSettledEvidence = await orphan.execute("Bounded execute settlement with one unrelated validator START still open.");
+    } catch (caught) {
+      orphanExecutionError = caught;
+    }
+    if (orphanSettledEvidence !== null) {
+      assert.fail("execute must not settle while an otherwise valid validator START remains outstanding");
+    }
+    assert.equal(orphanExecutionError?.kind, "BLOCKED", "an outstanding validator START must fail closed as BLOCKED");
+    assertCurrentHostReceipt(orphan, orphan.evidence, "orphan validator control", false);
+    assert.equal(orphan.settled, true, "the rejected settlement must retain the actual host session_settled state");
+    assert.equal(orphan.validatorCalls.size, 1, "the rejected settlement must retain the outstanding validator correlation");
+    assert.equal(orphan.evidence.task_records.length, 1, "the rejected settlement must retain the complete authoritative Root task record");
+    assert.equal(orphan.evidence.task_records[0].status, "completed", "the rejected settlement must retain the Root task completed status");
+    assert.equal(orphan.evidence.task_records[0].exitCode, 0, "the rejected settlement must retain the Root task exit code");
+    assert.equal(orphan.evidence.task_records[0].isError, false, "the rejected settlement must retain the Root task success flag");
+    const retainedComplete = assertCompleteValidatorCommand(orphan, 1, "rejected orphan validator control");
+    assert.equal(retainedComplete.report.status, "PASSOU", "the rejected settlement must retain the other complete validator PASSOU report");
+    assert.equal(orphan.evidence.command_results.filter((record) => record.correlation?.tool_call_id === orphanCallId).length, 1, "the rejected settlement must retain exactly one orphan START");
+  });
+}
+
 
 function adoptionCommandResultBudgetFailureIsAtomic(lifecycle, root, maxCaptureBytes) {
   const label = "adoption-command-result-budget-rollback";
@@ -5335,6 +5535,7 @@ async function main() {
   await executeAsyncCase(results, failures, "Missing exact yield END prevents settlement through execute/finalization rather than map-size-only inspection", "AC-016:yield-execute-finalization-boundary", () => {
     return executeRejectsMissingYieldEnd(apis.lifecycle, fixtureRoot);
   });
+  await executeAsyncCase(results, failures, "Root execute rejects an outstanding validator START even when another validator command completed", "AC-016:lifecycle-settlement:outstanding-validator-call", () => executeRejectsOutstandingValidatorStart(apis.lifecycle, fixtureRoot));
   executeCase(results, failures, "failed/completed child latches reject fresh read/write/bash STARTs and do not confuse correlated late ENDs with permission", "AC-016:lifecycle-3353:terminal-binding-liveness", () => lifecycleBindingLivenessBlocksFreshDomainStarts(apis.lifecycle, fixtureRoot));
   await executeAsyncCase(results, failures, "Root execute get_state without an actual sessionId blocks before Root prompt dispatch", "AC-016:lifecycle-3800:root-session-id-required", () => rootSessionMissingExecuteBlocksBeforePrompt(apis.lifecycle, fixtureRoot));
   executeCase(results, failures, "constructor-configured task or solutionSpace drift blocks before child binding", "AC-016:lifecycle-3067:assignment-literal-binding", () => constructorAssignmentDriftBlocksBeforeBinding(apis.lifecycle, fixtureRoot));

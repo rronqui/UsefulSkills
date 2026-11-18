@@ -592,6 +592,40 @@ function nestedSpecKitWriteFrames(root, callId = "nested-speckit|doc-handoff") {
     ],
   };
 }
+function nestedBackendRepairWriteFrames(root, callId = "nested-backend-repair|quality") {
+  const pathValue = "app/bin/quality.mjs";
+  const absolutePath = path.resolve(root, pathValue);
+  const content = "export const boundedRepair = true;\n";
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  fs.writeFileSync(absolutePath, content, "utf8");
+  return {
+    pathValue,
+    absolutePath,
+    events: [
+      {
+        type: "tool_execution_start",
+        toolName: "write",
+        toolCallId: callId,
+        args: { path: pathValue, content },
+      },
+      {
+        type: "tool_execution_update",
+        toolName: "write",
+        toolCallId: callId,
+        args: { path: pathValue },
+        partialResult: { details: { resolvedPath: absolutePath } },
+      },
+      {
+        type: "tool_execution_end",
+        toolName: "write",
+        toolCallId: callId,
+        isError: false,
+        result: { details: { resolvedPath: absolutePath } },
+      },
+    ],
+  };
+}
+
 
 
 function createSession(NativeRpcSession, root, assignments, label = "native-early-lifecycle-binding") {
@@ -1586,6 +1620,74 @@ function earlySpecKitAuthorDocHandoffIsDeferredThenAdmitted(apis, root) {
     "deferred metadata handoff evidence must retain its pre-Root arrival ordinals",
   );
 
+  session.consumeLogical(asyncMessage(asyncJob(FULL_ROOT_JOB, CANDIDATE_ID)));
+  assertAcceptedRecord(session, {
+    allocated_id: CANDIDATE_ID,
+    parent_tool_call_id: FULL_ROOT_CALL,
+    index: 0,
+    agent: item.agent,
+    agentSource: "project",
+    assignment_id: item.name,
+  });
+}
+
+function earlyBackendRepairWriteIsEnrichedOnRootAdoption(apis, root) {
+  const item = assignment(
+    "Native09BackendRepair",
+    "backend-developer",
+    "Apply the one bounded Native09 repair write only after Root ownership is observed.",
+  );
+  const session = createSession(apis.NativeRpcSession, root, [item], "native09-technical-retry-repair");
+  const repair = nestedBackendRepairWriteFrames(root);
+  consumePending(
+    session,
+    lifecycleFrame({ id: CANDIDATE_ID, agent: item.agent, parentToolCallId: FULL_ROOT_CALL }),
+    "early backend repair lifecycle",
+  );
+  for (const [index, event] of repair.events.entries()) {
+    consumePending(
+      session,
+      subagentEvent(CANDIDATE_ID, item.agent, event),
+      `early backend repair write frame ${index}`,
+    );
+  }
+  assert.equal(session.evidence.subagent_writes.length, 0, "early backend repair writes must remain pending before Root confirmation");
+
+  session.recordTool(rootStart(FULL_ROOT_CALL, [item]));
+  assert.equal(session.evidence.subagent_writes.length, 0, "Root START alone must not flush an early backend repair write");
+  session.recordTool(rootEnd(FULL_ROOT_CALL, FULL_ROOT_JOB, [progressRow(item, CANDIDATE_ID)]));
+
+  const writes = session.evidence.subagent_writes.filter((record) => record.allocated_id === CANDIDATE_ID);
+  assert.equal(writes.length, 3, "Root adoption must publish the buffered backend repair START, UPDATE, and END exactly once");
+  assert.deepEqual(writes.map((record) => record.phase), ["start", "update", "end"], "buffered backend repair frames must retain their order");
+  assert.equal(
+    writes.every((record) => record.role === "backend-developer"),
+    true,
+    "Root adoption must enrich every buffered backend repair frame with the accepted backend role",
+  );
+  assert.equal(
+    writes.every((record) => record.role_source === "observed-root-dispatch-lifecycle"),
+    true,
+    "Root adoption must enrich every buffered backend repair frame with the observed Root role source",
+  );
+  const binding = session.lifecycleByAllocated.get(`id:${CANDIDATE_ID}`);
+  assert.ok(binding?.accepted === true, "backend repair writes must adopt the actual accepted Root lifecycle binding");
+  assert.equal(
+    writes.every((record) => record.job_id === binding.job_id && record.instance_id === binding.instance_id && record.domain_id_provenance === binding.domain_id_provenance),
+    true,
+    "buffered backend repair frames must retain the actual opaque job and instance domain",
+  );
+  assert.equal(
+    writes.every((record) => record.parent_tool_call_id === FULL_ROOT_CALL && record.allocated_id === CANDIDATE_ID),
+    true,
+    "buffered backend repair frames must retain the exact opaque Root/lifecycle tuple",
+  );
+  assert.equal(
+    writes.every((record) => record.paths?.some((value) => path.resolve(root, value) === repair.absolutePath)),
+    true,
+    "buffered backend repair frames must retain the allowlisted repair path",
+  );
+  session.consumeLogical(lifecycleFrame({ id: CANDIDATE_ID, agent: item.agent, status: "completed" }));
   session.consumeLogical(asyncMessage(asyncJob(FULL_ROOT_JOB, CANDIDATE_ID)));
   assertAcceptedRecord(session, {
     allocated_id: CANDIDATE_ID,
@@ -4642,6 +4744,7 @@ async function main() {
   executeCase(results, failures, "permitted reader cannot adopt an unconfigured assignment name", "VALID_FINDING:constructor-assignment-name-authz", () => permittedReaderCannotAdoptUnconfiguredAssignmentName(apis, caseRoot("constructor-name-authz")));
   executeCase(results, failures, "early validator exact TOOLING_COMMAND is deferred then admitted", "VALID_FINDING:early-validator-role-guard", () => earlyValidatorToolingCommandIsDeferredThenAdmitted(apis, caseRoot("early-validator")));
   executeCase(results, failures, "early spec-kit-author metadata DOC handoff is deferred then admitted", "VALID_FINDING:early-speckit-role-guard", () => earlySpecKitAuthorDocHandoffIsDeferredThenAdmitted(apis, caseRoot("early-speckit")));
+  executeCase(results, failures, "early backend repair write is enriched with accepted role and Root-derived role_source on adoption", "VALID_FINDING:lifecycle-4117:early-backend-role-provenance", () => earlyBackendRepairWriteIsEnrichedOnRootAdoption(apis, caseRoot("early-backend-repair")));
   executeCase(results, failures, "fast SDK completion before Root is adopted only by the same allocation", "VALID_FINDING:fast-completed-same-allocation", () => fastCompletedLifecycleBeforeRootIsAdoptedOnlyBySameAllocation(apis, caseRoot("fast-completed")));
   executeCase(results, failures, "SDK aborted speculative candidate is never adopted", "VALID_FINDING:aborted-speculative-candidate", () => abortedSpeculativeCandidateIsNeverAdopted(apis, caseRoot("aborted")));
   executeCase(results, failures, "completed speculative candidate is not adopted by agent/index heuristic", "VALID_FINDING:completed-candidate-not-adopted", () => completedSpeculativeCandidateIsNotAdoptedByTupleHeuristic(apis, caseRoot("completed-candidate")));

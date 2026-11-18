@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // Source-only RED probe for T-011 / AC-016 retained Native route reuse.
 //
-// The historical Native27 evidence and four route inspection witnesses are
+// The current Native49 evidence and four route inspection witnesses are
 // read-only inputs. The probe copies only the pinned current source files into
 // owned temporary roots, then calls the real lifecycle private consumer through
 // an owned export seam. It never starts OMP/SDK, invokes a model, uses a
 // network/Git command, or edits the checkout or historical route projects.
+//
+// The historical Native27 capture remains an immutable prior RED input; this
+// probe's positive is deliberately anchored to the current Native49 capture.
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -23,8 +26,10 @@ const DEFAULT_RETRY_SOURCE = path.join(SOURCE_DIR, "technical-retry-scenario.mjs
 const TEST_FILE = "implementation-evidence/native-release/retained-route-capture-red-probe.mjs";
 const EXPECTED_CLASSIFICATION = "VALID_FINDING:AC-016:retained-route-capture-consumer";
 const SHA256 = /^[a-f0-9]{64}$/i;
-const BASELINE_LIFECYCLE_SHA256 = "b2d4327ea2274924677e510ba4e9b1ce5594371345266d339df22dc63774b492";
-const TRUSTED_CAPTURE_SHA256 = "1a3e8eedb5289f3b6fb2af387fddc9cd9060646bca962515a978a8160fc885b0";
+const BASELINE_LIFECYCLE_SHA256 = "17e9709bdedf00734c4bb83b02d95be6d8eb70c237c9e8b6520986efa2d32865";
+const TRUSTED_CAPTURE_SHA256 = "7f3873b1e639767fa394912134717ffdf00d56a7306d3815d54453144553bb13";
+const TRUSTED_CAPTURE_RUN_ID = "27aa0fb6-193c-4a8b-abc5-398e315b66e0";
+const TRUSTED_CAPTURE_BYTES = 11720032;
 const TRUSTED_ROUTE_CONSUMER_SHA256 = "65d9fbec24e1ec5cda1f7346f60e7a247f1c5ca40fed40aec59bbdae737ddeb9";
 const TRUSTED_BINARY_SHA256 = "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7";
 const TRUSTED_BINARY_BYTES = 249985024;
@@ -60,7 +65,7 @@ function parseArgs(argv) {
   }
   const capture = values.get("capture");
   const root = values.get("root");
-  if (!capture) throw new Error("--capture is required; the historical evidence is an explicit retained input");
+  if (!capture) throw new Error("--capture is required; the current Native49 evidence is an explicit retained input");
   if (!root) throw new Error("--root is required; every mutable fixture must remain below it");
   return {
     source: path.resolve(values.get("source") ?? PROJECT_ROOT),
@@ -168,9 +173,13 @@ function instrumentRouteApi(route, calls) {
 }
 
 function trustedInputs(options) {
-  const captureRecord = fileRecord(options.capture, "trusted Native27 main evidence");
-  assert.equal(captureRecord.sha256, TRUSTED_CAPTURE_SHA256, "trusted Native27 main evidence bytes changed");
-  const capture = readJson(options.capture, "trusted Native27 main evidence").value;
+  const captureRecord = fileRecord(options.capture, "trusted current Native49 main evidence");
+  assert.equal(captureRecord.sha256, TRUSTED_CAPTURE_SHA256, "trusted current Native49 main evidence bytes changed");
+  assert.equal(captureRecord.bytes, TRUSTED_CAPTURE_BYTES, "trusted current Native49 main evidence byte pin changed");
+  const capture = readJson(options.capture, "trusted current Native49 main evidence").value;
+  assert.equal(capture.run_id, TRUSTED_CAPTURE_RUN_ID, "trusted current Native49 run identity changed");
+  assert.equal(typeof capture.source_root, "string", "trusted current Native49 capture must pin source_root");
+  assert.equal(path.resolve(options.source), path.resolve(capture.source_root), "current --source must equal the Native49 capture.source_root");
   assert.equal(capture.alignment_binding?.source_capture?.manifest_sha256, "0d40b8a19c35681a7f05c17d76f022e95249624a86d3d55a5371cf27157fb3c9", "trusted source capture manifest digest changed");
   const sourceMap = new Map((capture.source_before ?? []).map((entry) => [entry.path, entry]));
   for (const [relative, expected] of Object.entries(NORMATIVE_DOCUMENTS)) {
@@ -274,9 +283,10 @@ function rowCheckCount(row) {
 }
 
 function assertPassResult(value, calls, trusted) {
-  assert.equal(value?.status, "PASS", "exact retained Native27 evidence must be reusable");
+  assert.equal(value?.status, "PASS", "exact current Native49 evidence must be reusable");
   assert.equal(value?.sdk_sessions_reexecuted, false, "retained route reuse must not reexecute SDK sessions");
-  assert.equal(value?.capture?.sha256, TRUSTED_CAPTURE_SHA256, "retained result must preserve the trusted main evidence digest");
+  assert.equal(value?.capture?.sha256, TRUSTED_CAPTURE_SHA256, "retained result must preserve the trusted current Native49 main evidence digest");
+  assert.equal(value?.capture?.run_id, TRUSTED_CAPTURE_RUN_ID, "retained result must preserve the trusted current Native49 run identity");
   const rows = routeCaseRows(value);
   assert.equal(value.route_matrix.run_id, trusted.capture.route_matrix.run_id, "retained route run_id must remain exact");
   assert.equal(value.route_matrix.revision, trusted.capture.route_matrix.revision, "retained route revision must remain exact");
@@ -321,7 +331,7 @@ function executeCase(results, failures, name, run) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   fs.mkdirSync(options.root, { recursive: true });
-  const runRoot = fs.mkdtempSync(path.join(options.root, "native28-retained-route-"));
+  const runRoot = fs.mkdtempSync(path.join(options.root, "native49-retained-route-"));
   const trusted = trustedInputs(options);
   const historicalInputs = [{ file: options.capture, sha256: TRUSTED_CAPTURE_SHA256 }, ...trusted.fixtureWitnesses];
   const apis = await loadApis(options, runRoot);
@@ -333,7 +343,7 @@ async function main() {
   const results = [];
   const failures = [];
 
-  executeCase(results, failures, "exact trusted Native27 main evidence reuses four retained routes with 576 checks and no SDK reexecution", () => {
+  executeCase(results, failures, "exact current Native49 capture reuses four retained routes with 576 checks and no SDK reexecution", () => {
     const calls = [];
     const route = instrumentRouteApi(apis.route, calls);
     const value = callRetained(apis, baseRoot, options.capture, route, trusted.binaryBefore);
@@ -402,7 +412,7 @@ async function main() {
       product_manifest_files: 131,
       normative_documents: Object.entries(NORMATIVE_DOCUMENTS).map(([pathName, pin]) => ({ path: pathName, ...pin })),
     },
-    trusted_capture: { path: options.capture, sha256: TRUSTED_CAPTURE_SHA256, bytes: trusted.captureRecord.bytes },
+    trusted_capture: { path: options.capture, sha256: TRUSTED_CAPTURE_SHA256, bytes: trusted.captureRecord.bytes, run_id: TRUSTED_CAPTURE_RUN_ID },
     binary_before: trusted.binaryBefore,
     fixtures_root: runRoot,
     criteria_to_tests: {

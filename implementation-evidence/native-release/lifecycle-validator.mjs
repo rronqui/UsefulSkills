@@ -34,6 +34,13 @@ function sha256File(file) {
 
 function isRegularFile(file) {
   try {
+    file = path.resolve(file);
+    if (!insideRoot(privateRoot, file)) return false;
+    for (let parent = path.dirname(file); insideRoot(privateRoot, parent); parent = path.dirname(parent)) {
+      const directory = lstatSync(parent);
+      if (!directory.isDirectory() || directory.isSymbolicLink()) return false;
+      if (path.relative(privateRoot, parent) === "") break;
+    }
     const stat = lstatSync(file);
     return stat.isFile() && !stat.isSymbolicLink();
   } catch {
