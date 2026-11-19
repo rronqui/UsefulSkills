@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/rronqui/UsefulSkills/compare/v0.4.0...v0.5.0) (2026-11-19)
+
+
+### Features
+
+* deliver OMP compatibility and audited Windows/Linux remediation ([#48](https://github.com/rronqui/UsefulSkills/issues/48)) ([82c24c2](https://github.com/rronqui/UsefulSkills/commit/82c24c254cd3d1c699de92fccf75728012e50e02))
+
 ## [0.4.0](https://github.com/rronqui/UsefulSkills/compare/v0.3.4...v0.4.0) (2026-08-11)
 
 
