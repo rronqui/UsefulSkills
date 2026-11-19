@@ -1,0 +1,10 @@
+# Synthetic redaction inputs only: non-PEM placeholder bodies, fixture
+# encryption text and an intentionally fake npm token. No rule/file exclusion.
+scripts/hitl-loop.test.mjs:generic-api-key:1021
+scripts/hitl-loop.test.mjs:generic-api-key:1251
+scripts/hitl-loop.test.mjs:private-key:304
+scripts/hitl-loop.test.mjs:private-key:330
+scripts/hitl-loop.test.mjs:private-key:500
+scripts/hitl-loop.test.mjs:private-key:638
+scripts/hitl-loop.test.mjs:private-key:666
+scripts/hitl-loop.test.mjs:private-key:1032
