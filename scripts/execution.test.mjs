@@ -348,6 +348,24 @@ describe('AC-002: safe execution locks and filesystem roots',()=>{
   f.context.capacity.activeWorkers=1;
   return f;
  }
+ function invalidTerminalAfterRunningAttempt(){
+  const f=fixture();
+  resource(f,'T001','WriterA','C:/fixture/shared');
+  resource(f,'T002','WriterB','C:/fixture/shared');
+  resource(f,'T003','WriterC','C:/fixture/independent');
+  terminal(f,'T001',{status:'RUNNING'});
+  terminal(f,'T001',{status:'PASS',attempt:2});
+  return f;
+ }
+ it.each([
+  ['revision',{revision:'old-revision'}],
+  ['static digest',{staticDigest:OTHER}],
+ ])('Review01-01 rejects stale RUNNING %s while retaining the conflicting lock',(_label,stale)=>{
+  const f=fixture();resource(f,'T001','WriterA','C:/fixture/shared');resource(f,'T002','WriterB','C:/fixture/shared');resource(f,'T003','WriterC','C:/fixture/independent');
+  terminal(f,'T001',{status:'RUNNING',...stale});
+  const r=evaluate(f);code(r,'E_HISTORY',{taskId:'T001'});blocked(r,'T002','RESOURCE_BUSY');
+  expect(r.value.ready).toContain('T003');expect(r.value.running).not.toContain('T001');expect(r.value.complete).toBe(false);
+ });
  function conflictingReaderAttempt(){
   const f=fixture(['T001','T002']);
   resource(f,'T001','Reader','C:/fixture/shared',{access:'read'});
@@ -406,6 +424,22 @@ describe('AC-002: safe execution locks and filesystem roots',()=>{
   blocked(r,'T002','RESOURCE_BUSY');
   expect(r.value.complete).toBe(false);
   partition(r,['T001','T002']);
+ });
+ it.each([
+  ['no current job',f=>{f.context.jobs=[];}],
+  ['terminal job only',f=>{f.context.jobs=f.context.jobs.filter(j=>j.state==='TERMINAL');}],
+ ])('retains an earlier RUNNING writer lock after an invalid later terminal history with %s',(_label,removeCurrentJob)=>{
+  const f=invalidTerminalAfterRunningAttempt();
+  removeCurrentJob(f);
+  const before=clone(f);freeze(f);
+  const r=evaluate(f);
+  code(r,'E_HISTORY',{taskId:'T001'});
+  expect(r.value.complete).toBe(false);
+  expect(r.value.ready).toContain('T003');
+  expect(r.value.ready).not.toContain('T002');
+  blocked(r,'T002','RESOURCE_BUSY');
+  partition(r,['T001','T002','T003']);
+  expect(f).toEqual(before);
  });
  it.each([
   ['missing job',f=>{f.context.jobs=[];}],

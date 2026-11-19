@@ -921,6 +921,53 @@ describe.each(POSIX_GIT_FACTORIES)("AC-008 Git admission session %s", (factoryNa
 
 
 describe("AC-008 Git admission session", () => {
+  it.each([
+    ["source", createGitSession],
+    ["generated", createGeneratedGitSession],
+  ])("%s revalidates the loaded Git closure before a later spawn", (_label, factory) => {
+    for (const mutate of [
+      metadata => { metadata.objects.dlls[0].sha256 = "0".repeat(64); },
+      metadata => { metadata.objects.git.sha256 = "0".repeat(64); },
+      metadata => {
+        const directory = metadata.objects.ancestors[2];
+        directory.identity.fileId128 = "0x" + "1".repeat(32);
+        for (const row of allRows(metadata).filter(row => Array.isArray(row.ancestors))) {
+          row.ancestors.find(item => item.path === directory.path).identity.fileId128 = directory.identity.fileId128;
+        }
+      },
+    ]) {
+      const fixture = makeDependencies();
+      const session = factory(fixture.dependencies);
+      expect(run(session).status).toBe(0);
+      mutate(fixture.metadata);
+      expectUnsafe(run(session, ALLOWED_TUPLES[1]));
+      expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("bounds the native PowerShell probe and reports its timeout before any Git spawn", () => {
+    const fixture = makeDependencies();
+    delete fixture.dependencies.queryWindowsMetadata;
+    fixture.spawnSync.mockReturnValue({ status: null, error: Object.assign(new Error("timeout"), { code: "ETIMEDOUT" }) });
+    const before = fixture.dependencies.fs.readFileSync(WRAPPER_PATH);
+    expectUnsafe(run(createGitSession(fixture.dependencies)));
+    expect(fixture.spawnSync).toHaveBeenCalledTimes(1);
+    expect(fixture.spawnSync).toHaveBeenCalledWith(POWERSHELL, expect.any(Array), expect.objectContaining({ timeout: 30_000, maxBuffer: 4 * 1024 * 1024, shell: false, windowsHide: true }));
+    expect(fixture.dependencies.fs.readFileSync(WRAPPER_PATH)).toEqual(before);
+  });
+
+  it.each([
+    ["check-ref-format", "refs/heads/ação-東京"],
+    ["check-ref-format", "refs/tags/build;$HOME'\"(ok)"],
+    ["symbolic-ref", "--quiet", "refs/remotes/ação+origin/HEAD"],
+    ["for-each-ref", "--format=%(refname)", "refs/remotes/team/ação+origin/HEAD"],
+  ])("passes a legitimate Git name through argv: %j", (...args) => {
+    const fixture = makeDependencies();
+    fixture.spawnSync.mockReturnValue({ status: 1, stdout: "original output\n", stderr: "original diagnostic\n" });
+    const result = run(createGitSession(fixture.dependencies), args);
+    expect(result).toEqual({ status: 1, stdout: "original output\n", stderr: "original diagnostic\n" });
+    expect(fixture.spawnSync).toHaveBeenCalledWith(WRAPPER_PATH, args, expect.objectContaining({ shell: false }));
+  });
 
   it("does not probe or execute when the session is closed, and close is idempotent", () => {
     const fixture = makeDependencies();

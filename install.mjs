@@ -256,11 +256,6 @@ function planSyncDir(dest, source) {
     } else if (!isRegularFile(result.stat)) {
       conflicts.push(`${node.relative}: ${statType(result.stat)} no destino onde deveria haver arquivo`);
     } else {
-      if (process.platform === "win32" && !check) {
-        operations.push({ source: node.path, target });
-        updated += 1;
-        continue;
-      }
       const sourceHashResult = safeSha256(node.path);
       const targetHashResult = sourceHashResult.error ? sourceHashResult : safeSha256(target);
       if (sourceHashResult.error || targetHashResult.error) {
@@ -378,7 +373,7 @@ function planNoticeFile(source, destination) {
       unsafe: true,
     };
   }
-  const sourceHashResult = process.platform === "win32" && !check ? { hash: null, error: null } : safeSha256(source);
+  const sourceHashResult = safeSha256(source);
   if (sourceHashResult.error) {
     return {
       status: "drift",
@@ -423,7 +418,6 @@ function planNoticeFile(source, destination) {
       unsafe: true,
     };
   }
-  if (process.platform === "win32" && !check) return { status: "updated", detail: "planejado para transação nativa", operations: copyOperations(source, destination), unsafe: false };
   const destinationHashResult = safeSha256(destination);
   if (destinationHashResult.error) {
     return {
@@ -581,11 +575,6 @@ if (agentsRootResult.conflict) {
     if (!isRegularFile(destinationResult.stat)) {
       console.log(`agent ${skill}/${file.padEnd(32)} drift    ${statType(destinationResult.stat)} no destino — preservado — E_INSTALL_DRIFT`);
       markUnsafe();
-      continue;
-    }
-    if (process.platform === "win32" && !check) {
-      plannedOperations.push({ source: sourcePath, target: destinationPath });
-      console.log(`agent ${skill}/${file.padEnd(32)} planned native transaction`);
       continue;
     }
     const sourceHashResult = safeSha256(sourcePath);

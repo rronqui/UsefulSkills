@@ -190,6 +190,7 @@ function generatedFiles() {
     if (!regularUnlinked(sourceResult.stat)) {
       throw new Error(`origem insegura do hook ${source}: ${typeOf(sourceResult.stat)}`);
     }
+    if (sourceResult.stat.size > MAX_GENERATED_BYTES) throw new Error(`origem do hook excede o limite de ${MAX_GENERATED_BYTES} bytes: ${source}`);
     const sourceText = readFileSync(source, "utf8");
     const sourceBytes = Buffer.byteLength(sourceText);
     const sourceAfter = lstatSafe(source);
@@ -322,6 +323,21 @@ function main() {
   // Isso expande aliases 8.3 no Windows e também impede que um caminho textual
   // alcance as fontes canônicas por meio de um ancestral alternativo.
   const canonicalRoot = canonicalPath(root);
+  // Node's lexical normalization collapses symlink/.. before the filesystem
+  // can apply its effective meaning. Refuse that ambiguous traversal.
+  const rawParts = rawHooksDir.split(/[\\/]/);
+  let cursor = path.isAbsolute(rawHooksDir) ? path.parse(rawHooksDir).root : root;
+  let symlinkSeen = false;
+  let missingSeen = false;
+  for (const component of rawParts) {
+    if (!component || component === "." || component === path.parse(rawHooksDir).root.replace(/[\\/]/g, "")) continue;
+    if (component === ".." && (symlinkSeen || missingSeen)) throw new Error("core.hooksPath contém travessia '..' ambígua após symlink/junction ou componente ausente; configure o destino efetivo sem travessia.");
+    cursor = path.join(cursor, component);
+    const entry = lstatSafe(cursor);
+    if (entry.error) throw entry.error;
+    if (entry.stat?.isSymbolicLink()) symlinkSeen = true;
+    if (!entry.stat) missingSeen = true;
+  }
   const hooksDir = path.resolve(root, rawHooksDir);
   const canonicalHooksDir = canonicalPath(hooksDir);
   const hooksInside = inside(canonicalRoot, canonicalHooksDir);

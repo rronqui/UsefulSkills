@@ -242,6 +242,9 @@ const __createGitSession = function createGitSession(dependencies = {}) {
     }
     return actual.size === expected.size && [...expected].every((item) => actual.has(item));
   };
+  // In the pinned Git source, secur32/ucrtbase use INIT_PROC_ADDR, whose
+  // lazyload.h implementation specifies LOAD_LIBRARY_SEARCH_SYSTEM32.
+  // Application-directory precedence therefore does not apply to those loads.
   const LOADER_NAMES = Object.freeze(["advapi32.dll", "bcrypt.dll", "kernel32.dll", "kernelbase.dll", "msvcrt.dll", "ntdll.dll", "psapi.dll", "secur32.dll", "shell32.dll", "shlwapi.dll", "ucrtbase.dll", "user32.dll", "ws2_32.dll"]);
   const SYSTEM32_NAMES = new Set(["bcrypt.dll", "kernelbase.dll", "ntdll.dll", "secur32.dll", "ucrtbase.dll"]);
 
@@ -542,6 +545,8 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
       shell: false,
       windowsHide: true,
       encoding: "utf8",
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
     });
     if (result?.error || result?.status !== 0) throw new Error("E_UNSAFE_GIT_EXECUTABLE: Windows metadata probe failed");
     const lines = String(result.stdout ?? "").trim().split(/\r?\n/).filter(Boolean);
@@ -641,6 +646,7 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
 
   let approvedBinding;
   let approvedHost;
+  let approvedClosure;
 
   const probe = (candidate, cwd, currentEnv) => {
     if (!isWindows || candidate.nlink === 1) return { binding: null };
@@ -660,7 +666,7 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
       if (reason) return fail("PROVENANCE", reason);
       const observed = independentBinding(candidate, cwd, currentEnv, host);
       if (!observed || !bindingMatchesMetadata(observed, metadata)) return fail("PROVENANCE", "Git executable changed during metadata admission");
-      return { binding: observed, host };
+      return { binding: observed, host, closure: JSON.stringify({ objects: metadata.objects, loader: metadata.loader }) };
     } catch { return fail("PROBE", "Windows metadata validation failed"); }
   };
 
@@ -672,17 +678,20 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
     }
     return cwd === firstCwd && sameJson(firstEnv, env);
   };
+  // Match Git's check-ref-format grammar without restricting Unicode or shell
+  // metacharacters that are ordinary argv bytes with shell:false.
+  const validRef = (value) => typeof value === "string" && value !== "@" && value.includes("/") && !/[\x00-\x20\x7f~^:?*\[\\]/.test(value) && !value.includes("..") && !value.includes("@{") && !value.endsWith(".") && value.split("/").every((part) => part && !part.startsWith(".") && !part.endsWith(".lock"));
   const validTuple = (args) => {
     if (!Array.isArray(args) || args.some((value) => typeof value !== "string" || value.includes("\0"))) return false;
     if (ALLOWED_TUPLES.some((tuple) => sameJson(tuple, args))) return true;
-    if (args.length === 2 && args[0] === "check-ref-format" && /^refs\/(?:heads|tags)\/[A-Za-z0-9][A-Za-z0-9._/+~-]*$/.test(args[1]) && !args[1].includes("..") && !args[1].includes("//")) return true;
+    if (args.length === 2 && args[0] === "check-ref-format" && /^refs\/(?:heads|tags)\//.test(args[1]) && validRef(args[1])) return true;
     if (args.length === 3 && args[0] === "symbolic-ref" && args[1] === "--quiet" && args[2].startsWith("refs/remotes/")) {
       const value = args[2].slice("refs/remotes/".length);
-      return /^[A-Za-z0-9][A-Za-z0-9._-]*\/HEAD$/.test(value);
+      return value.endsWith("/HEAD") && validRef(args[2]);
     }
     if (args.length === 3 && args[0] === "for-each-ref" && args[1] === "--format=%(refname)" && args[2].startsWith("refs/remotes/")) {
       const value = args[2].slice("refs/remotes/".length);
-      return /^[A-Za-z0-9][A-Za-z0-9._-]*\/HEAD$/.test(value);
+      return value.endsWith("/HEAD") && validRef(args[2]);
     }
     return false;
   };
@@ -706,12 +715,16 @@ $response.loader.appDirectoryCandidates = @($appCandidates)
       approvedExecutable = candidate.executable;
       approvedBinding = probeResult.binding;
       approvedHost = probeResult.binding ? probeResult.host : undefined;
+      approvedClosure = probeResult.closure;
       admitted = true;
     } else {
       if (!equalPath(approvedExecutable, candidate.executable)) return fail("CONTEXT_CHANGED", "Git executable changed within session");
       if (approvedBinding) {
-        const observed = independentBinding(candidate, options.cwd, currentEnv, approvedHost);
-        if (!sameBinding(observed, approvedBinding, true)) return fail("CONTEXT_CHANGED", "Git executable identity or bytes changed within session");
+        const refreshed = probe(candidate, options.cwd, currentEnv);
+        if (refreshed?.error) return refreshed;
+        if (refreshed.host !== approvedHost) return fail("CONTEXT_CHANGED", "Windows probe host changed within session");
+        if (!sameBinding(refreshed.binding, approvedBinding, true)) return fail("CONTEXT_CHANGED", "Git executable identity or bytes changed within session");
+        if (refreshed.closure !== approvedClosure) return fail("CONTEXT_CHANGED", "Git load closure changed within session");
       }
     }
     const spawnOptions = { cwd: options.cwd, env: firstEnv, shell: false, windowsHide: true, encoding: "utf8" };

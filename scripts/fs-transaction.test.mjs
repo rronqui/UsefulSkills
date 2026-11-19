@@ -4,7 +4,9 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import path from "node:path";
 import nodeFs from "node:fs";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { transact } from "../tdd-orchestrator/lib/fs-transaction/index.mjs";
 
 if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000 });
@@ -12,6 +14,7 @@ if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000 });
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tempRoot = path.join(repoRoot, ".test-temp");
 fs.mkdirSync(tempRoot, { recursive: true });
+const childProcess = createRequire(import.meta.url)("node:child_process");
 
 function assertOwnedTemp(candidate) {
   const base = path.resolve(tempRoot) + path.sep;
@@ -265,6 +268,7 @@ function singleFileTransactionFixture(prefix) {
 
 function replaceParentWithSymlinkAtPublication({ target, parent, outside, pivotAfterRename = false }) {
   const originalRenameSync = nodeFs.renameSync;
+  const originalUnlinkSync = nodeFs.unlinkSync;
   const physicalParentAndName = candidate => {
     const absolute = path.resolve(String(candidate));
     const lexicalParent = path.dirname(absolute);
@@ -308,7 +312,7 @@ function replaceParentWithSymlinkAtPublication({ target, parent, outside, pivotA
     nodeFs.symlinkSync(outside, parent);
     injection.called = true;
   };
-  const renameSpy = vi.spyOn(nodeFs, "renameSync").mockImplementation((from, to, ...args) => {
+  const unlinkSpy = vi.spyOn(nodeFs, "unlinkSync").mockImplementation((from, ...args) => {
     let candidate;
     try {
       candidate = physicalParentAndName(from);
@@ -318,15 +322,14 @@ function replaceParentWithSymlinkAtPublication({ target, parent, outside, pivotA
     const isPublication = !injection.called
       && candidate
       && candidate.id === targetPhysical.id
-      && candidate.name === targetPhysical.name
-      && path.basename(path.resolve(String(to))) === "0.backup.quarantine";
+      && candidate.name === targetPhysical.name;
     if (!isPublication) {
-      const result = originalRenameSync(from, to, ...args);
+      const result = originalUnlinkSync(from, ...args);
       if (injection.called) inspectOutsideTarget();
       return result;
     }
     if (!pivotAfterRename) pivot();
-    const result = originalRenameSync(from, to, ...args);
+    const result = originalUnlinkSync(from, ...args);
     injection.publicationSyscallReturned = true;
     if (pivotAfterRename) {
       pivot();
@@ -336,7 +339,133 @@ function replaceParentWithSymlinkAtPublication({ target, parent, outside, pivotA
     }
     return result;
   });
-  return { injection, restore: () => renameSpy.mockRestore() };
+  return { injection, restore: () => unlinkSpy.mockRestore() };
+}
+
+function pivotParentAfterLinkPublication({ target, parent, outside }) {
+  const originalLinkSync = nodeFs.linkSync;
+  const originalRenameSync = nodeFs.renameSync;
+  const physicalParentAndName = candidate => {
+    const absolute = path.resolve(String(candidate));
+    const lexicalParent = path.dirname(absolute);
+    const physicalParent = fs.realpathSync.native(lexicalParent);
+    const stat = fs.lstatSync(physicalParent, { bigint: true });
+    return {
+      id: `${stat.dev}:${stat.ino}`,
+      name: path.basename(absolute),
+    };
+  };
+  const targetPhysical = physicalParentAndName(target);
+  const outsideTarget = path.join(outside, targetPhysical.name);
+  const injection = {
+    called: false,
+    preserved: null,
+    publicationSyscallReturned: false,
+    afterPublication: null,
+  };
+  const linkSpy = vi.spyOn(nodeFs, "linkSync").mockImplementation((from, to, ...args) => {
+    const result = originalLinkSync(from, to, ...args);
+    let candidate;
+    try {
+      candidate = physicalParentAndName(to);
+    } catch {
+      candidate = null;
+    }
+    const isPublication = !injection.called
+      && candidate
+      && candidate.id === targetPhysical.id
+      && candidate.name === targetPhysical.name;
+    if (isPublication) {
+      injection.publicationSyscallReturned = true;
+      injection.preserved = `${parent}.preserved`;
+      originalRenameSync(parent, injection.preserved);
+      nodeFs.symlinkSync(outside, parent);
+      injection.called = true;
+      const stat = fs.lstatSync(outsideTarget, { bigint: true });
+      injection.afterPublication = {
+        id: `${stat.dev}:${stat.ino}`,
+        bytes: fs.readFileSync(outsideTarget),
+      };
+    }
+    return result;
+  });
+  return { injection, restore: () => linkSpy.mockRestore() };
+}
+
+// This test-only seam executes the real native script and NtSetInformationFile;
+// it never fakes link counts or replaces the host receipt.
+function injectWindowsHardlinkDuringStaging({ aliasParent, aliasName }) {
+  const marker = "  $directoryCreationLedger = [Collections.Generic.List[object]]::new()";
+  const originalSpawnSync = childProcess.spawnSync;
+  const state = { commandPatched: false };
+  const quote = value => String(value).replaceAll("'", "''");
+  const injection = String.raw`
+function SetTestHardlink($file,$root,[string]$name) {
+  $u = Unicode $name
+  $size = 20 + $u.Length
+  $info = [Runtime.InteropServices.Marshal]::AllocHGlobal($size)
+  $ios = [Runtime.InteropServices.Marshal]::AllocHGlobal(16)
+  try {
+    [Runtime.InteropServices.Marshal]::Copy([byte[]]::new($size),0,$info,$size)
+    [Runtime.InteropServices.Marshal]::Copy([byte[]]::new(16),0,$ios,16)
+    [Runtime.InteropServices.Marshal]::WriteByte($info,0,0)
+    [Runtime.InteropServices.Marshal]::WriteIntPtr($info,8,$root)
+    [Runtime.InteropServices.Marshal]::WriteInt32($info,16,$u.Length)
+    [Runtime.InteropServices.Marshal]::Copy($u.Bytes,0,[IntPtr]::Add($info,20),$u.Length)
+    $status = $native::NtSetInformationFile($file,$ios,$info,[uint32]$size,11)
+    return ([int]$status -ge 0)
+  } finally {
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($ios)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($info)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($u.Value)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($u.Buffer)
+  }
+}
+function OpenTestMetadata($root,[string]$name) {
+  $u = Unicode $name
+  $oa = ObjectAttributes $root $u
+  $out = [Runtime.InteropServices.Marshal]::AllocHGlobal([IntPtr]::Size)
+  $ios = [Runtime.InteropServices.Marshal]::AllocHGlobal(16)
+  try {
+    $status = $native::NtCreateFile($out,0x100080,$oa,$ios,[IntPtr]::Zero,0,7,1,0x200020,[IntPtr]::Zero,0)
+    CheckStatus $status 'NtCreateFile metadata hardlink fallback'
+    $handle = [Runtime.InteropServices.Marshal]::ReadIntPtr($out)
+    if ($handle -eq [IntPtr]::Zero) { Fail 'metadata hardlink fallback returned null handle' }
+    $allHandles.Add($handle)
+    return $handle
+  } finally {
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($ios)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($out)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($oa)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($u.Value)
+    [Runtime.InteropServices.Marshal]::FreeHGlobal($u.Buffer)
+  }
+}
+$hardlinkRecord = $owned[0]
+$aliasRoot = OpenChain '${quote(aliasParent)}' $true $false $false $false
+$metadata = OpenTestMetadata $hardlinkRecord.Target.Parent $hardlinkRecord.Target.Name
+if (-not (SetTestHardlink $metadata $aliasRoot.Handle '${quote(aliasName)}')) {
+  Fail 'real hardlink seam could not create the alias'
+}
+`;
+  const spawnSpy = vi.spyOn(childProcess, "spawnSync").mockImplementation((executable, args, options) => {
+    const nextArgs = [...args];
+    const commandIndex = nextArgs.indexOf("-Command") + 1;
+    const command = commandIndex > 0 ? nextArgs[commandIndex] : null;
+    if (!state.commandPatched && typeof command === "string" && command.includes(marker)) {
+      nextArgs[commandIndex] = command.replace(marker, `${injection}\n${marker}`);
+      state.commandPatched = true;
+    }
+    return originalSpawnSync(executable, nextArgs, options);
+  });
+  syncBuiltinESMExports();
+  return {
+    state,
+    restore() {
+      spawnSpy.mockRestore();
+      syncBuiltinESMExports();
+    },
+  };
 }
 
 function precreateForeignReservation({ mode, foreignBytes }) {
@@ -355,6 +484,35 @@ function precreateForeignReservation({ mode, foreignBytes }) {
     return result;
   });
   return { injection, restore: () => copySpy.mockRestore() };
+}
+
+function createQuarantineAfterMissingReservation(foreignBytes) {
+  const originalLstatSync = nodeFs.lstatSync;
+  const injection = {
+    called: false,
+    observedMissing: false,
+    path: null,
+    identity: null,
+  };
+  const lstatSpy = vi.spyOn(nodeFs, "lstatSync").mockImplementation((file, ...args) => {
+    try {
+      return originalLstatSync(file, ...args);
+    } catch (error) {
+      if (
+        !injection.called
+        && error?.code === "ENOENT"
+        && path.basename(String(file)) === "0.backup.quarantine"
+      ) {
+        injection.observedMissing = true;
+        injection.path = String(file);
+        nodeFs.writeFileSync(injection.path, foreignBytes, { flag: "wx" });
+        injection.identity = originalLstatSync(injection.path, { bigint: true });
+        injection.called = true;
+      }
+      throw error;
+    }
+  });
+  return { injection, restore: () => lstatSpy.mockRestore() };
 }
 
 function replaceBackupAtCleanup(foreignBytes) {
@@ -465,9 +623,86 @@ const boundaryIt = supportedBoundary ? it : it.skip;
 const linuxParentPivotIt = process.platform === "linux"
   ? it
   : (name, test) => it.skip(`${name} — requires Linux parent-pivot real-FS interleavings`, test);
+const windowsBoundaryIt = process.platform === "win32" && process.arch === "x64"
+  ? it
+  : (name, test) => it.skip(`${name} — requires Windows x64 native FS interleaving`, test);
+
 
 
 describe("AC-005 fs-transaction boundary", () => {
+  boundaryIt("verifies generated content without replacing an identical readonly target", () => {
+    const { fixture, target, oldBytes } = singleFileTransactionFixture("fs-transaction-readonly-content-");
+    fs.chmodSync(target, 0o444);
+    const before = fs.lstatSync(target, { bigint: true });
+    try {
+      expect(transact([{ content: oldBytes, target, verify: true }], { home: fixture.home }).ok).toBe(true);
+      const after = fs.lstatSync(target, { bigint: true });
+      expect(after.ino).toBe(before.ino);
+      expect(after.mtimeNs).toBe(before.mtimeNs);
+      expect(after.mode).toBe(before.mode);
+      expect(fs.readFileSync(target)).toEqual(oldBytes);
+      expect(() => transact([{ content: Buffer.from("different\n"), target, verify: true }], { home: fixture.home })).toThrow(/divergente/);
+      expect(fs.readFileSync(target)).toEqual(oldBytes);
+    } finally {
+      fs.chmodSync(target, 0o644);
+      fixture.close();
+    }
+  });
+
+  boundaryIt("rejects source reads without an explicit trusted scope before publication", () => {
+    const { fixture, source, target, oldBytes } = singleFileTransactionFixture("fs-transaction-empty-scopes-");
+    const before = fs.lstatSync(target, { bigint: true });
+    try {
+      expect(() => transact([{ source, target }], { home: fixture.home, sourceScopes: [] })).toThrow(/escopo/);
+      expect(fs.readFileSync(target)).toEqual(oldBytes);
+      expect(fs.lstatSync(target, { bigint: true }).ino).toBe(before.ino);
+      expect(fs.existsSync(path.join(fixture.home, ".omp"))).toBe(false);
+    } finally { fixture.close(); }
+  });
+  windowsBoundaryIt("rejects a real hardlink added after initial pinning before commit", () => {
+    const { fixture, source, target, oldBytes } = singleFileTransactionFixture("fs-transaction-windows-hardlink-");
+    const aliasName = "foreign-target-hardlink.bin";
+    const alias = path.join(fixture.outside, aliasName);
+    const sentinel = path.join(fixture.outside, "foreign-sentinel.bin");
+    const sentinelBytes = Buffer.from("foreign sentinel must survive\n");
+    fs.writeFileSync(sentinel, sentinelBytes);
+    const sentinelIdentity = fs.lstatSync(sentinel, { bigint: true });
+    const targetIdentity = fs.lstatSync(target, { bigint: true });
+    const seam = injectWindowsHardlinkDuringStaging({
+      aliasParent: fixture.outside,
+      aliasName,
+    });
+    let result;
+    let error;
+    try {
+      try {
+        result = transact([{ source, target, retainBackup: false }], {
+          home: fixture.home,
+          sourceScopes: [fixture.scope],
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(seam.state.commandPatched, "the real native transaction script must receive the staging seam").toBe(true);
+      expect(fs.existsSync(alias), "the kernel must create the concurrent hardlink alias").toBe(true);
+      expect(result, "a hardlink added after pinning must not report success").toBeUndefined();
+      expect(error, "a changed link set must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(target), "rollback must preserve the target preimage").toEqual(oldBytes);
+      const targetAfter = fs.lstatSync(target, { bigint: true });
+      expect(`${targetAfter.dev}:${targetAfter.ino}`).toBe(`${targetIdentity.dev}:${targetIdentity.ino}`);
+      const aliasAfter = fs.lstatSync(alias, { bigint: true });
+      expect(`${aliasAfter.dev}:${aliasAfter.ino}`).toBe(`${targetIdentity.dev}:${targetIdentity.ino}`);
+      expect(fs.readFileSync(alias)).toEqual(oldBytes);
+      expect(fs.readFileSync(sentinel), "foreign outside data must remain unchanged").toEqual(sentinelBytes);
+      const sentinelAfter = fs.lstatSync(sentinel, { bigint: true });
+      expect(`${sentinelAfter.dev}:${sentinelAfter.ino}`).toBe(`${sentinelIdentity.dev}:${sentinelIdentity.ino}`);
+    } finally {
+      seam.restore();
+      fixture.close();
+    }
+  });
   posixBoundaryIt("fails closed when the target parent becomes a symlink before pathname publication", () => {
     const { fixture, source, target } = singleFileTransactionFixture("fs-transaction-parent-swap-");
     const parent = path.dirname(target);
@@ -506,7 +741,7 @@ describe("AC-005 fs-transaction boundary", () => {
       fixture.close();
     }
   });
-  linuxParentPivotIt("preserves a foreign outside target with the same basename when the parent pivots after the real quarantine rename", () => {
+  linuxParentPivotIt("preserves a foreign outside target with the same basename when the parent pivots after the real quarantine unlink", () => {
     const { fixture, source, target, oldBytes } = singleFileTransactionFixture("fs-transaction-parent-pivot-foreign-");
     const parent = path.dirname(target);
     const outsideTarget = path.join(fixture.outside, path.basename(target));
@@ -558,7 +793,7 @@ describe("AC-005 fs-transaction boundary", () => {
     }
   });
 
-  linuxParentPivotIt("does not transiently publish through the outside parent after the real quarantine rename", () => {
+  linuxParentPivotIt("does not transiently publish through the outside parent after the real quarantine unlink", () => {
     const { fixture, source, target } = singleFileTransactionFixture("fs-transaction-parent-pivot-absent-");
     const parent = path.dirname(target);
     const outsideTarget = path.join(fixture.outside, path.basename(target));
@@ -601,6 +836,52 @@ describe("AC-005 fs-transaction boundary", () => {
   });
 
 
+
+  linuxParentPivotIt("rejects a live-parent pivot after real link publication before commit", () => {
+    const { fixture, source, target } = singleFileTransactionFixture("fs-transaction-parent-pivot-post-link-");
+    const parent = path.dirname(target);
+    const outsideTarget = path.join(fixture.outside, path.basename(target));
+    const outsideBytes = Buffer.from("foreign target must survive post-link pivot\n");
+    fs.writeFileSync(outsideTarget, outsideBytes);
+    const outsideIdentity = fs.lstatSync(outsideTarget, { bigint: true });
+    const parentBefore = fs.lstatSync(parent, { bigint: true });
+    const attack = pivotParentAfterLinkPublication({
+      target,
+      parent,
+      outside: fixture.outside,
+    });
+    let result;
+    let error;
+    try {
+      try {
+        result = transact([{
+          source,
+          target,
+          expectedParent: { path: parent, id: `${parentBefore.dev}:${parentBefore.ino}` },
+          retainBackup: false,
+        }], { home: fixture.home, sourceScopes: [fixture.scope] });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(attack.injection.publicationSyscallReturned, "the real link publication must return before the pivot").toBe(true);
+      expect(attack.injection.called, "the live parent must pivot after link publication").toBe(true);
+      expect(attack.injection.afterPublication).toEqual({
+        id: `${outsideIdentity.dev}:${outsideIdentity.ino}`,
+        bytes: outsideBytes,
+      });
+      expect(result, "a detached-directory publication must not report success").toBeUndefined();
+      expect(error, "a live-parent pivot after publication must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.lstatSync(parent).isSymbolicLink()).toBe(true);
+      expect(fs.readFileSync(outsideTarget), "the foreign live target must remain unchanged").toEqual(outsideBytes);
+      const outsideAfter = fs.lstatSync(outsideTarget, { bigint: true });
+      expect(`${outsideAfter.dev}:${outsideAfter.ino}`).toBe(`${outsideIdentity.dev}:${outsideIdentity.ino}`);
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
   for (const mode of ["quarantine", "backup"]) {
     posixBoundaryIt(`preserves a foreign precreated ${mode} reservation`, () => {
       const { fixture, source, target, oldBytes } = singleFileTransactionFixture(`fs-transaction-precreated-${mode}-`);
@@ -630,6 +911,41 @@ describe("AC-005 fs-transaction boundary", () => {
     });
   }
 
+
+  posixBoundaryIt("fails closed when a foreign quarantine reservation appears after the missing check", () => {
+    const { fixture, source, target, oldBytes } = singleFileTransactionFixture("fs-transaction-quarantine-after-missing-");
+    const foreignBytes = Buffer.from("foreign quarantine reservation after missing check\n");
+    const targetIdentity = fs.lstatSync(target, { bigint: true });
+    const attack = createQuarantineAfterMissingReservation(foreignBytes);
+    let result;
+    let error;
+    try {
+      try {
+        result = transact([{ source, target, retainBackup: false }], {
+          home: fixture.home,
+          sourceScopes: [fixture.scope],
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(attack.injection.observedMissing, "the seam must observe ENOENT before creating the foreign entry").toBe(true);
+      expect(attack.injection.called, "the foreign entry must be created after the missing observation").toBe(true);
+      expect(result, "a quarantine reservation race must not report success").toBeUndefined();
+      expect(error, "a foreign quarantine reservation must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(target), "the target preimage must remain intact").toEqual(oldBytes);
+      const targetAfter = fs.lstatSync(target, { bigint: true });
+      expect(`${targetAfter.dev}:${targetAfter.ino}`).toBe(`${targetIdentity.dev}:${targetIdentity.ino}`);
+      expect(fs.existsSync(attack.injection.path)).toBe(true);
+      expect(fs.readFileSync(attack.injection.path)).toEqual(foreignBytes);
+      const foreignAfter = fs.lstatSync(attack.injection.path, { bigint: true });
+      expect(`${foreignAfter.dev}:${foreignAfter.ino}`).toBe(`${attack.injection.identity.dev}:${attack.injection.identity.ino}`);
+    } finally {
+      attack.restore();
+      fixture.close();
+    }
+  });
   posixBoundaryIt("preserves a foreign backup replacement during retainBackup:false cleanup", () => {
     const { fixture, source, target, newBytes } = singleFileTransactionFixture("fs-transaction-backup-cleanup-");
     const foreignBytes = Buffer.from("foreign bytes replaced at backup cleanup\n");
@@ -913,6 +1229,58 @@ describe("AC-005 fs-transaction boundary", () => {
         ? fs.readdirSync(transactionRoot).filter(name => name.startsWith("install-"))
         : [];
       expect(transactions, "scope rejection must happen before transaction staging").toEqual([]);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  boundaryIt("commits a normal replacement and leaves the source and target bytes intact", () => {
+    const { fixture, source, target, newBytes } = singleFileTransactionFixture("fs-transaction-positive-");
+    try {
+      const result = transact([{ source, target, retainBackup: false }], {
+        home: fixture.home,
+        sourceScopes: [fixture.scope],
+      });
+      expect(result.ok).toBe(true);
+      expect(process.platform === "win32" ? result.response.event : result.event).toBe("commit-complete");
+      expect(fs.readFileSync(source)).toEqual(newBytes);
+      expect(fs.readFileSync(target)).toEqual(newBytes);
+      const targetStat = fs.lstatSync(target, { bigint: true });
+      expect(targetStat.isFile() && !targetStat.isSymbolicLink()).toBe(true);
+      expect(targetStat.nlink).toBe(1n);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  posixBoundaryIt("rejects an equal-plan snapshot when the source changes before transaction execution", () => {
+    const { fixture, source, target, oldBytes, newBytes } = singleFileTransactionFixture("fs-transaction-equal-plan-drift-");
+    try {
+      // The installer binds this destination snapshot while source and target are equal.
+      fs.writeFileSync(source, oldBytes);
+      const plannedTarget = fs.lstatSync(target, { bigint: true });
+      const expectedTarget = {
+        exists: true,
+        id: `${plannedTarget.dev}:${plannedTarget.ino}`,
+        hash: createHash("sha256").update(oldBytes).digest("hex"),
+      };
+
+      // Model a source edit after planning but before transact() receives the operation.
+      fs.writeFileSync(source, newBytes);
+      let error;
+      try {
+        transact([{ source, target, verify: true, expectedTarget }], {
+          home: fixture.home,
+          sourceScopes: [fixture.scope],
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error, "an equal operation with stale planned source bytes must fail closed").toBeDefined();
+      expect(error.code).toBe("E_INSTALL_DRIFT");
+      expect(fs.readFileSync(target), "drift must preserve the planned target preimage").toEqual(oldBytes);
+      expect(fs.readFileSync(source), "drift must preserve the changed source bytes").toEqual(newBytes);
     } finally {
       fixture.close();
     }

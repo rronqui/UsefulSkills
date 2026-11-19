@@ -189,7 +189,7 @@ function desiredHash(operation) {
 // Source confinement is rechecked before each source read/copy; hostile swaps after
 // the final check remain outside the bounded POSIX guarantee.
 function assertSourceScope(source, scopes) {
-  if (!Array.isArray(scopes) || scopes.length === 0) return;
+  if (!Array.isArray(scopes) || scopes.length === 0) throw failure(`origem sem escopo confiável: ${source}`);
   const candidate = path.resolve(source);
   const lexicalAccepted = scopes.some(scope => {
     const base = path.resolve(scope);
@@ -361,6 +361,15 @@ function recoverRenamedTarget(operation, anchor, handle) {
   const target = safeLstat(targetPath);
   if (moved.error) throw moved.error;
   if (target.error) throw target.error;
+  if (moved.stat && target.stat && moved.stat.nlink === 2n && target.stat.nlink === 2n) {
+    const retained = stateWithLinkCount(operation.quarantine, 2n);
+    const named = stateWithLinkCount(targetPath, 2n);
+    if (retained.id === operation.previous.id && retained.hash === operation.previous.hash && named.id === retained.id && named.hash === retained.hash) {
+      fs.unlinkSync(operation.quarantine);
+      assertState(targetPath, operation.previous);
+      return true;
+    }
+  }
   if (!moved.stat || target.stat || !regular(moved.stat)) return false;
   const movedState = state(operation.quarantine);
   if (movedState.id !== operation.previous.id || movedState.hash !== operation.previous.hash) {
@@ -451,7 +460,7 @@ function preflight(operations, home) {
     if (targetResult.stat && !operation.directory) {
       if (!regular(targetResult.stat)) return { target, error: failure(`tipo inseguro ${statType(targetResult.stat)}: ${target}`) };
       const contentUnchanged = operation.previous?.hash === desiredHash(operation);
-      if (operation.mode === undefined || !contentUnchanged) {
+      if (!operation.verify && !contentUnchanged) {
         try { fs.accessSync(target, constants.W_OK); } catch (error) { return { target, error }; }
       }
     }
@@ -559,6 +568,9 @@ function applyPosix(operations, home, sourceScopes = []) {
         assertExpectedParent(operation, created);
         assertSource(operation, sourceScopes);
         assertState(operation.target, operation.previous);
+        if (desiredHash(operation) !== operation.previous?.hash) {
+          throw failure(`plano divergente: ${operation.target}`);
+        }
         continue;
       }
       if (operation.directory) {
@@ -575,12 +587,21 @@ function applyPosix(operations, home, sourceScopes = []) {
       assertState(operation.target, operation.previous);
       if (operation.previous) {
         const parent = parentAnchor(operation, created);
+        operation.parentAnchor = parent;
         const handle = openParentHandle(operation, parent, ownedParentFds);
         operation.parentHandle = handle;
         operation.quarantine = `${operation.backup}.quarantine`;
         assertMissing(operation.quarantine, operation.quarantine);
         try {
-          fs.renameSync(handle.target, operation.quarantine);
+          // link() reserves the name exclusively. rename() would overwrite an
+          // entry created by another actor after assertMissing().
+          fs.linkSync(handle.target, operation.quarantine);
+          const retained = stateWithLinkCount(operation.quarantine, 2n);
+          const named = stateWithLinkCount(handle.target, 2n);
+          if (retained.id !== operation.previous.id || retained.hash !== operation.previous.hash || named.id !== retained.id || named.hash !== retained.hash) {
+            throw failure(`quarentena alterada: ${operation.quarantine}`);
+          }
+          fs.unlinkSync(handle.target);
           assertParentAnchor(operation, parent);
         } catch (error) {
           try { recoverRenamedTarget(operation, parent, handle); } catch (recoveryError) {
@@ -592,6 +613,7 @@ function applyPosix(operations, home, sourceScopes = []) {
       }
       if (!operation.parentHandle) {
         const parent = parentAnchor(operation, created);
+        operation.parentAnchor = parent;
         operation.parentHandle = openParentHandle(operation, parent, ownedParentFds);
       }
       const targetPath = operation.parentHandle.target;
@@ -599,9 +621,14 @@ function applyPosix(operations, home, sourceScopes = []) {
       applied.push(operation);
       fs.linkSync(operation.stage, targetPath);
       operation.published = true;
+      assertParentAnchor(operation, operation.parentAnchor);
       fs.unlinkSync(operation.stage);
       assertState(targetPath, operation.installed);
       if (operation.installed.hash !== desiredHash(operation)) throw failure(`destino divergente: ${operation.target}`);
+    }
+    for (const operation of operations) {
+      if (operation.parentAnchor) assertParentAnchor(operation, operation.parentAnchor);
+      else assertExpectedParent(operation, created);
     }
     committed = true;
     for (const operation of operations) {
@@ -623,7 +650,7 @@ function applyPosix(operations, home, sourceScopes = []) {
     for (const [index, operation] of applied.reverse().entries()) {
       try {
         checkTransaction();
-        assertExpectedParent(operation, created);
+        if (!operation.parentHandle) assertExpectedParent(operation, created);
         if (operation.previous) assertState(operation.quarantine, operation.previous);
         removeOwnedPublication(operation, index, transaction);
         restoreQuarantine(operation, checkTransaction);
@@ -827,7 +854,7 @@ function Stream($handle,$write) {
   $safe = [Microsoft.Win32.SafeHandles.SafeFileHandle]::new($handle,$false)
   [IO.FileStream]::new($safe, $(if ($write) { [IO.FileAccess]::ReadWrite } else { [IO.FileAccess]::Read }), 65536, $false)
 }
-function HashHandle($handle) { $stream = Stream $handle $false; try { [void]$stream.Seek(0,[IO.SeekOrigin]::Begin); $sha = [Security.Cryptography.SHA256]::Create(); return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant() } finally { $stream.Dispose() } }
+function HashHandle($handle) { Attributes $handle $false; $stream = Stream $handle $false; try { [void]$stream.Seek(0,[IO.SeekOrigin]::Begin); $sha = [Security.Cryptography.SHA256]::Create(); return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant() } finally { $stream.Dispose() } }
 function HashBytes($bytes) { $sha = [Security.Cryptography.SHA256]::Create(); try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() } }
 function RenameHandle($handle,$root,[string]$name) {
   $u = Unicode $name; $size = 20 + $u.Length; $info = [Runtime.InteropServices.Marshal]::AllocHGlobal($size); $ios = [Runtime.InteropServices.Marshal]::AllocHGlobal(16)
@@ -905,7 +932,7 @@ try {
     } else {
       $sourceHash = $null
     }
-    $target = OpenChain $op.target $false $true $false $true
+    $target = OpenChain $op.target $false $true $false $false
     $targetId = if ($target.Exists) { Identity $target.Handle } else { $null }
     $targetHash = if ($target.Exists) { HashHandle $target.Handle } else { $null }
     $parentId = if ($target.Parent -ne [IntPtr]::Zero) { Identity $target.Parent } else { $null }
@@ -926,6 +953,11 @@ try {
     if ($target.Exists -and $targetHash -eq $sourceHash) {
       [void]$equal.Add([pscustomobject]@{ Op = $op; Source = $source; Target = $target; SourceId = $sourceId; TargetId = $targetId })
       continue
+    }
+    if ($target.Exists -and -not $payload.inspectOnly) {
+      CloseNative $target.Handle
+      $target = OpenChain $op.target $false $false $false $true
+      if ((Identity $target.Handle) -ne $targetId -or (HashHandle $target.Handle) -ne $targetHash) { Fail ('destino alterado: ' + $op.target) }
     }
     [void]$owned.Add([pscustomobject]@{ Op = $op; Source = $source; SourceId = $sourceId; Target = $target; TargetId = $targetId; Stage = [IntPtr]::Zero; Previous = $null; Published = $false })
   }

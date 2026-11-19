@@ -5,7 +5,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { tmpdir } from "node:os";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
@@ -666,6 +666,48 @@ describe("install-hooks + wrappers gerados", () => {
       rmSync(configured, { recursive: true, force: true });
       expect(existsSync(join(hooksPath(dir), "commit-msg"))).toBe(true);
     }
+  });
+  it("rejeita core.hooksPath com symlink/.. antes de escrever no destino lexical", () => {
+    const fixture = initRepo("hooks-symlink-parent");
+    const linked = join(fixture, "actual", "nested");
+    mkdirSync(linked, { recursive: true });
+    symlinkSync(linked, join(fixture, "alias"), process.platform === "win32" ? "junction" : "dir");
+    try {
+      const configured = spawnSync("git", ["config", "core.hooksPath", "alias/../effective-hooks"], { cwd: fixture, encoding: "utf8" });
+      expectChildExit(configured, 0);
+      const result = install(fixture);
+      expectChildExit(result, 1);
+      expect(result.stderr).toMatch(/travessia.*ambígua/);
+      expect(existsSync(join(fixture, "effective-hooks"))).toBe(false);
+      expect(existsSync(join(fixture, "actual", "effective-hooks"))).toBe(false);
+      expectChildExit(spawnSync("git", ["config", "core.hooksPath", "absent/../effective-hooks"], { cwd: fixture, encoding: "utf8" }), 0);
+      const missingParent = install(fixture);
+      expectChildExit(missingParent, 1);
+      expect(missingParent.stderr).toMatch(/travessia.*ambígua/);
+      expect(existsSync(join(fixture, "effective-hooks"))).toBe(false);
+    } finally { rmSync(fixture, { recursive: true, force: true }); }
+  });
+
+  it("preserva core.hooksPath com '..' quando os componentes anteriores não são links", () => {
+    const fixture = initRepo("hooks-safe-parent");
+    mkdirSync(join(fixture, "nested"));
+    try {
+      const configured = spawnSync("git", ["config", "core.hooksPath", "nested/../safe-hooks"], { cwd: fixture, encoding: "utf8" });
+      expectChildExit(configured, 0);
+      expectChildExit(install(fixture), 0);
+      for (const name of managedHookNames) expect(existsSync(join(fixture, "safe-hooks", name))).toBe(true);
+    } finally { rmSync(fixture, { recursive: true, force: true }); }
+  });
+
+  it("rejeita hook fonte acima do limite antes de materializar seu conteúdo", () => {
+    const fixture = initRepo("hooks-oversized-source");
+    try {
+      truncateSync(join(fixture, "scripts", "hooks", "pre-push.mjs"), 8 * 1024 * 1024 + 1);
+      const result = install(fixture);
+      expectChildExit(result, 1);
+      expect(result.stderr).toMatch(/excede o limite/);
+      for (const name of managedHookNames) expect(existsSync(join(fixture, ".git", "hooks", name))).toBe(false);
+    } finally { rmSync(fixture, { recursive: true, force: true }); }
   });
   it("usa o valor efetivo da última entrada de core.hooksPath", () => {
     const fixture = initRepo("hooks-effective-path");

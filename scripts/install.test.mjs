@@ -421,6 +421,29 @@ const fileSymlinkCapability = (() => {
 })();
 
 describe("install.mjs", () => {
+  it("reinstala arquivos idênticos readonly sem reescrever nem reportar atualização", () => {
+    const home = newHome();
+    const fixture = newInstallerFixture();
+    const target = join(home, ".omp", "agent", "skills", "ship", "SKILL.md");
+    try {
+      const initial = runFixtureInstaller(home, fixture);
+      expect(initial.status, initial.stdout + initial.stderr).toBe(0);
+      chmodSync(target, 0o444);
+      const before = lstatSync(target, { bigint: true });
+      const result = runFixtureInstaller(home, fixture);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/skill ship\s+equal/);
+      expect(result.stdout).not.toMatch(/\bupdated\b|planned native/);
+      const after = lstatSync(target, { bigint: true });
+      expect(after.ino).toBe(before.ino);
+      expect(after.mtimeNs).toBe(before.mtimeNs);
+      expect(after.mode).toBe(before.mode);
+    } finally {
+      if (existsSync(target)) chmodSync(target, 0o644);
+      rmSync(home, { recursive: true, force: true });
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
   it("instala o inventário e --check limpo em seguida (idempotente)", () => {
     const home = newHome();
     try {
