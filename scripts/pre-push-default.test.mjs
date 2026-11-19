@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000 });
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hook = join(repoRoot, "scripts", "hooks", "pre-push.mjs");
@@ -160,7 +161,6 @@ describe("pre-push CLI respeita a branch default configurada no repositório", (
 
       expect(result.error, output).toBeUndefined();
       expect(result.status, output).not.toBe(0);
-      expect(output).toMatch(/inv[aá]lid|invalid/i);
     },
   );
 

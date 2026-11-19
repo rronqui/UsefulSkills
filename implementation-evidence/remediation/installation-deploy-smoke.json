@@ -1,0 +1,676 @@
+{
+  "schema": "remediation.installation-deploy-smoke.v1",
+  "recordedAt": "2026-11-19T16:58:59.603Z",
+  "source": {
+    "head": "0da9310ef8753782869b0aa38975ccfd5368d2f1",
+    "candidate": "current workspace with remediation changes, before final integration commit",
+    "files": {
+      "installerSha256": "0518558893b2b72193dcb991591c11a1698d1d405e4c29ebcf527c780276db03",
+      "fsTransactionSha256": "ee17ec3327d2bdb10bfcb0ffe20174cb72f374fffb5450088cfefc83076469dc",
+      "shipCliSha256": "db603549a1fe3a3561b637fb8807b2f5610826e97af5516a1f78a4ed4fcc7daf",
+      "shipLibSha256": "44a3335402b435f9d15dff52601fd41229f8178a7f2519e8634987aeec936921",
+      "backupHelperSha256": "ead6be95210819123ca38189c334684c6b90fef841661ed63f57d7c44f4ef1ff"
+    }
+  },
+  "summary": {
+    "windowsInstallation": "PASS",
+    "linuxInstallation": "PASS",
+    "linuxSuccessfulDeploy": "PASS",
+    "linuxFailedBuildRollback": "PASS",
+    "allOwnedProcessesTerminated": true,
+    "allDiscardableLabsRemoved": true
+  },
+  "installation": {
+    "windows": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v22.23.2",
+      "scope": "discardable installer destination; source copied from current workspace; no global changes",
+      "phases": [
+        {
+          "phase": "initial-install",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 created  instalado\nskill alignment          created  10 arquivo(s) instalados, 2 diretório(s) criados\nskill bug-diagnosis      created  5 arquivo(s) instalados, 2 diretório(s) criados\nskill conflict-resolution created  3 arquivo(s) instalados\nskill deep-review        created  24 arquivo(s) instalados, 4 diretório(s) criados\nskill release-bootstrap  created  4 arquivo(s) instalados, 1 diretório(s) criados\nskill ship               created  9 arquivo(s) instalados, 2 diretório(s) criados\nskill tdd-orchestrator   created  47 arquivo(s) instalados, 7 diretório(s) criados\nskill architecture       created  9 arquivo(s) instalados, 2 diretório(s) criados\nskill secure-linux-web-hosting created  6 arquivo(s) instalados, 2 diretório(s) criados\nskill retro              created  7 arquivo(s) instalados, 2 diretório(s) criados\nagent tdd-orchestrator/backend-developer.md             created  instalado\nagent tdd-orchestrator/frontend-developer.md            created  instalado\nagent tdd-orchestrator/integrator.md                    created  instalado\nagent tdd-orchestrator/peer-reviewer.md                 created  instalado\nagent tdd-orchestrator/refactorer.md                    created  instalado\nagent tdd-orchestrator/spec-kit-author.md               created  instalado\nagent tdd-orchestrator/test-author.md                   created  instalado\nagent tdd-orchestrator/validator.md                     created  instalado\nagent deep-review/deep-reviewer.md                 created  instalado\nagent alignment/requirements-reader.md           created  instalado\nagent architecture/architect.md                     created  instalado\nagent secure-linux-web-hosting/host-operator.md                 created  instalado\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "idempotent-readonly-reinstall",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "drift-check",
+          "args": [
+            "--check"
+          ],
+          "status": 1,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               drift    1 arquivo(s) divergentes (não alterados no --check)\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nDRIFT detectado — rode `node install.mjs` para sincronizar.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "repair-drift",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               updated  1 arquivo(s) divergentes atualizados\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "repaired-clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "type-conflict-preserves-all-targets",
+          "args": [],
+          "status": 1,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               updated  1 arquivo(s) divergentes atualizados\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-review/deep-reviewer.md                 drift    directory no destino — preservado — E_INSTALL_DRIFT\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n",
+          "stderr": "E_INSTALL_DRIFT: Exceção ao chamar \"ComputeHash\" com \"1\" argumento(s): \"Função incorreta.\r\n\"; rollback concluído\n\nDRIFT detectado — conflitos exigem correção manual (E_INSTALL_DRIFT).\n"
+        },
+        {
+          "phase": "restored-clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        }
+      ],
+      "cleanup": true,
+      "candidate": {
+        "installerSha256": "0518558893b2b72193dcb991591c11a1698d1d405e4c29ebcf527c780276db03",
+        "fsTransactionSha256": "ee17ec3327d2bdb10bfcb0ffe20174cb72f374fffb5450088cfefc83076469dc"
+      },
+      "initialTree": {
+        "sha256": "8a1ffce621c9881d83d60fabdb4c1df7cf2f009ced7212a89fec68eeef2b4851",
+        "fileCount": 137
+      },
+      "readonly": {
+        "identityPreserved": true,
+        "mtimePreserved": true,
+        "modePreserved": true
+      },
+      "failurePreservation": {
+        "foreignDirectoryAndSentinelPreserved": true,
+        "otherManagedPreimagePreserved": true
+      },
+      "finalTree": {
+        "sha256": "8a1ffce621c9881d83d60fabdb4c1df7cf2f009ced7212a89fec68eeef2b4851",
+        "fileCount": 137
+      },
+      "ok": true
+    },
+    "linux": {
+      "platform": "linux",
+      "architecture": "x64",
+      "node": "v22.22.1",
+      "scope": "discardable installer destination; source copied from current workspace; no global changes",
+      "phases": [
+        {
+          "phase": "initial-install",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 created  instalado\nskill alignment          created  10 arquivo(s) instalados, 2 diretório(s) criados\nskill bug-diagnosis      created  5 arquivo(s) instalados, 2 diretório(s) criados\nskill conflict-resolution created  3 arquivo(s) instalados\nskill deep-review        created  24 arquivo(s) instalados, 4 diretório(s) criados\nskill release-bootstrap  created  4 arquivo(s) instalados, 1 diretório(s) criados\nskill ship               created  9 arquivo(s) instalados, 2 diretório(s) criados\nskill tdd-orchestrator   created  47 arquivo(s) instalados, 7 diretório(s) criados\nskill architecture       created  9 arquivo(s) instalados, 2 diretório(s) criados\nskill secure-linux-web-hosting created  6 arquivo(s) instalados, 2 diretório(s) criados\nskill retro              created  7 arquivo(s) instalados, 2 diretório(s) criados\nagent tdd-orchestrator/backend-developer.md             created  instalado\nagent tdd-orchestrator/frontend-developer.md            created  instalado\nagent tdd-orchestrator/integrator.md                    created  instalado\nagent tdd-orchestrator/peer-reviewer.md                 created  instalado\nagent tdd-orchestrator/refactorer.md                    created  instalado\nagent tdd-orchestrator/spec-kit-author.md               created  instalado\nagent tdd-orchestrator/test-author.md                   created  instalado\nagent tdd-orchestrator/validator.md                     created  instalado\nagent deep-review/deep-reviewer.md                 created  instalado\nagent alignment/requirements-reader.md           created  instalado\nagent architecture/architect.md                     created  instalado\nagent secure-linux-web-hosting/host-operator.md                 created  instalado\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "idempotent-readonly-reinstall",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "drift-check",
+          "args": [
+            "--check"
+          ],
+          "status": 1,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               drift    1 arquivo(s) divergentes (não alterados no --check)\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nDRIFT detectado — rode `node install.mjs` para sincronizar.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "repair-drift",
+          "args": [],
+          "status": 0,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               updated  1 arquivo(s) divergentes atualizados\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação concluída. Reinicie a sessão do omp (descoberta ocorre no startup).\n",
+          "stderr": ""
+        },
+        {
+          "phase": "repaired-clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        },
+        {
+          "phase": "type-conflict-preserves-all-targets",
+          "args": [],
+          "status": 1,
+          "signal": null,
+          "stdout": "Instalando em ~/.omp/agent/ ...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               updated  1 arquivo(s) divergentes atualizados\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-review/deep-reviewer.md                 drift    directory no destino — preservado — E_INSTALL_DRIFT\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n",
+          "stderr": "E_INSTALL_DRIFT: tipo inseguro directory: <lab>/home/.omp/agent/agents/deep-reviewer.md\n\nDRIFT detectado — conflitos exigem correção manual (E_INSTALL_DRIFT).\n"
+        },
+        {
+          "phase": "restored-clean-check",
+          "args": [
+            "--check"
+          ],
+          "status": 0,
+          "signal": null,
+          "stdout": "Checando instalação (--check; nada é alterado)...\nnotice                 equal    igual\nskill alignment          equal    10 arquivo(s) iguais, 2 diretório(s) iguais\nskill bug-diagnosis      equal    5 arquivo(s) iguais, 2 diretório(s) iguais\nskill conflict-resolution equal    3 arquivo(s) iguais, 0 diretório(s) iguais\nskill deep-review        equal    24 arquivo(s) iguais, 4 diretório(s) iguais\nskill release-bootstrap  equal    4 arquivo(s) iguais, 1 diretório(s) iguais\nskill ship               equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill tdd-orchestrator   equal    47 arquivo(s) iguais, 7 diretório(s) iguais\nskill architecture       equal    9 arquivo(s) iguais, 2 diretório(s) iguais\nskill secure-linux-web-hosting equal    6 arquivo(s) iguais, 2 diretório(s) iguais\nskill retro              equal    7 arquivo(s) iguais, 2 diretório(s) iguais\nagent backend-developer.md                     equal\nagent frontend-developer.md                    equal\nagent integrator.md                            equal\nagent peer-reviewer.md                         equal\nagent refactorer.md                            equal\nagent spec-kit-author.md                       equal\nagent test-author.md                           equal\nagent validator.md                             equal\nagent deep-reviewer.md                         equal\nagent requirements-reader.md                   equal\nagent architect.md                             equal\nagent host-operator.md                         equal\n\nInstalação sincronizada.\n",
+          "stderr": ""
+        }
+      ],
+      "cleanup": true,
+      "candidate": {
+        "installerSha256": "0518558893b2b72193dcb991591c11a1698d1d405e4c29ebcf527c780276db03",
+        "fsTransactionSha256": "ee17ec3327d2bdb10bfcb0ffe20174cb72f374fffb5450088cfefc83076469dc"
+      },
+      "initialTree": {
+        "sha256": "8a1ffce621c9881d83d60fabdb4c1df7cf2f009ced7212a89fec68eeef2b4851",
+        "fileCount": 137
+      },
+      "readonly": {
+        "identityPreserved": true,
+        "mtimePreserved": true,
+        "modePreserved": true
+      },
+      "failurePreservation": {
+        "foreignDirectoryAndSentinelPreserved": true,
+        "otherManagedPreimagePreserved": true
+      },
+      "finalTree": {
+        "sha256": "8a1ffce621c9881d83d60fabdb4c1df7cf2f009ced7212a89fec68eeef2b4851",
+        "fileCount": 137
+      },
+      "ok": true
+    }
+  },
+  "deployment": {
+    "platform": "linux",
+    "node": "v22.22.1",
+    "scope": "offline Linux Git/Node process lab; local bare origin; exact gh metadata stub; no production service, release, PR, or network transport",
+    "commands": [
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "init",
+          "-b",
+          "main"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "Initialized empty Git repository in <lab>/author/.git/\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "config",
+          "user.name",
+          "Disposable Lab"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "config",
+          "user.email",
+          "lab@example.invalid"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "add",
+          "."
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-qm",
+          "initial disposable service"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "60ff038689beda73503ad837b41286c0fbd72638\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "init",
+          "--bare",
+          "--initial-branch=main",
+          "<lab>/origin.git"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "Initialized empty Git repository in <lab>/origin.git/\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "remote",
+          "add",
+          "origin",
+          "<lab>/origin.git"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "push",
+          "-u",
+          "origin",
+          "main"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "branch 'main' set up to track 'origin/main'.\n",
+        "stderr": "To <lab>/origin.git\n * [new branch]      main -> main\n"
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "clone",
+          "<lab>/origin.git",
+          "<lab>/deployed"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": "Cloning into '<lab>/deployed'...\ndone.\n"
+      },
+      {
+        "kind": "initial-service-start",
+        "command": [
+          "node",
+          "control.cjs",
+          "start"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "SERVICE START {\"pid\":391,\"version\":\"0.1.0\",\"labRevision\":\"initial\"}\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "add",
+          "package.json",
+          "ship.config.json"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-qm",
+          "advance disposable good release"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "push",
+          "origin",
+          "main"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": "To <lab>/origin.git\n   60ff038..a97aaf4  main -> main\n"
+      },
+      {
+        "kind": "successful-real-deploy",
+        "command": [
+          "node",
+          "<workspace>/ship/bin/ship.mjs",
+          "deploy"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "SERVICE STOP 391\nBackup: <lab>/deployed/.runtime/backups/db.bin-20261119165817\nBUILD_OK 0.1.1\nSERVICE START {\"pid\":499,\"version\":\"0.1.1\",\"labRevision\":\"good-release\"}\nDeploy concluído.\n",
+        "stderr": "From <lab>/origin\n * branch            main       -> FETCH_HEAD\n   60ff038..a97aaf4  main       -> origin/main\nFrom <lab>/origin\n * branch            main       -> FETCH_HEAD\n"
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "add",
+          "package.json",
+          "ship.config.json",
+          "build.cjs"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-qm",
+          "advance disposable failing release"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "59c236590ab8a8ed0120aadb69f7943f912b6bf3\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "push",
+          "origin",
+          "main"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": "To <lab>/origin.git\n   a97aaf4..59c2365  main -> main\n"
+      },
+      {
+        "kind": "failed-real-deploy-and-rollback",
+        "command": [
+          "node",
+          "<workspace>/ship/bin/ship.mjs",
+          "deploy"
+        ],
+        "status": 1,
+        "signal": null,
+        "stdout": "SERVICE STOP 499\nBackup: <lab>/deployed/.runtime/backups/db.bin-20261119165817-1\nBUILD_OK 0.1.1\nSERVICE START {\"pid\":605,\"version\":\"0.1.1\",\"labRevision\":\"good-release\"}\n",
+        "stderr": "From <lab>/origin\n * branch            main       -> FETCH_HEAD\n   a97aaf4..59c2365  main       -> origin/main\nFrom <lab>/origin\n * branch            main       -> FETCH_HEAD\nBUILD_FAIL controlled lab failure\nrollback do deploy concluído: revisão a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f restaurada e servidor reiniciado.\nDeploy falhou: Build falhou — a revisão nova não foi iniciada.\n"
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f\n",
+        "stderr": ""
+      },
+      {
+        "kind": "git-local",
+        "command": [
+          "git",
+          "status",
+          "--porcelain"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "kind": "cleanup-service-stop",
+        "command": [
+          "node",
+          "control.cjs",
+          "stop"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "SERVICE STOP 605\n",
+        "stderr": ""
+      }
+    ],
+    "cleanup": {
+      "createdPids": [
+        391,
+        499,
+        605
+      ],
+      "noLiveProcesses": true,
+      "disposableLabRemoved": true
+    },
+    "ok": true,
+    "candidate": {
+      "shipCliSha256": "db603549a1fe3a3561b637fb8807b2f5610826e97af5516a1f78a4ed4fcc7daf",
+      "shipLibSha256": "44a3335402b435f9d15dff52601fd41229f8178a7f2519e8634987aeec936921",
+      "backupHelperSha256": "ead6be95210819123ca38189c334684c6b90fef841661ed63f57d7c44f4ef1ff"
+    },
+    "verification": {
+      "initialHead": "60ff038689beda73503ad837b41286c0fbd72638",
+      "goodHead": "a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f",
+      "failedRemoteHead": "59c236590ab8a8ed0120aadb69f7943f912b6bf3",
+      "restoredHead": "a97aaf4d4de61fe3d09e3bcbf6381c795c519b4f",
+      "restoredConfigSha256": "d77ad45efc1863dc564de627eb4f7ad91d1d8d8a1bd2549cad2b26a5a5c230ec",
+      "databaseSha256": "f10d813291b268c3d2ffaee5a1e53de7cc529fefd9ecf2be59abe2613af1d9f2",
+      "databaseBytes": 33,
+      "databaseUnchanged": true,
+      "firstSnapshots": [
+        {
+          "path": ".runtime/backups/db.bin-20261119165817",
+          "sha256": "f10d813291b268c3d2ffaee5a1e53de7cc529fefd9ecf2be59abe2613af1d9f2",
+          "bytes": 33
+        }
+      ],
+      "finalSnapshots": [
+        {
+          "path": ".runtime/backups/db.bin-20261119165817",
+          "sha256": "f10d813291b268c3d2ffaee5a1e53de7cc529fefd9ecf2be59abe2613af1d9f2",
+          "bytes": 33
+        },
+        {
+          "path": ".runtime/backups/db.bin-20261119165817-1",
+          "sha256": "f10d813291b268c3d2ffaee5a1e53de7cc529fefd9ecf2be59abe2613af1d9f2",
+          "bytes": 33
+        }
+      ],
+      "initialService": {
+        "pid": 391,
+        "version": "0.1.0",
+        "labRevision": "initial"
+      },
+      "goodService": {
+        "pid": 499,
+        "version": "0.1.1",
+        "labRevision": "good-release"
+      },
+      "restoredService": {
+        "pid": 605,
+        "version": "0.1.1",
+        "labRevision": "good-release"
+      },
+      "gitTreeClean": true,
+      "rollbackScope": "HEAD/config/build/service restoration; no schema migration or automatic database restoration claimed"
+    },
+    "ghStubCalls": [
+      [
+        "repo",
+        "view",
+        "--json",
+        "nameWithOwner",
+        "-q",
+        ".nameWithOwner"
+      ],
+      [
+        "api",
+        "repos/lab/disposable",
+        "-q",
+        ".default_branch"
+      ],
+      [
+        "repo",
+        "view",
+        "--json",
+        "nameWithOwner",
+        "-q",
+        ".nameWithOwner"
+      ],
+      [
+        "api",
+        "repos/lab/disposable",
+        "-q",
+        ".default_branch"
+      ]
+    ]
+  },
+  "historicalFixtureAttempt": {
+    "classification": "fixture setup failure; no product change needed",
+    "diagnostic": "The extensionless gh stub inherited type:module from its temporary ancestor. Added bin/package.json type:commonjs only in the disposable fixture and reran.",
+    "productDeployReached": false,
+    "serviceStopBoundaryReached": false,
+    "cliStatus": 1,
+    "cleanup": {
+      "createdPids": [
+        420
+      ],
+      "noLiveProcesses": true,
+      "disposableLabRemoved": true
+    }
+  },
+  "limits": [
+    "No full test suite was run for this smoke.",
+    "No global installation, production service, public remote, GitHub authentication, PR, release, or network deployment was involved.",
+    "gh was an exact metadata-only stub; Git fetch/pull/push and bare origin were real local operations.",
+    "Linux validation used native Linux Node on the Linux filesystem; Windows installation used Windows Node and native filesystem APIs.",
+    "Rollback verified revision/configuration/build/service restoration and an unchanged 33-byte database. No schema migration or automatic database restore is claimed.",
+    "Version HTTP endpoint and application traffic were outside this process smoke.",
+    "The results validate the recorded file hashes and sampled OS/Node combinations; final candidate suite and other native OMP evidence remain separate."
+  ]
+}

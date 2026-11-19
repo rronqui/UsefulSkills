@@ -5,6 +5,23 @@ description: Resolver conflitos de merge/rebase hunk a hunk pela intenção de c
 
 # conflict-resolution — resolução determinística de conflitos de merge e rebase
 
+## Integração e autoridade
+
+Preserve intenção dos dois lados, resolução por hunk e testes; conflito semântico
+retorna ao dono da decisão, sem enfraquecer asserts. O protocolo abaixo descreve
+continuação de operação Git autorizada: commit/push/fetch/merge remoto só se a
+ação está no escopo, sem publicação inferida. Preserve estado bloqueado/retomável
+e revisão do snapshot resolvido. [Contexto/reuso](../deep-review/references/fresh-review.md)
+e [dois eixos](../deep-review/references/review-axes.md) usam provas atuais;
+o TDD conserva estado/recursos, não há segundo coordenador. [Origem](SOURCE.md).
+
+O snapshot resolvido também deve satisfazer a fonte única
+`skill://tdd-orchestrator/references/quality-policy.md` (localização resolvida no
+OMP). Reavalie impacto funcional e segurança dos hunks combinados e encaminhe
+documentação afetada ao dono correspondente. Não reutilize aprovação anterior
+quando conteúdo, critérios ou ambiente mudarem; a revisão final existente cobre
+o resultado combinado, sem uma segunda orquestração de revisão.
+
 Este protocolo é operacional e fail-closed: o estado observado no Git e a prova
 persistida são a fonte da verdade. Nunca invente uma resolução, decisão ou sucesso.
 

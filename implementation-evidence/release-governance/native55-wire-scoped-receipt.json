@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "kind": "goal47-actual-native-controlled-wire-scoped-receipt",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "status": "PASS",
+  "scope": "NATIVE05 controlled malformed caller only; composite Native review pending",
+  "contract_version": "0.7.0",
+  "immutable_driver_task_label": "NATIVE-06.fallback",
+  "original_label_unchanged": true,
+  "whole_native_approved": false,
+  "goal_complete": false,
+  "capture": {
+    "run_id": "6eca85d6-7ebd-4702-ad53-2fcd2521421e",
+    "bytes": 159473,
+    "sha256": "46c82e127c4961fbc0c99bd1a6182555ae08350e1495e7453d45464804c68dc3",
+    "started_at": "2026-11-18T17:57:37.718Z",
+    "finished_at": "2026-11-18T18:01:28.162Z",
+    "launcher_wall_seconds": 233.6,
+    "launcher_exit_code": null,
+    "raw_retained_locally": true,
+    "raw_published": false,
+    "private_receipt": ".omp/state/release-47/proofs/native55-actual-controlled-wire-pass.json"
+  },
+  "source": {
+    "fallback_sha256": "10cda7f9bb01e571ebe5020611e809ceccc446a253d0a59cdaa64ba11276c5c8",
+    "protocol_sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+    "helper_sha256": "ed4ef40bde0f5fcc72aca7c511af5158e261e594a111d51c31515f3d3f7fac29",
+    "source_unchanged": true,
+    "fixture_unchanged": true,
+    "project_unchanged": true,
+    "binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "binary_bytes": 249985024,
+    "binary_unchanged": true
+  },
+  "observations": {
+    "required_reads": 34,
+    "actual_reads": 34,
+    "bash_start_sequence": 214,
+    "bash_end_sequence": 215,
+    "raw_is_error": false,
+    "raw_is_error_observed": true,
+    "SDK_exit_code": null,
+    "SDK_exit_code_observed": false,
+    "child_exit_code": 0,
+    "child_exit_code_observed": true,
+    "child_signal": null,
+    "child_signal_observed": true,
+    "child_spawn_error": null,
+    "child_argv_sha256": "45e3ed7696df30982c475210e2a4b56d10415f57c3a6591d80e4c42738d532aa",
+    "expected_revision": "2f28c09811568ce46fee8b69a4a5b1ba23d18e96",
+    "expected_receipt_sha256": "b1d8c629ff4db7b1ad393e2613d60444d12e9d0f5e8ee09f562ec7e1d2ed7b18",
+    "valid": {
+      "ok": true,
+      "errors": [],
+      "status": "APROVADO"
+    },
+    "malformed": {
+      "ok": false,
+      "errors": [
+        "reviewer result.explanation must be an own enumerable property",
+        "explanation must be a non-empty string"
+      ],
+      "status": "BLOCKED"
+    },
+    "prompt_status": "completed",
+    "session_settled": true
+  },
+  "fixture": {
+    "producer_malformed": false,
+    "origin": "controlled-local-fixture",
+    "corruption": "missing-required-field:explanation",
+    "valid_sha256": "b7878de0658501f4001c6b770a6dddcd23c891da40172f75f92d82658bd76e59",
+    "malformed_sha256": "f1e526e92431cf8477c955f6de9af6885566a07f61a69fdeeffe197881ce2359"
+  },
+  "limits": [
+    "Actual native caller invokes the current canonical receiver with owned malformed input; not a malformed model/SDK producer output.",
+    "SDK outer successful exit code unexposed, not inferred zero. Real child exit0 separately observed and bound to script/argv/input hashes.",
+    "Not a rerun of Native52 fallback or Native50 lifecycle, no cross-run source/model-serving equivalence invented.",
+    "Native53/54 authentic BLOCKED captures remain retained. No gate waiver or global configuration change."
+  ]
+}

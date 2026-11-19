@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-19T17:23:30.311Z",
+  "candidate_manifest_sha256": "86ff94c7eefdadf63ea243d831aabb98d5b08d74b5f8b70cbd4b0e5463f29f28",
+  "secrets": {
+    "tool": "Gitleaks 8.30.1",
+    "command": "gitleaks dir . --redact --no-banner --report-format json --report-path <local report>",
+    "scope": "Clean publication tree: git tracked and nonignored untracked files, copied with original bytes. Local .omp state, node_modules and .git are outside publication scope.",
+    "files": 283,
+    "status": "PASS",
+    "findings": 0,
+    "exceptions": "Only eight exact synthetic HITL fixture fingerprints in .gitleaksignore; no general rule or path exemption.",
+    "report_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "dependencies": {
+    "command": "npm audit --audit-level=high --json",
+    "status": "PASS",
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "report_sha256": "4d867646d3cd629c8acbfde84caa7363efc2757feec82d18d540c3644bd119d7"
+  },
+  "limits": [
+    "Scanner outputs are local and retained by hash; this record does not certify absence of every security defect.",
+    "Native OMP, hosted CI and release remain separate gates."
+  ]
+}

@@ -1,0 +1,395 @@
+{
+  "kind": "EXECUTED_CURRENT_CONFIGURED_PLATFORM_SUITE_LEDGER",
+  "scope_status": "UNIT_SUITE_PASS_NATIVE_INTEGRATION_PENDING",
+  "captured_at": "2026-11-17T05:14:18.131Z",
+  "source_scope_packet": ".omp/state/release-47/proofs/native22-current-full-qa-actual.json",
+  "source_scope_sha256": "c50e8d784fe147d9b70fe099725c62f9a9c369c443c9c2152721862e5f6365db",
+  "source_manifest_sha256": "9db427c289e9cc7587c7205a970cd759e0352d43619058fd40cf3e8dfe3cd151",
+  "source_files": 228,
+  "counts": {
+    "windows": {
+      "passed": 1216,
+      "failed": 0,
+      "skipped": 34,
+      "todo": 0,
+      "total": 1250,
+      "test_files": 27,
+      "suites": 80
+    },
+    "linux": {
+      "passed": 1236,
+      "failed": 0,
+      "skipped": 14,
+      "todo": 0,
+      "total": 1250,
+      "test_files": 27,
+      "suites": 80
+    }
+  },
+  "executed_unique_actual_test_refs": 1325,
+  "raw_skip_records": [
+    {
+      "platform": "windows",
+      "path": "scripts/fs-transaction.test.mjs",
+      "full_name": "AC-005 fs-transaction boundary fails closed when foreign regular bytes replaces a published operation quarantine",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/fs-transaction.test.mjs",
+      "full_name": "AC-005 fs-transaction boundary fails closed when symlink to an external sentinel replaces a published operation quarantine",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/hitl-loop.test.mjs",
+      "full_name": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa substituir TRACE_FILE symlink existente — skip: symlink indisponível (EPERM)",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/hitl-loop.test.mjs",
+      "full_name": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck — skip: symlink indisponível (EPERM)",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "install-hooks + wrappers gerados restaura todos os destinos após falha de link em destino posterior",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "install-hooks + wrappers gerados restaura todos os destinos após falha de unlink em destino posterior",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "install-hooks + wrappers gerados reporta estado inseguro quando a restauração do rollback falha",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 restores an existing preimage when first POSIX publication fails before link — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 restores an earlier preimage while preserving a foreign later destination on link EEXIST — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 restores an existing preimage when unlinking the published stage fails — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 rejects a real parent replacement after the first stage without publishing into the replacement — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 rejects a destination hash changed after preflight without overwriting the user edit — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 rejects a source hash changed after preflight without distributing unverified bytes — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs transaction contract AC-013 rejects destination hardlink swaps without touching the linked target — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 real identities preserve a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high inode permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high device permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preserva NOTICE symlink — skip: file symlink unsupported: EPERM",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs symlink em arquivo gerenciado — skip: file symlink unsupported: EPERM",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs --check preserva extras quando a raiz de agentes não é legível — skip: permissões POSIX não são portáveis no Windows",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs --check trata destino FIFO como drift sem bloquear ou fazer hash — skip: FIFO não é portável neste Windows; cenário gated",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs modo normal preserva destino FIFO conflitante e não aplica operações pendentes — skip: FIFO não é portável neste Windows; cenário gated",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preflight detecta socket Unix no destino sem bloquear a instalação",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preflight detecta device no destino sem substituí-lo — skip: device POSIX não é portável neste Windows; cenário gated",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: block device POSIX não é portável neste Windows; cenário gated",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/quality.test.mjs",
+      "full_name": "AC-002 inventory refuses symlink alias or escape",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "scripts/retro.test.mjs",
+      "full_name": "AC-009 safe reads refuse real symlink evidence",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "windows",
+      "path": "ship/bin/lib.test.mjs",
+      "full_name": "Linux native backup consumer verifica identidade bigint, cópia exata, colisão, staging nomeado ausente e alvo indisponível fail-closed",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.cmd com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.bat com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 aceita Conventional válido pelo fallback .cmd em cwd e mensagem com Unicode, espaços e metacaracteres",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-hooks.test.mjs",
+      "full_name": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 rejeita Conventional inválido pelo fallback .cmd sem executar comando extra",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 preserves every external sentinel byte when a real worker races an ancestor after native staging — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 converts a real exclusive destination handle into native sharing drift without writes — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 revalidates an equal file after a real worker attempts a post-preflight write — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 restores multiple same-basename preimages when a later destination collides — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 restores the first publication while preserving a foreign second destination and its handle — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install-transaction.test.mjs",
+      "full_name": "install.mjs filesystem boundary AC-005 preserves a foreign NOTICE created after planning before native preflight — requires Windows x64 native filesystem primitives",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "scripts/install.test.mjs",
+      "full_name": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "ship/bin/lib.test.mjs",
+      "full_name": "performBackup propaga E_BACKUP_CLOSE sem retentar após colisão de destino",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    },
+    {
+      "platform": "linux",
+      "path": "ship/bin/lib.test.mjs",
+      "full_name": "performBackup falha fechada quando uma tentativa de troca do staging é bloqueada",
+      "status": "skipped",
+      "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
+    }
+  ],
+  "report_bindings": {
+    "windows": {
+      "path": "vitest-windows.json",
+      "sha256": "edff16cf4ee9f936e79250ca2dbb189b24a4c167a236443781db443a3d1a96b3",
+      "memo": ".omp/state/release-47/proofs/native22-current-full-qa-actual.json"
+    },
+    "linux": {
+      "path": "vitest.json",
+      "sha256": "b460a224e66b690c9c38c78071d919a26b2f670030842a54a29da2803b736c03",
+      "memo": ".omp/state/release-47/proofs/native22-linux-full-qa-actual.json"
+    }
+  },
+  "fixture_correction": {
+    "path": "scripts/ship-protocol.test.mjs",
+    "sha256": "605986e4ac4794a495afd254c6e4d2a0c8b8eaf414b1b5a77feeb623faf157f9",
+    "only_change": "Privatelocalcore.autocrlf=false; expectedbyte/tree/headassertionsunchanged",
+    "affected_narrow": "3PASS0FAIL0skip"
+  },
+  "scope_limits": [
+    "ConfiguredpermanentVitestdiscoveryunchanged,nofilters;actual27files80suites1250casesperplatform;1325uniquePASSrefsnotinstances",
+    "WindowsNode22.23.2:1216PASS34SKIP;LinuxNode22.22.1:1236PASS14SKIP;0FAIL;228frozenSourcebytespreservedperclone",
+    "WindowsPOSIX/symlinkEPERMandLinuxplatform/CAP_MKNODlimitationsremainSKIPnotPASS;all48rawskiprecordspreserved",
+    "AftercaptureGoal-onlyprivateearlyprobeP1fixtureauthorityneutralizationpassed56Source-onlycases;runtime/configuredunitfilesunchanged;Native22frozenSourceuntouched",
+    "Prior214-file1237-caseledgerandCRLFfixturehistoryarchivedinnative22-platform-ledger-before-current-update.json;fixture_correctionaboveishistorical",
+    "Native22integratedexecutionstillpending;notNative09/10/E2E/security/wholeAC017/releaseapproval;independentconsolidationreviewpending"
+  ],
+  "report_locator_semantics": "Report filenames are portable retained-artifact locators, not repository files. Existing sha256 binds the original report. Raw reports are not bundled; host-private paths in diagnostic titles were redacted without claiming a rerun."
+}

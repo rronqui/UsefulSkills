@@ -6,17 +6,14 @@
 // Requer: Node >= 20. Não toca nenhum arquivo fora do inventário abaixo.
 import { createHash } from "node:crypto";
 import {
-  accessSync,
-  constants as fsConstants,
-  cpSync,
   lstatSync,
-  mkdirSync,
   readFileSync,
   readdirSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { transact } from "./tdd-orchestrator/lib/fs-transaction/index.mjs";
 
 const nodeMajor = Number(process.versions.node.split(".")[0]);
 if (!Number.isInteger(nodeMajor) || nodeMajor < 20) {
@@ -41,6 +38,9 @@ const SKILLS = [
   "release-bootstrap",
   "ship",
   "tdd-orchestrator",
+  "architecture",
+  "secure-linux-web-hosting",
+  "retro",
 ];
 // Agentes: [skill de origem, subdir dentro dela, basename do arquivo]
 const AGENTS = [
@@ -53,6 +53,9 @@ const AGENTS = [
   ["tdd-orchestrator", "agents", "test-author.md"],
   ["tdd-orchestrator", "agents", "validator.md"],
   ["deep-review", "agents", "deep-reviewer.md"],
+  ["alignment", "agents", "requirements-reader.md"],
+  ["architecture", "agents", "architect.md"],
+  ["secure-linux-web-hosting", "agents", "host-operator.md"],
 ];
 const inventoryKey = (name) => process.platform === "win32" ? name.toLowerCase() : name;
 const compareNames = (a, b) => {
@@ -63,7 +66,7 @@ const compareNames = (a, b) => {
 
 function safeLstat(file) {
   try {
-    return { stat: lstatSync(file), error: null };
+    return { stat: lstatSync(file, { bigint: true }), error: null };
   } catch (error) {
     if (error?.code === "ENOENT") return { stat: null, error: null };
     return { stat: null, error };
@@ -81,7 +84,7 @@ function statType(stat) {
   if (!stat) return "missing";
   if (stat.isSymbolicLink()) return "symlink";
   if (stat.isDirectory()) return "directory";
-  if (stat.isFile() && stat.nlink > 1) return "hardlink";
+  if (stat.isFile() && stat.nlink > 1n) return "hardlink";
   if (stat.isFile()) return "file";
   if (typeof stat.isFIFO === "function" && stat.isFIFO()) return "special (FIFO)";
   if (typeof stat.isSocket === "function" && stat.isSocket()) return "special (socket)";
@@ -91,7 +94,7 @@ function statType(stat) {
 }
 
 function isRegularFile(stat) {
-  return Boolean(stat && stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1);
+  return Boolean(stat && stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1n);
 }
 
 function inspectTree(dir) {
@@ -252,11 +255,19 @@ function planSyncDir(dest, source) {
       created += 1;
     } else if (!isRegularFile(result.stat)) {
       conflicts.push(`${node.relative}: ${statType(result.stat)} no destino onde deveria haver arquivo`);
-    } else if (sha256(node.path) !== sha256(target)) {
-      operations.push({ source: node.path, target });
-      updated += 1;
     } else {
-      equal += 1;
+      const sourceHashResult = safeSha256(node.path);
+      const targetHashResult = sourceHashResult.error ? sourceHashResult : safeSha256(target);
+      if (sourceHashResult.error || targetHashResult.error) {
+        const error = sourceHashResult.error || targetHashResult.error;
+        conflicts.push(`${node.relative}: hash inacessível (${error.code || error.message})`);
+      } else if (sourceHashResult.hash !== targetHashResult.hash) {
+        operations.push({ source: node.path, target });
+        updated += 1;
+      } else {
+        operations.push({ source: node.path, target, verify: true });
+        equal += 1;
+      }
     }
   }
 
@@ -271,6 +282,7 @@ function planSyncDir(dest, source) {
     }
     extras.push(`${node.relative} (${node.type})`);
   }
+  if (!check && extras.length) console.log(`extras preservados em ${dest}: ${extras.join(", ")}`);
   if (issues.length > 0 || conflicts.length > 0) {
     return {
       status: "drift",
@@ -311,65 +323,6 @@ function findProjectAgent(file) {
   return null;
 }
 
-function applyOperations(operations) {
-  for (const operation of operations) {
-    if (operation.directory) {
-      mkdirSync(operation.target, { recursive: true });
-      continue;
-    }
-    mkdirSync(path.dirname(operation.target), { recursive: true });
-    cpSync(operation.source, operation.target);
-  }
-}
-function nearestExistingPath(target) {
-  let current = path.resolve(target);
-  while (true) {
-    const result = safeLstat(current);
-    if (result.stat || result.error) return { path: current, ...result };
-    const parent = path.dirname(current);
-    if (parent === current) return { path: current, stat: null, error: new Error("no existing ancestor") };
-    current = parent;
-  }
-}
-function preflightOperations(operations) {
-  const checked = new Set();
-  for (const operation of operations) {
-    const destination = path.resolve(operation.target);
-    if (!operation.directory) {
-      const sourceResult = safeLstat(operation.source);
-      if (sourceResult.error) return { target: operation.source, error: sourceResult.error };
-      if (!sourceResult.stat || !isRegularFile(sourceResult.stat)) {
-        return { target: operation.source, error: new Error("source must be a regular file") };
-      }
-      try {
-        accessSync(operation.source, fsConstants.R_OK);
-      } catch (error) {
-        return { target: operation.source, error };
-      }
-    }
-    const targetResult = safeLstat(destination);
-    if (targetResult.error) return { target: destination, error: targetResult.error };
-    if (operation.directory && targetResult.stat?.isDirectory()) continue;
-    const paths = [];
-    if (targetResult.stat && !operation.directory) paths.push(destination);
-    const parent = nearestExistingPath(path.dirname(destination));
-    if (parent.error || !parent.stat?.isDirectory()) {
-      return { target: destination, error: parent.error ?? new Error("parent is not a directory") };
-    }
-    paths.push(parent.path);
-    for (const writablePath of paths) {
-      if (checked.has(writablePath)) continue;
-      try {
-        const mode = writablePath === parent.path ? fsConstants.W_OK | fsConstants.X_OK : fsConstants.W_OK;
-        accessSync(writablePath, mode);
-      } catch (error) {
-        return { target: writablePath, error };
-      }
-      checked.add(writablePath);
-    }
-  }
-  return null;
-}
 function copyOperations(source, target) {
   return check ? [] : [{ source, target }];
 }
@@ -482,7 +435,7 @@ function planNoticeFile(source, destination) {
       unsafe: false,
     };
   }
-  return { status: "equal", detail: "igual", operations: [], unsafe: false };
+  return { status: "equal", detail: "igual", operations: [{ source, target: destination, verify: true }], unsafe: false };
 }
 
 let drift = false;
@@ -493,6 +446,15 @@ function recordPlan(result) {
   if (result.status === "drift") drift = true;
   if (result.unsafe) unsafe = true;
 }
+function bindTargetSnapshots() {
+  if (!(targetSnapshots instanceof Map)) throw new Error("inspeção inicial de destinos ausente");
+  for (const operation of plannedOperations) {
+    const entry = targetSnapshots.get(snapshotKey(operation.target, operation.directory));
+    if (!entry) throw new Error(`destino ausente na inspeção: ${operation.target}`);
+    operation.expectedTarget = { exists: entry.exists, id: entry.id, hash: entry.hash };
+    operation.expectedParent = entry.parent;
+  }
+}
 function markUnsafe() {
   drift = true;
   unsafe = true;
@@ -500,12 +462,49 @@ function markUnsafe() {
 
 
 console.log(check ? "Checando instalação (--check; nada é alterado)..." : "Instalando em ~/.omp/agent/ ...");
+const sourceInventories = new Map(SKILLS.map(name => [name, sourceInventory(name)]));
+const agentSourceResults = new Map(AGENTS.map(([skill, subdir, file]) => {
+  const sourcePath = path.join(root, skill, subdir, file);
+  return [sourcePath, safeLstat(sourcePath)];
+}));
+let targetSnapshots = null;
+const snapshotKey = (target, directory = false) => `${directory ? "directory" : "file"}\0${path.resolve(target)}`;
+if (!check) {
+  const descriptors = [{ target: noticeDest, directory: false }];
+  for (const name of SKILLS) {
+    const source = sourceInventories.get(name);
+    if (source?.issues.length === 0) {
+      for (const node of source.dirs) descriptors.push({ target: path.join(skillsDest, name, node.relative), directory: true });
+      for (const node of source.files) descriptors.push({ target: path.join(skillsDest, name, node.relative), directory: false });
+    }
+  }
+  for (const [skill, subdir, file] of AGENTS) {
+    const sourceResult = agentSourceResults.get(path.join(root, skill, subdir, file));
+    if (!sourceResult.error && sourceResult.stat && isRegularFile(sourceResult.stat)) {
+      descriptors.push({ target: path.join(agentsDest, file), directory: false });
+    }
+  }
+  try {
+    const inspection = transact(descriptors, { home, inspectOnly: true });
+    if (!inspection?.ok || !Array.isArray(inspection.targets) || inspection.targets.length !== descriptors.length) {
+      throw new Error("inspeção inicial de destinos incompleta");
+    }
+    targetSnapshots = new Map(descriptors.map((descriptor, index) => {
+      const entry = inspection.targets[index];
+      if (!entry || entry.target !== descriptor.target) throw new Error(`inspeção fora de ordem: ${descriptor.target}`);
+      return [snapshotKey(descriptor.target, descriptor.directory), entry];
+    }));
+  } catch (error) {
+    console.error(`E_INSTALL_DRIFT: ${error.message}`);
+    markUnsafe();
+  }
+}
 const noticeResult = planNoticeFile(noticeSource, noticeDest);
 recordPlan(noticeResult);
 console.log(`notice                 ${noticeResult.status.padEnd(8)} ${noticeResult.detail}`);
 
 for (const name of SKILLS) {
-  const source = sourceInventory(name);
+  const source = sourceInventories.get(name);
   if (source.issues.length > 0) {
     markUnsafe();
     console.log(`skill ${name.padEnd(18)} drift    ${source.issues.join("; ")} — E_INSTALL_DRIFT`);
@@ -537,7 +536,7 @@ if (agentsRootResult.conflict) {
 } else {
   for (const [skill, subdir, file] of AGENTS) {
     const sourcePath = path.join(root, skill, subdir, file);
-    const sourceResult = safeLstat(sourcePath);
+    const sourceResult = agentSourceResults.get(sourcePath);
     const destinationPath = path.join(agentsDest, file);
     const destinationResult = safeLstat(destinationPath);
     if (destinationResult.error) {
@@ -578,12 +577,19 @@ if (agentsRootResult.conflict) {
       markUnsafe();
       continue;
     }
-    if (sha256(sourcePath) !== sha256(destinationPath)) {
+    const sourceHashResult = safeSha256(sourcePath);
+    const destinationHashResult = sourceHashResult.error ? sourceHashResult : safeSha256(destinationPath);
+    if (sourceHashResult.error || destinationHashResult.error) {
+      const error = sourceHashResult.error || destinationHashResult.error;
+      console.log(`agent ${skill}/${file.padEnd(32)} drift    hash inacessível (${error.code || error.message}) — E_INSTALL_DRIFT`);
+      markUnsafe();
+    } else if (sourceHashResult.hash !== destinationHashResult.hash) {
       plannedOperations.push(...copyOperations(sourcePath, destinationPath));
       console.log(`agent ${skill}/${file.padEnd(32)} ${check ? "drift    divergente" : "updated  atualizado"}`);
       drift = drift || check;
     } else {
-      console.log(`agent ${skill}/${file.padEnd(32)} equal`);
+      plannedOperations.push({ source: sourcePath, target: destinationPath, verify: true });
+      console.log(`agent ${file.padEnd(40)} equal`);
     }
   }
 
@@ -595,16 +601,16 @@ if (agentsRootResult.conflict) {
   }
 }
 
-// Probe every target and required parent before the first write. A late
-// permission failure must not leave an earlier operation applied.
-if (!check && !unsafe) {
-  const preflight = preflightOperations(plannedOperations);
-  if (preflight) {
-    console.error(`E_INSTALL_DRIFT: destino não gravável ${preflight.target}: ${preflight.error?.message || preflight.error}`);
+// The shared transaction owns capture, preflight, staging, CAS, commit and rollback.
+if (!check && !unsafe && plannedOperations.length > 0) {
+  try {
+    bindTargetSnapshots();
+    transact(plannedOperations, { home, sourceScopes: [noticeSource, ...SKILLS.map(name => path.join(root, name))] });
+  } catch (error) {
+    console.error(`E_INSTALL_DRIFT: ${error.message}`);
     markUnsafe();
   }
 }
-if (!check && !unsafe) applyOperations(plannedOperations);
 
 if (check) {
   console.log(drift ? "\nDRIFT detectado — rode `node install.mjs` para sincronizar." : "\nInstalação sincronizada.");

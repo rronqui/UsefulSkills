@@ -157,7 +157,7 @@ function operationBullet(operation) {
   const endAt = protocolLines.findIndex(
     (line, index) =>
       index > startAt &&
-      (line.trimStart().startsWith("- `merge`:") || line.trimStart().startsWith("- `rebase`:")),
+      (/^-\s/.test(line) || /^#{1,6}\s/.test(line)),
   );
   return protocolLines.slice(startAt, endAt === -1 ? protocolLines.length : endAt).join(" ");
 }

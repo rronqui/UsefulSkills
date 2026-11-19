@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0",
+  "kind": "native52-fallback-scoped-receipt",
+  "recorded_at": "2026-11-18T16:04:42.915Z",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "normative_contract": "0.7.0",
+  "private_capture_contract_label": "0.5.0",
+  "status": "PASS",
+  "scope": [
+    "NATIVE-06 actual named-capability fallback",
+    "31 successful correlated Root reads before task dispatch",
+    "disabled deep-reviewer preflight exact correlated terminal",
+    "two authentic project peer-reviewer DEEP_REVIEW_FALLBACK/VALID completions",
+    "actual current strict consumer and aggregate"
+  ],
+  "capture": {
+    "run_id": "59fc9d34-8f8e-4447-b67a-a95c692ea629",
+    "bytes": 1926889,
+    "sha256": "d196241aee5b47674a5776a5db0f4bccd2b760a0478a1a77725666cffca961d3",
+    "started_at": "2026-11-18T15:36:57.799Z",
+    "finished_at": "2026-11-18T15:42:13.246Z",
+    "launcher_wall_seconds": 315.8,
+    "launcher_exit_code": null,
+    "raw_private_not_published": true
+  },
+  "driver": {
+    "sha256": "ebe75f49add96720601cd21ffb888c5421fcdf01578d596e220fe2ba22a0fca0",
+    "selected_mode": "default-NATIVE06",
+    "new_peer_wire_mode_NOT_selected": true,
+    "later_b47_changes": "RestrictedtounselectedN5guards; rawcaptureisnotrelabeledasnewdriverexecution."
+  },
+  "current_consumer": {
+    "path": "deep-review/lib/protocol.mjs",
+    "sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4"
+  },
+  "root": {
+    "expected_reads": 31,
+    "observed_reads": 31,
+    "tool_events": 118,
+    "prompt_result": {
+      "status": "completed",
+      "agentInvoked": true,
+      "sessionSettled": false
+    },
+    "later_observed_session_settled": true
+  },
+  "reviewers": [
+    {
+      "name": "FallbackReviewGood",
+      "agent": "peer-reviewer",
+      "protocol_mode": "DEEP_REVIEW_FALLBACK",
+      "consumer_ok": true,
+      "terminal": "completed",
+      "exit_code": null,
+      "exit_code_observed": false
+    },
+    {
+      "name": "FallbackReviewBad",
+      "agent": "peer-reviewer",
+      "protocol_mode": "DEEP_REVIEW_FALLBACK",
+      "consumer_ok": true,
+      "terminal": "completed",
+      "exit_code": null,
+      "exit_code_observed": false
+    }
+  ],
+  "aggregate": {
+    "status": "BLOCKED",
+    "P0": 0,
+    "P1": 1,
+    "P2": 0,
+    "P3": 0,
+    "intentional_private_bad_checkout_fixture": true,
+    "NOT_a_Goal_product_blocker": true
+  },
+  "derived_controls": [
+    {
+      "name": "missing",
+      "evidence_level": "DERIVED_CONSUMER",
+      "source": "actual-native-fallback-result-cloned-in-memory",
+      "expected": "BLOCKED",
+      "observed": "blocked"
+    },
+    {
+      "name": "duplicate",
+      "evidence_level": "DERIVED_CONSUMER",
+      "source": "actual-native-fallback-result-cloned-in-memory",
+      "expected": "BLOCKED",
+      "observed": "blocked"
+    },
+    {
+      "name": "stale",
+      "evidence_level": "DERIVED_CONSUMER",
+      "source": "actual-native-fallback-result-cloned-in-memory",
+      "expected": "BLOCKED",
+      "observed": "blocked"
+    },
+    {
+      "name": "wrongmode",
+      "evidence_level": "DERIVED_CONSUMER",
+      "source": "actual-native-fallback-result-cloned-in-memory",
+      "expected": "BLOCKED",
+      "observed": "blocked"
+    }
+  ],
+  "derived_controls_NOT_fresh_SDK_producers": true,
+  "preservation": {
+    "source64_unchanged": true,
+    "fixture_unchanged": true,
+    "project_unchanged": true,
+    "binary_before_after_unchanged": true,
+    "binary_bytes": 249985024,
+    "binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7"
+  },
+  "independent_review": {
+    "protocol_mode": "TDD_PEER_REVIEW",
+    "agent": "peer-reviewer",
+    "status": "APROVADO",
+    "reviewed_revision": "sha256:d196241aee5b47674a5776a5db0f4bccd2b760a0478a1a77725666cffca961d3",
+    "overall_correctness": "correct",
+    "explanation": "Implementado por: parent/NativeMalformedCallerGreen47; fixture-author (private negative fixture); Revisado por: peer-reviewer. A captura confirma os critérios NATIVE-06 escopados, incluindo leituras 31/31, preflight correlacionado, dois peers válidos, agregação P1 esperada e preservação integral. O contrato privado 0.5.0 permanece literal; a semântica corrente 0.7.0 não altera NATIVE-06, e esta aprovação não promove NATIVE-05, T-011, Goal ou release.",
+    "confidence": 0.99,
+    "findings": []
+  },
+  "limits": [
+    "ScopedN6only; actualN5stillpending",
+    "NOTprovider/model-servingfallbackobservation",
+    "Originalprivate0.5.0andfixture0.2labelsunchanged; current0.7semanticreviewexplicit",
+    "Reviewerexitcodesunknownnotinferredzero",
+    "NoRootown-futuresettlementwaitorrewrittenSDKflags",
+    "NoGoalDONE/release/publicationclaim"
+  ],
+  "whole_t011_approved": false,
+  "goal_complete": false
+}

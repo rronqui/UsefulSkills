@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "kind": "goal47-actual-native-negative-wire-scoped-receipt",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "status": "PASS",
+  "scope": "NATIVE05 actual normal TDD peer BLOQUEADO only, on owned negative fixture; not wholeNative approval or product blocker.",
+  "run_id": "84c13ede-fa22-40f3-aed3-7df02f8be3db",
+  "capture_bytes": 426724,
+  "capture_sha256": "b2e2d0cf27545a4f8ade4011a24406064e224bfccb560e050c3aaf9bca8a6d4d",
+  "started_at": "2026-11-18T18:29:02.102Z",
+  "finished_at": "2026-11-18T18:30:55.275Z",
+  "launcher_wall_seconds": 115.28,
+  "launcher_exit_code": null,
+  "fixture_revision": "24be28229c24f3059b20e3a30a6f148ff22bd9e6",
+  "binary_before": {
+    "sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "bytes": 249985024
+  },
+  "binary_after": {
+    "sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "bytes": 249985024
+  },
+  "immutable_profile_protocol_inputs": 13,
+  "source_before_after_unchanged": true,
+  "actual_task_count": 1,
+  "actual_result": {
+    "agent": "peer-reviewer",
+    "protocol_mode": "TDD_PEER_REVIEW",
+    "status": "BLOQUEADO",
+    "expected_revision": "24be28229c24f3059b20e3a30a6f148ff22bd9e6",
+    "consumer_accepted": true,
+    "consumer_errors": []
+  },
+  "root_prompt_completed": true,
+  "root_session_settled": true,
+  "driver_original_sha256": "53f08041a2fbadc55c484f5ea3a1b886809ee1cc36f762162cd351099259624b",
+  "disposable_scoped_caller_sha256": "8e00485048e5531a9e2b175f93f22f15f9bcc45469a9052ffc0d91e21eac9a9c",
+  "original_helpers_guards_unchanged": true,
+  "fresh_owned_fixture_readonly_before_after": true,
+  "private_receipt": ".omp/state/release-47/proofs/native57-actual-binary-bound-negative-pass.json",
+  "limits": [
+    "Different owned fixture revision independently matched to actual task and consumer; not asserted same SHA as older positive/malformed fixtures.",
+    "Old batch binary_before null retained, not backfilled from this run.",
+    "Native56 failed broad batch and Native57 initial pre-SDK argument failure retained, not relabelled PASS.",
+    "No whole profile discovery rerun or provider/model-serving claim; pending whole review/validator/final Ship/delivery."
+  ],
+  "whole_native_approved": false,
+  "goal_complete": false
+}

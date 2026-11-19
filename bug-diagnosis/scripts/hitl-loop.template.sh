@@ -373,6 +373,7 @@ redact() {
     }
     {
       quoted_key = "([\047\"][^\047\"]*(" labels ")[^\047\"]*[\047\"][[:space:]]*[=:]|\\[[^]]*(" labels ")[^]]*\\][[:space:]]*[=:])"
+      quoted_key = quoted_key "|(" labels ")([[:space:]]*\\[[^]]*\\])+[[:space:]]*[=:]"
       lower = tolower($0)
       if (pending == 2) {
         print "<REDACTED>"
@@ -611,7 +612,7 @@ redact() {
             flow_depth -= gsub(/\]/, "", scan) + gsub(/\}/, "", scan)
             if (flow_parens) flow_depth += gsub(/\(/, "", scan) - gsub(/\)/, "", scan)
             pending = (flow_depth > 0) ? 2 : 0
-          } else pending = 7
+          } else pending = 0
           next
         }
         if ($0 ~ /^[[:space:]]/ || $0 == "" || $0 ~ /^[-?][[:space:]]/ || $0 ~ /^[[:space:]]*#/) {
@@ -737,7 +738,7 @@ sanitize_trace() {
         pem_label_value = pem_label(lower)
         next
       }
-      gsub(/eyJ[[:alnum:]_-]+([.][[:alnum:]_-]+){1,2}|glpat_[[:alnum:]_-]+|glpat-[[:alnum:]_-]+|sk_live_[[:alnum:]_-]+|sk_test_[[:alnum:]_-]+|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|npm_[[:alnum:]_-]+|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/, "<REDACTED>")
+      gsub(/eyJ[[:alnum:]_-]+([.][[:alnum:]_-]+){1,2}|glpat_[[:alnum:]_-]+|glpat-[[:alnum:]_-]+|sk_live_[[:alnum:]_-]+|sk_test_[[:alnum:]_-]+|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|npm_[[:alnum:]_-]+|(AKIA|ASIA)[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/, "<REDACTED>")
       print
     }
   '
@@ -750,7 +751,7 @@ scan_clean_trace() {
       if (lower ~ /\[debug-[^]]*\]/ ||
           lower ~ /(^|[^[:alnum:]])encryption[[:space:]_-]*key[[:alnum:]_-]*[[:space:]]*[=:][[:space:]]*[^[:space:]#]/ ||
           lower ~ /(^|[^[:alnum:]])[[:alnum:]_-]+(password|passphrase|secret|token|private[[:space:]_-]*key|api[[:space:]_-]*key|credential|credentials)[[:space:]]*[=:][[:space:]]*[^[:space:]#]/ ||
-          $0 ~ /eyJ[[:alnum:]_-]+|glpat_|sk_live_|sk_test_|github_pat_|ghp_|gho_|ghs_|ghr_|npm_|AKIA[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
+          $0 ~ /eyJ[[:alnum:]_-]+|glpat_|sk_live_|sk_test_|github_pat_|ghp_|gho_|ghs_|ghr_|npm_|(AKIA|ASIA)[[:alnum:]]+|AIza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
           lower ~ /eyj|glpat_|sk_live_|sk_test_|github_pat_[[:alnum:]_-]+|ghp_[[:alnum:]_-]*|gho_[[:alnum:]_-]*|ghs_[[:alnum:]_-]*|ghr_[[:alnum:]_-]*|npm_[[:alnum:]_-]+|akia[[:alnum:]]+|aiza[[:alnum:]_-]+|xox[bp]-[[:alnum:]_-]+|sk-[[:alnum:]_-]+/ ||
           lower ~ /-----begin[[:space:]][a-z0-9 -]+-----|-----end[[:space:]][a-z0-9 -]+-----/) found = 1
     }

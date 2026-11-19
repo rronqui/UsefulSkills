@@ -3,5 +3,8 @@
   "buildCommand": null,
   "stopCommand": null,
   "startCommand": null,
-  "versionCheckUrl": null
+  "versionCheckUrl": null,
+  "qualityPolicyVersion": 1,
+  "qualityReport": ".omp/state/quality.json",
+  "qualityContext": ".omp/state/quality-context.json"
 }

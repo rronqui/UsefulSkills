@@ -1,5 +1,5 @@
 name: release-please
-# Runtime suportado: Node.js >=20.
+# O runtime da Action é independente do Node usado pela suíte do projeto.
 
 on:
   push:
@@ -17,6 +17,6 @@ jobs:
     steps:
       # PAT pessoal: PRs criados com GITHUB_TOKEN não disparam outros
       # workflows (CI ficaria sem rodar no PR de release). Ver README.
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}

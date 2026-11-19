@@ -24,16 +24,17 @@ if (existsSync(cli)) {
 }
 const cmd = join(cwd, "node_modules", ".bin", process.platform === "win32" ? "commitlint.cmd" : "commitlint");
 const bin = existsSync(cmd) ? cmd : process.platform === "win32" ? "commitlint.cmd" : "commitlint";
-// Windows: .cmd exige cmd.exe, mas NUNCA interpolamos os caminhos no comando.
-// Variáveis de ambiente fazem uma única expansão; sem `call`, um `%VAR%` contido
-// no valor do caminho não é reinterpretado como outra variável.
+// /s remove o par externo de aspas; o par interno mantém cada path inteiro.
+// O template é fixo: paths entram por uma expansão de env, sem call ou delayed expansion.
+// Verbatim evita que o quoting CRT do Node corrompa as aspas esperadas pelo CMD.
 const r =
   process.platform === "win32"
     ? spawnSync(
         process.env.ComSpec ?? "cmd.exe",
-        ["/d", "/v:off", "/s", "/c", `"%COMMITLINT_BIN%" --edit "%COMMIT_MSG_FILE%"`],
+        ["/d", "/v:off", "/s", "/c", `""%COMMITLINT_BIN%" --edit "%COMMIT_MSG_FILE%""`],
         {
           stdio: "inherit",
+          windowsVerbatimArguments: true,
           env: { ...process.env, COMMITLINT_BIN: bin, COMMIT_MSG_FILE: file },
         },
       )

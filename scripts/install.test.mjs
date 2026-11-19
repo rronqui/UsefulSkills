@@ -1,16 +1,26 @@
 // Testes do instalador (install.mjs) via CLI real com HOME isolado.
 // Costura: spawn de `node install.mjs` com HOME/USERPROFILE apontando para temp
 // (HOME cobre POSIX, USERPROFILE cobre Windows).
-import { describe, it, expect } from "vitest";
-import { spawnSync } from "node:child_process";
+// specs004 AC-013: inventário, preflight e transação da CLI em ambiente isolado.
+// Partes de empacotamento de AC-001/AC-010/AC-015; conteúdo normativo e decisões
+// de papéis exigem revisão semântica independente, não são certificados por esta suíte.
+import { describe, it, expect, vi } from "vitest";
+if (process.platform === "win32") vi.setConfig({ testTimeout: 90_000 });
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { realpathSync } from "node:fs";
+import { basename, dirname, join, relative, isAbsolute, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INSTALLER = join(repoRoot, "install.mjs");
+const testTemp = join(repoRoot, ".test-temp");
+mkdirSync(testTemp, { recursive: true });
+const tmpdir = () => testTemp;
+function assertIsolatedHome(home) {
+  const rel = relative(realpathSync(testTemp), realpathSync(home));
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error("HOME must be contained in workspace .test-temp");
+}
 const INSTALLER_SKILLS = [
   "alignment",
   "bug-diagnosis",
@@ -19,6 +29,9 @@ const INSTALLER_SKILLS = [
   "release-bootstrap",
   "ship",
   "tdd-orchestrator",
+  "architecture",
+  "secure-linux-web-hosting",
+  "retro",
 ];
 const INSTALLER_AGENTS = [
   "backend-developer.md",
@@ -30,6 +43,9 @@ const INSTALLER_AGENTS = [
   "test-author.md",
   "validator.md",
   "deep-reviewer.md",
+  "requirements-reader.md",
+  "architect.md",
+  "host-operator.md",
 ];
 
 function newHome() {
@@ -47,6 +63,7 @@ function newInstallerFixture() {
 }
 
 function runInstaller(home, args = [], options = {}) {
+  assertIsolatedHome(home);
   const { installer = INSTALLER, ...spawnOptions } = options;
   const result = spawnSync(process.execPath, [installer, ...args], {
     cwd: repoRoot,
@@ -68,6 +85,7 @@ function runFixtureInstaller(home, fixture, args = [], options = {}) {
   });
 }
 function runInstallerWithLstatFault(home, destination, args = []) {
+  assertIsolatedHome(home);
   const preload = join(home, `.usefulskills-install-lstat-fault-${Math.random().toString(36).slice(2)}.cjs`);
   writeFileSync(
     preload,
@@ -211,8 +229,221 @@ const blockDeviceCapability = (() => {
 })();
 const blockDeviceTest = blockDeviceCapability.available ? it : it.skip;
 const socketTest = process.platform === "win32" ? it.skip : it;
+async function startUnixSocketFixture(destination) {
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      [
+        "const net = require('node:net');",
+        "const socketName = process.env.USEFULSKILLS_SOCKET_NAME;",
+        "const server = net.createServer();",
+        "server.once('error', (error) => {",
+        "  process.stderr.write(`${error.code || error.message}\\n`);",
+        "  process.exit(1);",
+        "});",
+        "process.stdin.setEncoding('utf8');",
+        "process.stdin.on('data', (chunk) => {",
+        "  if (chunk.includes('CLOSE')) server.close(() => process.exit(0));",
+        "});",
+        "server.listen(socketName, () => process.stdout.write('READY\\n'));",
+      ].join("\n"),
+    ],
+    {
+      cwd: dirname(destination),
+      env: { USEFULSKILLS_SOCKET_NAME: basename(destination) },
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  let stdout = "";
+  let stderr = "";
+  let childError = null;
+  let onStdout;
+  let onStderr;
+  let onReadyError;
+  let onReadyExit;
+  const onChildError = (error) => { childError ??= error; };
+  child.on("error", onChildError);
+  child.stdin.on("error", onChildError);
+  child.stdout.on("error", onChildError);
+  child.stderr.on("error", onChildError);
+  const describeError = (error) => error?.code || error?.message || String(error);
+  const hasExited = () => child.exitCode !== null || child.signalCode !== null;
+  const exitResult = () => ({ code: child.exitCode, signal: child.signalCode });
+  const waitForExit = (timeoutMs, phase) => new Promise((resolve, reject) => {
+    if (hasExited()) {
+      resolve(exitResult());
+      return;
+    }
+    let timer;
+    let settled = false;
+    const cleanupWait = () => {
+      clearTimeout(timer);
+      child.removeListener("error", onError);
+      child.removeListener("exit", onExit);
+    };
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      cleanupWait();
+      callback();
+    };
+    const onError = (error) => finish(() => reject(new Error(`Unix socket child error during ${phase}: ${describeError(error)}`)));
+    const onExit = (code, signal) => finish(() => resolve({ code, signal }));
+    child.once("error", onError);
+    child.once("exit", onExit);
+    timer = setTimeout(() => {
+      finish(() => reject(new Error(`Unix socket child did not exit within ${timeoutMs} ms during ${phase}`)));
+    }, timeoutMs);
+  });
+  const terminateChild = async (phase) => {
+    if (hasExited()) return exitResult();
+    const diagnostics = [];
+    for (const signal of ["SIGTERM", "SIGKILL"]) {
+      try {
+        const sent = child.kill(signal);
+        if (!sent && !hasExited()) diagnostics.push(`${signal} could not be sent`);
+      } catch (error) {
+        diagnostics.push(`${signal}: ${describeError(error)}`);
+      }
+      if (hasExited()) return exitResult();
+      try {
+        return await waitForExit(2_000, `${phase} ${signal}`);
+      } catch (error) {
+        diagnostics.push(describeError(error));
+      }
+    }
+    throw new Error(`Unix socket child termination unconfirmed during ${phase}: ${diagnostics.join("; ")}`);
+  };
+  const cleanup = () => {
+    child.removeListener("error", onChildError);
+    child.stdin.removeListener("error", onChildError);
+    child.stdout.removeListener("error", onChildError);
+    child.stderr.removeListener("error", onChildError);
+    if (onStdout) child.stdout.removeListener("data", onStdout);
+    if (onStderr) child.stderr.removeListener("data", onStderr);
+  };
+  let readyTimer;
+  let readySettled = false;
+  const clearReadyListeners = () => {
+    clearTimeout(readyTimer);
+    if (onStdout) child.stdout.removeListener("data", onStdout);
+    if (onStderr) child.stderr.removeListener("data", onStderr);
+    child.removeListener("error", onReadyError);
+    child.removeListener("exit", onReadyExit);
+  };
+  const ready = new Promise((resolve, reject) => {
+    const finish = (callback) => {
+      if (readySettled) return;
+      readySettled = true;
+      clearReadyListeners();
+      callback();
+    };
+    onStdout = (chunk) => {
+      stdout += chunk;
+      if (stdout.includes("READY\n")) finish(resolve);
+    };
+    onStderr = (chunk) => { stderr += chunk; };
+    onReadyError = (error) => finish(() => reject(error));
+    onReadyExit = (code, signal) => {
+      if (!readySettled) finish(() => reject(new Error(`Unix socket child exited before ready (${code ?? signal}): ${stderr || stdout}`)));
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", onStdout);
+    child.stderr.on("data", onStderr);
+    child.once("error", onReadyError);
+    child.once("exit", onReadyExit);
+    readyTimer = setTimeout(() => {
+      finish(() => reject(new Error(`Unix socket child did not become ready: ${stderr || stdout}`)));
+    }, 5_000);
+  });
+  try {
+    await ready;
+  } catch (error) {
+    let terminationError = null;
+    try {
+      await terminateChild("ready failure");
+    } catch (cleanupError) {
+      terminationError = cleanupError;
+    }
+    cleanup();
+    if (terminationError) {
+      throw new Error(`Unix socket readiness failed: ${describeError(error)}; ${describeError(terminationError)}`);
+    }
+    throw error;
+  }
+  return {
+    async close() {
+      if (hasExited()) {
+        const result = exitResult();
+        cleanup();
+        if (childError || result.code !== 0) {
+          throw new Error(`Unix socket child exited before cleanup (${result.code ?? result.signal}): ${describeError(childError)}`);
+        }
+        return;
+      }
+      let gracefulError = null;
+      try {
+        child.stdin.write("CLOSE\n");
+        const result = await waitForExit(2_000, "graceful CLOSE");
+        if (childError) throw new Error(`Unix socket child I/O error during graceful CLOSE: ${describeError(childError)}`);
+        if (result.code !== 0) throw new Error(`Unix socket child exited during graceful CLOSE (${result.code ?? result.signal})`);
+        cleanup();
+        return;
+      } catch (error) {
+        gracefulError = error;
+      }
+      let terminationError = null;
+      try {
+        await terminateChild("graceful CLOSE timeout");
+      } catch (error) {
+        terminationError = error;
+      }
+      cleanup();
+      if (terminationError) {
+        throw new Error(`Unix socket child cleanup failed: ${describeError(gracefulError)}; ${describeError(terminationError)}`);
+      }
+      throw new Error(`Unix socket child graceful cleanup failed: ${describeError(gracefulError)}; forced termination confirmed`);
+    },
+  };
+}
+const fileSymlinkCapability = (() => {
+  const dir = mkdtempSync(join(tmpdir(), "install-file-symlink-"));
+  try {
+    writeFileSync(join(dir, "target"), "probe");
+    symlinkSync(join(dir, "target"), join(dir, "link"), "file");
+    return { available: true, reason: "" };
+  } catch (error) {
+    if (!["EPERM", "EACCES", "ENOTSUP", "EOPNOTSUPP"].includes(error.code)) throw error;
+    return { available: false, reason: `file symlink unsupported: ${error.code}` };
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+})();
 
 describe("install.mjs", () => {
+  it("reinstala arquivos idênticos readonly sem reescrever nem reportar atualização", () => {
+    const home = newHome();
+    const fixture = newInstallerFixture();
+    const target = join(home, ".omp", "agent", "skills", "ship", "SKILL.md");
+    try {
+      const initial = runFixtureInstaller(home, fixture);
+      expect(initial.status, initial.stdout + initial.stderr).toBe(0);
+      chmodSync(target, 0o444);
+      const before = lstatSync(target, { bigint: true });
+      const result = runFixtureInstaller(home, fixture);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/skill ship\s+equal/);
+      expect(result.stdout).not.toMatch(/\bupdated\b|planned native/);
+      const after = lstatSync(target, { bigint: true });
+      expect(after.ino).toBe(before.ino);
+      expect(after.mtimeNs).toBe(before.mtimeNs);
+      expect(after.mode).toBe(before.mode);
+    } finally {
+      if (existsSync(target)) chmodSync(target, 0o644);
+      rmSync(home, { recursive: true, force: true });
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
   it("instala o inventário e --check limpo em seguida (idempotente)", () => {
     const home = newHome();
     try {
@@ -296,8 +527,8 @@ describe("install.mjs", () => {
     }
   });
 
-  if (process.platform === "win32") {
-    it.skip("preserva NOTICE symlink — skip: criação de symlink de arquivo requer privilégio no Windows", () => {});
+  if (!fileSymlinkCapability.available) {
+    it.skip(`preserva NOTICE symlink — skip: ${fileSymlinkCapability.reason}`, () => {});
   } else {
     it("preserva NOTICE symlink e reporta conflito nos modos normal e --check", () => {
       const home = newHome();
@@ -490,8 +721,8 @@ describe("install.mjs", () => {
     }
   });
 
-  if (process.platform === "win32") {
-    it.skip("symlink em arquivo gerenciado — skip: criação de symlink de arquivo requer privilégio no Windows", () => {});
+  if (!fileSymlinkCapability.available) {
+    it.skip(`symlink em arquivo gerenciado — skip: ${fileSymlinkCapability.reason}`, () => {});
   } else {
     it("reporta symlink em arquivo gerenciado sem substituí-lo", () => {
       const home = newHome();
@@ -716,7 +947,7 @@ describe("install.mjs", () => {
       }
     },
   );
-  it("inventário completo mantém exatamente 7 skills e 9 agentes", () => {
+  it("inventário completo mantém exatamente 10 skills e 12 agentes", () => {
     const home = newHome();
     try {
       const installed = runInstaller(home);
@@ -725,9 +956,9 @@ describe("install.mjs", () => {
       const agentsRoot = join(home, ".omp", "agent", "agents");
       const skills = readdirSync(skillsRoot).sort();
       const agents = readdirSync(agentsRoot).sort();
-      expect(skills).toHaveLength(7);
+      expect(skills).toHaveLength(10);
       expect(skills).toEqual([...INSTALLER_SKILLS].sort());
-      expect(agents).toHaveLength(9);
+      expect(agents).toHaveLength(12);
       expect(agents).toEqual([...INSTALLER_AGENTS].sort());
       for (const file of agents) expect(lstatSync(join(agentsRoot, file)).isFile()).toBe(true);
     } finally {
@@ -735,7 +966,7 @@ describe("install.mjs", () => {
     }
   });
 
-  it("precedência projeto vence perfil para todos os 9 agentes sem sobrescrever nenhum lado", () => {
+  it("precedência projeto vence perfil para todos os 12 agentes sem sobrescrever nenhum lado", () => {
     const home = newHome();
     const fixture = newInstallerFixture();
     const project = join(home, "project");
@@ -743,6 +974,7 @@ describe("install.mjs", () => {
       const initial = runFixtureInstaller(home, fixture);
       expect(initial.status, initial.stdout + initial.stderr).toBe(0);
       const profileRoot = join(home, ".omp", "agent", "agents");
+      for (const file of INSTALLER_AGENTS) expect(existsSync(join(profileRoot, file)), `required role ${file}`).toBe(true);
       const profileContents = new Map(
         INSTALLER_AGENTS.map((file) => [file, readFileSync(join(profileRoot, file), "utf8")]),
       );
@@ -820,24 +1052,36 @@ describe("install.mjs", () => {
     async () => {
       const home = newHome();
       const destination = join(home, ".omp", "agent", "agents", "deep-reviewer.md");
-      const server = createServer();
+      const source = join(repoRoot, "deep-review", "agents", "deep-reviewer.md");
+      const sourceBytes = readFileSync(source);
+      let socketFixture;
       try {
-        expect(runInstaller(home).status).toBe(0);
+        const initial = runInstaller(home);
+        expect(initial.status, initial.stdout + initial.stderr).toBe(0);
+        expect(readFileSync(destination)).toEqual(sourceBytes);
         rmSync(destination, { force: true });
-        await new Promise((resolve, reject) => {
-          server.once("error", reject);
-          server.listen(destination, resolve);
-        });
+
+        socketFixture = await startUnixSocketFixture(destination);
+        const before = lstatSync(destination);
+        expect(before.isSocket()).toBe(true);
 
         const result = runInstaller(home, ["--check"], { timeout: 2000 });
         const output = result.stdout + result.stderr;
         expect(result.error?.code, output).not.toBe("ETIMEDOUT");
         expect(result.status, output).toBe(1);
         expect(output).toMatch(/socket|soquete|especial|DRIFT/i);
-        expect(lstatSync(destination).isSocket()).toBe(true);
+
+        const after = lstatSync(destination);
+        expect(after.isSocket()).toBe(true);
+        expect(after.dev).toBe(before.dev);
+        expect(after.ino).toBe(before.ino);
+        expect(readFileSync(source)).toEqual(sourceBytes);
       } finally {
-        await new Promise((resolve) => server.close(resolve));
-        rmSync(home, { recursive: true, force: true });
+        try {
+          if (socketFixture) await socketFixture.close();
+        } finally {
+          rmSync(home, { recursive: true, force: true });
+        }
       }
     },
   );

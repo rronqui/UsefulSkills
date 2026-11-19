@@ -1,0 +1,733 @@
+{
+  "schema": "native-release-proof-index/v1",
+  "retention_task": "T-011",
+  "acceptance_criteria": [
+    "AC-016",
+    "AC-021"
+  ],
+  "contract": "0.5.0",
+  "classification": "development-evidence-only",
+  "execution_binding": {
+    "source_root": "D:\\Projects\\UsefulSkills",
+    "retained_paths_are_not_execution_paths": true,
+    "authenticated_rerun_performed": false,
+    "source_selection": "Physical lab scripts were hashed and byte-compared with their local:// counterparts before retention; the physical lab copies were selected.",
+    "script_comparisons": [
+      {
+        "logical_lab_script": "lab/ship-native-alignment-regression.mjs",
+        "executed_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-alignment-regression.mjs",
+        "local_counterpart": "local://ship-native-alignment-regression.mjs",
+        "sha256": "cc610da9d7a25e1f935f7a801d559072ebf76e8600d49444da22ed9ae891da9f",
+        "bytes": 162812,
+        "local_counterpart_sha256": "cc610da9d7a25e1f935f7a801d559072ebf76e8600d49444da22ed9ae891da9f",
+        "byte_identical": true
+      },
+      {
+        "logical_lab_script": "lab/ship-native-review-context-regression.mjs",
+        "executed_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-review-context-regression.mjs",
+        "local_counterpart": "local://ship-native-review-context-regression.mjs",
+        "sha256": "1a17bd0a0a4f60cc65013fd67a413ecbeec8fc27ce5434ff11db1ab14bf015da",
+        "bytes": 95322,
+        "local_counterpart_sha256": "1a17bd0a0a4f60cc65013fd67a413ecbeec8fc27ce5434ff11db1ab14bf015da",
+        "byte_identical": true
+      },
+      {
+        "logical_lab_script": "lab/ship-native-profile-regression.mjs",
+        "executed_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-regression.mjs",
+        "local_counterpart": "local://ship-native-profile-regression.mjs",
+        "sha256": "53f08041a2fbadc55c484f5ea3a1b886809ee1cc36f762162cd351099259624b",
+        "bytes": 181168,
+        "local_counterpart_sha256": "53f08041a2fbadc55c484f5ea3a1b886809ee1cc36f762162cd351099259624b",
+        "byte_identical": true
+      }
+    ],
+    "runtime": {
+      "node_executable": "C:/Users/Ricar/AppData/Local/hermes/node/node.exe",
+      "node_version": "22.23.2",
+      "omp_version": "18.18.6",
+      "omp_binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+      "omp_binary_bytes": 249985024,
+      "package_or_runtime_footprint": "unchanged within recorded source and binary scopes",
+      "raw_captures_retained": false
+    }
+  },
+  "artifacts": {
+    "alignment": {
+      "retained_path": "implementation-evidence/native-release/alignment.mjs",
+      "kind": "exact-tested-driver",
+      "sha256": "cc610da9d7a25e1f935f7a801d559072ebf76e8600d49444da22ed9ae891da9f",
+      "bytes": 162812,
+      "capture": {
+        "run_id": "31f9914f-b024-406d-a9a3-b2dea28f6031",
+        "evidence_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-alignment-31f9914f-b024-406d-a9a3-b2dea28f6031/evidence.json",
+        "phase": "green",
+        "stage": "resume_capture_native_collision",
+        "assertions": [
+          {
+            "id": "AC-009.resume-capture",
+            "status": "PASS"
+          },
+          {
+            "id": "preservation.source",
+            "status": "PASS"
+          }
+        ],
+        "replay_capture": {
+          "run_id": "e27f59ff-7642-40cc-81b8-d1679a091939",
+          "evidence_sha256": "e9fed3eed4cbbd6378b3342267f2b388def5d8473904510b6e321cf1b861ceeb",
+          "collision_history_run_id": "d6923a4a-e96b-43e7-b4ef-0ded63a68126",
+          "collision_history_sha256": "a9e353123d34300db3734d2eb7b3bacb905f03a9d13e173f493666b2871d67ee",
+          "native_collision_request_id": "af7d05c3-9c98-422e-a5c0-7921054556cf",
+          "native_collision_run_id": "09032fde-e705-4e42-97ba-c06a4f466bbf",
+          "secondary_resume_b_run_id": "e5024b0d-a007-409d-9d5c-6020c1eb0644"
+        },
+        "source_footprint": {
+          "skills": 10,
+          "agent_profiles": 12,
+          "files": 136,
+          "manifest_sha256": "710c5e088e00733e75610c429124f74931474f5a645eb65b8247440b3628393e",
+          "after_scope": "alignment-six-targets-only",
+          "omp_binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7"
+        },
+        "native_scope_limit": "GREEN-resume-capture-collision is an exact replay binding; the evidence explicitly says only fresh native A collision controls were executed."
+      },
+      "test_refs": [
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeAndCollisionControls/GREEN-resume-A-initial",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeAndCollisionControls/GREEN-resume-B-initial",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeAndCollisionControls/GREEN-resume-A",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeAndCollisionControls/GREEN-resume-B",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeAndCollisionControls/GREEN-collision",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreenResumeCapture/GREEN-resume-capture-collision",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreen/GREEN-local",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreen/GREEN-short",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreen/GREEN-full",
+        "implementation-evidence/native-release/alignment.mjs::T008/AC-009/runGreen/GREEN-blocked"
+      ]
+    },
+    "review_context": {
+      "retained_path": "implementation-evidence/native-release/review-context.mjs",
+      "kind": "exact-tested-driver",
+      "sha256": "1a17bd0a0a4f60cc65013fd67a413ecbeec8fc27ce5434ff11db1ab14bf015da",
+      "bytes": 95322,
+      "capture": {
+        "run_id": "624d66b1-2903-4ade-b6d5-88480942dd12",
+        "evidence_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-review-context-624d66b1-2903-4ade-b6d5-88480942dd12/evidence.json",
+        "task": "T009C",
+        "acceptance_criteria": [
+          "AC-014"
+        ],
+        "contract": "0.5.0",
+        "phase": "green",
+        "source_before_after_equal": true,
+        "native": {
+          "status": "PASS",
+          "evidence_level": "native",
+          "execution_cwd": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/review-fixture/worktrees/review",
+          "probe_refs": [
+            "native.Fase0.documentation-before-task",
+            "native.source-receipt-diff-file-reads",
+            "native.task-wire-no-overrides",
+            "native.terminal-revision-bound"
+          ]
+        },
+        "source_footprint": {
+          "omp_binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+          "omp_binary_bytes": 249985024,
+          "protocol_consumer": {
+            "path": "deep-review/lib/protocol.mjs",
+            "sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+            "signatures": [
+              "validateReviewerResult",
+              "aggregateReviewInstances"
+            ]
+          },
+          "state_consumer": {
+            "path": "tdd-orchestrator/lib/state.mjs",
+            "sha256": "554e2da091138d5d8faa870608265f036116ebb53a38ff2f3118e9451bd805c9",
+            "signature": "validateProgress/canPromoteWave"
+          },
+          "reviewed_revisions": {
+            "branch_base": "2f28c09811568ce46fee8b69a4a5b1ba23d18e96",
+            "pr_uri": "d5cc8a75ad3db50dd5cf89512b7882dd232cfc83"
+          }
+        },
+        "claims": "Consumer, state, and native OMP observations are retained at their recorded evidence levels; tabletop is never promoted to PASS."
+      },
+      "test_refs": [
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.protocol-positive",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.stale-local-revision",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.mismatched-head-revision",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.missing-explicit-base",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr-uri.protocol-positive",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.stale-consumer-revision",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.conflicting-head-alias",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.local-workspace-substitution",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-stale-revision",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-git-receipt-hash",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-file-hash",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-cross-file-consumer",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-workspace-fallback",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-diff-hash",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-patch-head",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-api-receipt-hash",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-file-revision",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-deletion-base",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-workspace-fallback",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-uri-mismatch",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.IMPLEMENTED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.IMPLEMENTED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.IMPLEMENTED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.VALIDATED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.VALIDATED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.VALIDATED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.COVERED.ongoing",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.COVERED.DOC",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.COVERED",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.COVERED.DONE",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.Fase0.missing-documentation-proof",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.missing-review",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.missing-validator",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/runNative/T009C-branch-base-1",
+        "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/runNative/T009C-pr-uri-2"
+      ]
+    },
+    "profiles": {
+      "retained_path": "implementation-evidence/native-release/profiles.mjs",
+      "kind": "exact-tested-driver",
+      "sha256": "53f08041a2fbadc55c484f5ea3a1b886809ee1cc36f762162cd351099259624b",
+      "bytes": 181168,
+      "capture": {
+        "evaluation_run_id": "9cf3a564-85c0-4fd5-8bfd-633107baaae9",
+        "evidence_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-9cf3a564-85c0-4fd5-8bfd-633107baaae9/evidence.json",
+        "validation_source": "local://ship-native-profiles-wire-validated-result.json",
+        "evaluation_kind": "offline_bounded_evaluation",
+        "not_fresh_native_inference": true,
+        "validated_result": {
+          "status": "PASS",
+          "exit_code": 0,
+          "executed_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-regression.mjs",
+          "retained_path_not_executed": true
+        },
+        "source_footprint": {
+          "skills": 10,
+          "agent_profiles": 12,
+          "files": 136,
+          "manifest_sha256": "f410399df3cb748c1827d58856ca204f5bffc92c8e78c3408733d53bfc9c5ba2",
+          "manifest_digest": "94321cbf4c76e55d50669d2ee8b63984bfd1caea663966f8f0a331159873745b",
+          "immutable_scope": "twelve installer-mapped agent profiles plus deep-review/lib/protocol.mjs",
+          "protocol_sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+          "omp_binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+          "omp_binary_bytes": 249985024
+        },
+        "offline_replays": {
+          "peer_positive": {
+            "source_kind": "offline_captured_native_evidence_record",
+            "captured_run_id": "5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d",
+            "evidence_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-5e25dd6a-c4bd-4dbe-8dcb-b8637e57b65d/evidence.json",
+            "evidence_sha256": "62590861487562f4d1fbe7e63364cfe408d3a44cd010f177d8438387884cd755",
+            "evidence_bytes": 256148,
+            "fixture_revision": "2f28c09811568ce46fee8b69a4a5b1ba23d18e96",
+            "task_sha256": "3e3c39ae31b4eda6eabf07f4ff65149db981fbc25213f767a8d07857a9a2eccc",
+            "assignment_sha256": "1def2a198afd2224078df75a88b02587b21ae5b3422592b4278e13ade9d43a5a"
+          },
+          "batch": {
+            "source_kind": "offline_captured_native_batch_evidence",
+            "replay_label": "NativeReplay-exact",
+            "captured_run_id": "14b1c89c-ee9c-438c-a7c8-9ec9e095173a",
+            "evidence_path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/ship-native-profile-14b1c89c-ee9c-438c-a7c8-9ec9e095173a/evidence.json",
+            "evidence_sha256": "d2400ac627eb8d2bb1f8d0536dcfd97b8a228ab40412e1c5491744559025f4b8",
+            "evidence_bytes": 1022542,
+            "source_scope_count": 13,
+            "before_after_equal": true,
+            "fixture_revision": "2f28c09811568ce46fee8b69a4a5b1ba23d18e96"
+          }
+        },
+        "observed_assertions": {
+          "AC-012.profile-discovery": "OBSERVED",
+          "AC-013.review-wire": "OBSERVED",
+          "NATIVE-06.fallback": "PENDING",
+          "NATIVE-09.retry": "PENDING",
+          "NATIVE-09.fallback": "PENDING"
+        },
+        "peer_cases": [
+          {
+            "id": "PeerPositive",
+            "expected": "APROVADO",
+            "observed_status": "APROVADO",
+            "consumer_accepted": true
+          },
+          {
+            "id": "PeerNegative",
+            "expected": "BLOQUEADO",
+            "observed_status": "BLOQUEADO",
+            "consumer_accepted": true
+          },
+          {
+            "id": "PeerMalformed",
+            "expected": "MALFORMED",
+            "observed_status": "APROVADO",
+            "consumer_accepted": true,
+            "mode": "producer-healed-valid-control",
+            "limit": "Malformed-role output was healed into a valid TDD_PEER_REVIEW object; this is not native malformed-wire rejection."
+          }
+        ],
+        "derived_offline_control": {
+          "function": "derivePeerConsumerFaultInjection",
+          "assignment": "PeerMalformed",
+          "operation": "drop-required-field",
+          "field": "explanation",
+          "consumer_accepted": false,
+          "evaluation_only": true,
+          "limit": "Separate derived mutation rejection is not a fresh native malformed-role capture."
+        },
+        "aborted_redundant_peer": {
+          "id": "ProfilePeerReviewer",
+          "agent": "peer-reviewer",
+          "status": "aborted",
+          "exit_code": 1,
+          "classification": "schema",
+          "task_sha256": "e4b9f2dcd5d10734a286df9a893a75b5fb3fddba631fe1077a3eaf0bc6fa83e9",
+          "assignment_sha256": "9c79f349712b27c2ca8f8c09e2bdf544c0b8f2adf6fe91c5f6f0ad984d267dbd",
+          "captured_batch_run_id": "14b1c89c-ee9c-438c-a7c8-9ec9e095173a",
+          "not_renamed_to_success": true,
+          "separate_positive_role": "PeerPositive"
+        },
+        "model_observation": {
+          "serving_models": [],
+          "actual": null,
+          "observation": "unverified",
+          "resolved_model_ids_are_request_or_resolution_metadata_only": true,
+          "serving_attestation": false,
+          "observer_limit": "The profile harness may expose an incomplete or overstrict serving observer; no old capture is relabeled as proof of a modified observer."
+        }
+      },
+      "aborted_test_refs": [
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfilePeerReviewer"
+      ],
+      "test_refs": [
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileRequirementsReader",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileArchitect",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileHostOperator",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileDeepReviewer",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileSpecKitAuthor",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileTestAuthor",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileBackendDeveloper",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileFrontendDeveloper",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileRefactorer",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileValidator",
+        "implementation-evidence/native-release/profiles.mjs::T009A/AC-012/assertProfileRecords/ProfileIntegrator",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertDeepCases/DeepReviewOne",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertDeepCases/DeepReviewTwo",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertPeerCase/PeerPositive",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertPeerCase/PeerNegative",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/assertPeerCase/PeerMalformed",
+        "implementation-evidence/native-release/profiles.mjs::T009B/AC-013/derivePeerConsumerFaultInjection/PeerMalformed",
+        "implementation-evidence/native-release/profiles.mjs::T009B/NATIVE-09/assertRetryAndFallbackEvidence"
+      ]
+    },
+    "fallback": {
+      "retained_path": "implementation-evidence/native-release/fallback.mjs",
+      "kind": "exact-executed-driver",
+      "sha256": "067fb9f736301af7752fe80ee73e0605be02bdb26ab48da6c77881820151dd61",
+      "bytes": 86677,
+      "test_refs": [
+        "implementation-evidence/native-release/fallback.mjs::NATIVE-06.fallback"
+      ],
+      "capture": {
+        "run_id": "ef2f324d-8cf3-438d-b09a-090003be052d",
+        "evidence_path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-fallback-ef2f324d-8cf3-438d-b09a-090003be052d\\evidence.json",
+        "evidence_sha256": "e846f9124532d4e647241ccb99e8cdd1fa36ace880d43c6b86d843cf8b33257c",
+        "scope": "named capability fallback, NOT provider/model fallback and NOT technical TDD retry",
+        "root_reads": {
+          "expected": 31,
+          "observed": 31,
+          "first_task_sequence": 222
+        },
+        "disabled_preflight_status": "OBSERVED",
+        "aggregate": {
+          "ok": true,
+          "status": "BLOCKED",
+          "reviewers": [
+            "FallbackReviewGood",
+            "FallbackReviewBad"
+          ],
+          "counts": {
+            "P0": 0,
+            "P1": 1,
+            "P2": 0,
+            "P3": 0
+          },
+          "intentional_negative_fixture": true
+        },
+        "derived_controls": [
+          {
+            "name": "missing",
+            "label": "DERIVED_CONSUMER",
+            "evidence_level": "DERIVED_CONSUMER",
+            "source": "actual-native-fallback-result-cloned-in-memory",
+            "expected": "BLOCKED",
+            "observed": "blocked",
+            "errors": [
+              "missing expected instance: FallbackReviewBad",
+              "instance result set must match assignments exactly"
+            ]
+          },
+          {
+            "name": "duplicate",
+            "label": "DERIVED_CONSUMER",
+            "evidence_level": "DERIVED_CONSUMER",
+            "source": "actual-native-fallback-result-cloned-in-memory",
+            "expected": "BLOCKED",
+            "observed": "blocked",
+            "errors": [
+              "results[2].id duplicate instance ID",
+              "instance result set must match assignments exactly"
+            ]
+          },
+          {
+            "name": "stale",
+            "label": "DERIVED_CONSUMER",
+            "evidence_level": "DERIVED_CONSUMER",
+            "source": "actual-native-fallback-result-cloned-in-memory",
+            "expected": "BLOCKED",
+            "observed": "blocked",
+            "errors": [
+              "results[0]: reviewer revision does not match expected reviewed_revision",
+              "instance result set must match assignments exactly"
+            ]
+          },
+          {
+            "name": "wrongmode",
+            "label": "DERIVED_CONSUMER",
+            "evidence_level": "DERIVED_CONSUMER",
+            "source": "actual-native-fallback-result-cloned-in-memory",
+            "expected": "BLOCKED",
+            "observed": "blocked",
+            "errors": [
+              "results[0]: reviewer protocol_mode does not match expected protocol_mode",
+              "results[0]: peer-reviewer must use DEEP_REVIEW_FALLBACK",
+              "instance result set must match assignments exactly"
+            ]
+          }
+        ],
+        "preservation": {
+          "source": {
+            "label": "source",
+            "changed": [],
+            "unchanged": true
+          },
+          "fixture": {
+            "label": "immutable fixture",
+            "changed": [],
+            "unchanged": true
+          },
+          "binary": {
+            "before": {
+              "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\omp-18.18.6-pinned.exe",
+              "bytes": 249985024,
+              "sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7"
+            },
+            "after": {
+              "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\omp-18.18.6-pinned.exe",
+              "bytes": 249985024,
+              "sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7"
+            },
+            "unchanged": true
+          },
+          "project": {
+            "label": "private project",
+            "changed": [],
+            "unchanged": true
+          }
+        },
+        "observed_exit_fields": "Missing peer exit codes remain null; no exit0 inference",
+        "model_serving": "unverified; no model/provider fallback claim"
+      },
+      "post_capture_source_delta": {
+        "entries": [],
+        "meaning": "Later unrelated/source documentation changes do not rewrite the captured snapshot; full current-release acceptance remains pending.",
+        "current_qa_manifest_sha256": "04da64cf2490a3ebe08806bf822838ffcadea5fcbbb4ffff4ec9f84925a933b9"
+      },
+      "history": [
+        {
+          "run_id": "7214a48c-7edf-4d6e-a948-a87ee87f54f8",
+          "status": "BLOCKED",
+          "reason": "read-path observer truncated first path with Array.map callback index"
+        },
+        {
+          "run_id": "6f94f748-d02f-47bd-884c-ea170b9c1d80",
+          "status": "BLOCKED",
+          "reason": "observer truncation persisted; not retrospectively replayable for root reads"
+        }
+      ]
+    },
+    "lifecycle": {
+      "kind": "executed-offline-guard-and-local-program-only; native-pending",
+      "retained_path": "implementation-evidence/native-release/lifecycle.mjs",
+      "sha256": "b789eb98b6a600b697b2db7b9665586703a8633694db4248efc6f7979a5aefb4",
+      "bytes": 180599,
+      "test_refs": [
+        "implementation-evidence/native-release/lifecycle.mjs::T-011/AC-016/validator-correlation-offline"
+      ],
+      "offline": {
+        "artifact": "artifact://988",
+        "exit_code": 0,
+        "status": "PASS",
+        "scope": "actualv2START/UPDATE/ENDcorrelationfixtures, noNative"
+      },
+      "capture": {
+        "run_id": "c2987eb6-9008-48fc-8d1d-6b2794c84fee",
+        "evidence_path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\evidence.json",
+        "evidence_sha256": "f802a310647dfc7dbfce6142a7bc9681efe6aa3295c826ed90c07f7898c9a32f",
+        "driver_revision_at_capture": "1346bbb15b9d5101e95d63e16a3bca3ae92a8ebf6ad8c6d0648d2e007a343ade",
+        "status": "PENDING_NATIVE",
+        "evidence_level": "LOCAL_PROGRAM_ONLY",
+        "plan_cli": {
+          "status": "PASS",
+          "evidence_level": "LOCAL_PROGRAM_ONLY",
+          "attempted": true,
+          "command": {
+            "executable": "C:\\Users\\Ricar\\AppData\\Local\\hermes\\node\\node.exe",
+            "args": [
+              "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\ship\\bin\\ship.mjs",
+              "plan",
+              "--root",
+              "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project",
+              "--target",
+              "main",
+              "--report",
+              ".omp/state/quality.json",
+              "--context",
+              ".omp/state/quality-context.json"
+            ],
+            "cwd": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project",
+            "shell": false,
+            "timeout_ms": 30000
+          },
+          "child": {
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "error": null,
+            "stdout_sha256": "ac36abe7b74f971be589b1260940dd91f22450be616f19b6f051f67151293f7e",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stderr": ""
+          },
+          "receipt": {
+            "schema_version": 1,
+            "mode": "external",
+            "dry_run": true,
+            "status": "PLANNED",
+            "merge_target": "main",
+            "quality": {
+              "status": "PASS",
+              "legacy": false
+            },
+            "steps": [
+              {
+                "step": "issue",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "branch",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "commit",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "push",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "pull_request",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "ci",
+                "status": "NOT_EXECUTED"
+              },
+              {
+                "step": "release",
+                "status": "NOT_EXECUTED"
+              }
+            ]
+          },
+          "source_binding": {
+            "before": {
+              "status": "PASS",
+              "files": [
+                {
+                  "role": "ship_cli",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\ship\\bin\\ship.mjs",
+                    "bytes": 46187,
+                    "sha256": "bda6c7a74e5381f2c3ff7e7fb4bce7d1cc803b0f4d305275eda6114397781e67"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\ship\\bin\\ship.mjs",
+                    "bytes": 46187,
+                    "sha256": "bda6c7a74e5381f2c3ff7e7fb4bce7d1cc803b0f4d305275eda6114397781e67"
+                  }
+                },
+                {
+                  "role": "ship_quality_lib",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\ship\\bin\\lib.mjs",
+                    "bytes": 14978,
+                    "sha256": "4d795575201e6db33a782f91159d8793a10eb0370fbde1c8b884e7962b2bace0"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\ship\\bin\\lib.mjs",
+                    "bytes": 14978,
+                    "sha256": "4d795575201e6db33a782f91159d8793a10eb0370fbde1c8b884e7962b2bace0"
+                  }
+                },
+                {
+                  "role": "quality_consumer",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\tdd-orchestrator\\lib\\quality.mjs",
+                    "bytes": 36160,
+                    "sha256": "463634cc6c37044ed2478285b419554ce8ea36a45b4f3fdd83d4c8026810305c"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\tdd-orchestrator\\lib\\quality.mjs",
+                    "bytes": 36160,
+                    "sha256": "463634cc6c37044ed2478285b419554ce8ea36a45b4f3fdd83d4c8026810305c"
+                  }
+                }
+              ]
+            },
+            "after": {
+              "status": "PASS",
+              "files": [
+                {
+                  "role": "ship_cli",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\ship\\bin\\ship.mjs",
+                    "bytes": 46187,
+                    "sha256": "bda6c7a74e5381f2c3ff7e7fb4bce7d1cc803b0f4d305275eda6114397781e67"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\ship\\bin\\ship.mjs",
+                    "bytes": 46187,
+                    "sha256": "bda6c7a74e5381f2c3ff7e7fb4bce7d1cc803b0f4d305275eda6114397781e67"
+                  }
+                },
+                {
+                  "role": "ship_quality_lib",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\ship\\bin\\lib.mjs",
+                    "bytes": 14978,
+                    "sha256": "4d795575201e6db33a782f91159d8793a10eb0370fbde1c8b884e7962b2bace0"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\ship\\bin\\lib.mjs",
+                    "bytes": 14978,
+                    "sha256": "4d795575201e6db33a782f91159d8793a10eb0370fbde1c8b884e7962b2bace0"
+                  }
+                },
+                {
+                  "role": "quality_consumer",
+                  "source": {
+                    "path": "D:\\Projects\\UsefulSkills\\tdd-orchestrator\\lib\\quality.mjs",
+                    "bytes": 36160,
+                    "sha256": "463634cc6c37044ed2478285b419554ce8ea36a45b4f3fdd83d4c8026810305c"
+                  },
+                  "overlay": {
+                    "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\skills\\tdd-orchestrator\\lib\\quality.mjs",
+                    "bytes": 36160,
+                    "sha256": "463634cc6c37044ed2478285b419554ce8ea36a45b4f3fdd83d4c8026810305c"
+                  }
+                }
+              ]
+            },
+            "unchanged": true
+          },
+          "quality_inputs": {
+            "report": {
+              "before": {
+                "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\state\\quality.json",
+                "bytes": 6375,
+                "sha256": "03423061266598e9903c2bf4f443fac8120ba383e4e886c76eaccf0ce0c8af04"
+              },
+              "after": {
+                "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\state\\quality.json",
+                "bytes": 6375,
+                "sha256": "03423061266598e9903c2bf4f443fac8120ba383e4e886c76eaccf0ce0c8af04"
+              },
+              "unchanged": true
+            },
+            "context": {
+              "before": {
+                "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\state\\quality-context.json",
+                "bytes": 113,
+                "sha256": "b8307ac8a300109ffe6b1040942a40b42eab0b131110627d712904026f847e8b"
+              },
+              "after": {
+                "path": "C:\\Users\\Ricar\\AppData\\Local\\Temp\\usefulskills-audit-CdmZsI\\ship-native-lifecycle-c2987eb6-9008-48fc-8d1d-6b2794c84fee\\private-project\\.omp\\state\\quality-context.json",
+                "bytes": 113,
+                "sha256": "b8307ac8a300109ffe6b1040942a40b42eab0b131110627d712904026f847e8b"
+              },
+              "unchanged": true
+            },
+            "unchanged": true
+          },
+          "checks": {
+            "exit_code_zero": true,
+            "stdout_json": true,
+            "exact_ac021_receipt": true,
+            "source_bound": true,
+            "quality_inputs_unchanged": true
+          },
+          "parse_error": null,
+          "reason": null
+        }
+      },
+      "latest_local_preflight": {
+        "run_id": "15bfe4d0-7d76-4f49-b31c-18d810a4d9f8",
+        "driver_sha256": "b789eb98b6a600b697b2db7b9665586703a8633694db4248efc6f7979a5aefb4",
+        "status": "PENDING_NATIVE",
+        "scope": "offlineguard+localinstalledCLIonly, notNativeEXTERNAL"
+      },
+      "native_history": [
+        {
+          "run_id": "31e368eb-b554-4801-a196-4043df63ada5",
+          "status": "PENDING_NATIVE",
+          "observer_failure": "unclassifiedvalidatorguardoriginalhashonly"
+        },
+        {
+          "run_id": "c8d48ce7-7a38-4e19-ae22-6f40af53b53d",
+          "status": "PENDING_NATIVE",
+          "observer_failure": "endwithoutcommandmismatch"
+        },
+        {
+          "run_id": "cfa133c1-8b06-4aa9-b120-2adc0c68c01c",
+          "status": "PENDING_NATIVE",
+          "observer_failure": "requirednonexistenttaskId"
+        },
+        {
+          "run_id": "f555de16-2b22-4147-88d7-9941efad05ce",
+          "status": "PENDING_NATIVE",
+          "observer_failure": "normaltool_execution_updateunhandled"
+        }
+      ],
+      "limits": [
+        "NoNative09technicalretryobservedyet",
+        "LocalplanCLIexit0/PLANNEDisnotnativeEXTERNALorpublication",
+        "Requested/actual/serving remainseparate; physicalserving/providerfallbackNOT_OBSERVEDlimitacceptedbyuser",
+        "Currentretaineddriverisb789offline-exercised; c298actualdriver1346distinctpreserved",
+        "No previousobserverfailurepromotedretrospectivelytoPASS"
+      ]
+    }
+  },
+  "known_limits": [
+    "No native authenticated rerun was performed after retention; syntax checks only were run after the byte-identical copies.",
+    "The retained paths are new evidence-source paths and do not evidence execution at those paths.",
+    "The malformed-role native output was accepted only after producer healing to valid APROVADO; the separate dropped-explanation mutation is offline bounded consumer evaluation.",
+    "ProfilePeerReviewer remains an aborted/schema attempt; PeerPositive is a separate captured role and was not renamed to that aborted attempt.",
+    "Client model.id/resolved model identity is not a serving attestation; model/provider fallback and technical retry remain pending. Named capability fallback is scoped in the separate fallback artifact.",
+    "The retained scripts are evidence drivers only and do not change package/runtime footprint."
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "classification": "ORIGINAL_T009C_HISTORY_BLOCKED_RED_UNAVAILABLE",
+  "authorization": "local://ship-final-completion-decisions.json",
+  "archived_at": "2026-11-14T15:57:54.729Z",
+  "task": {
+    "id": "T-009C",
+    "title": "Reconciliar branch/PR no mesmo SHA, Fase 0/OK, DOC e DONE por IMPLEMENTED/VALIDATED; reabrir prova stale.",
+    "phase": "BLOCKED",
+    "attempt": 1,
+    "allowed_write_globs": [
+      "deep-review/SKILL.md",
+      "ship/references/integrated-delivery.md",
+      "tdd-orchestrator/references/handoff.md",
+      "tdd-orchestrator/references/execution-and-resume.md"
+    ],
+    "acceptance_criteria": [
+      "AC-014"
+    ],
+    "implemented_by": "Main integration",
+    "reviewed_by": "peer-reviewer",
+    "review": {
+      "status": "PENDING",
+      "agent": "",
+      "independent": false,
+      "revision": "",
+      "evidence": ""
+    },
+    "red": {
+      "status": "PENDING",
+      "failing_tests": [],
+      "failure_reason_expected": false,
+      "criteria_to_tests": {
+        "AC-014": [
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.protocol-positive",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.stale-local-revision",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.mismatched-head-revision",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/branch-base.missing-explicit-base",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr-uri.protocol-positive",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.stale-consumer-revision",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.conflicting-head-alias",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/protocolCases/pr.local-workspace-substitution",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-stale-revision",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-git-receipt-hash",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-file-hash",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-cross-file-consumer",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-workspace-fallback",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/branch-base.source-binding-diff-hash",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-patch-head",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-api-receipt-hash",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-file-revision",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-deletion-base",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-workspace-fallback",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/sourceBindingCases/pr.source-binding-uri-mismatch",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.IMPLEMENTED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.IMPLEMENTED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.IMPLEMENTED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.VALIDATED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.VALIDATED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.VALIDATED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DOC.COVERED.ongoing",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.COVERED.DOC",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.DONE.COVERED",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.COVERED.DONE",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.Fase0.missing-documentation-proof",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.missing-review",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/stateCases/state.promotion.missing-validator",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/runNative/T009C-branch-base-1",
+          "implementation-evidence/native-release/review-context.mjs::T009C/AC-014/runNative/T009C-pr-uri-2"
+        ]
+      },
+      "revision_delta": {
+        "ac": "",
+        "test": "",
+        "evidence": ""
+      },
+      "revision_baseline_tests": {}
+    },
+    "green": {
+      "status": "PASS",
+      "reason_if_skipped": "",
+      "changed_files": [],
+      "tooling_evidence": "",
+      "tooling_suite_evidence": ""
+    },
+    "refactor": {
+      "status": "SKIPPED",
+      "reason_if_skipped": "No further code refactor for current documentation/caller-context reconciliation; captured consumer/runtime witness retained."
+    },
+    "doc_impact": "none",
+    "gates": {
+      "tests": "pending",
+      "traceability": "pending",
+      "spec_kit": "pending",
+      "coverage": "pending",
+      "lint": "pending",
+      "type_check": "pending",
+      "build": "pending",
+      "security": "pending",
+      "contract": "pending",
+      "git_sanity": "pending"
+    },
+    "gate_origins": {
+      "tests": "",
+      "traceability": "",
+      "spec_kit": "",
+      "coverage": "",
+      "lint": "",
+      "type_check": "",
+      "build": "",
+      "security": "",
+      "contract": "",
+      "git_sanity": ""
+    },
+    "gate_evidence": {
+      "tests": "",
+      "traceability": "",
+      "spec_kit": "",
+      "coverage": "",
+      "lint": "",
+      "type_check": "",
+      "build": "",
+      "security": "",
+      "contract": "",
+      "git_sanity": ""
+    },
+    "blockers": [
+      "Formal original RED assertion-to-source binding is not recorded; bounded624d66b1 native GREEN remains retained. Do not invent failing test evidence or silently claim existing-code cutover."
+    ],
+    "evidence": "\nResume checkpoint: Native2dd2182e Root reads/consumer/state controls observed, but projected observer lost terminal structured yields; author fixed ephemeral decoder from actual14b1 and requires one fresh bounded session. Native acceptance pending.\nUser explicitly approved renewed three-attempt window; prior diagnostics/captures retained: local://ship-focused-retry-window-approval.json\nNative genuine624d66b1 PASS source/binary unchanged;20consumer and13state casesPASS; actual branch+PR deep-reviewer project completed revision-bound VALID yields accepted by real consumer. Exit codes not exposed in progress remainnull/unverified. local://ship-t009c-native-green-summary.json; global gates remainpending.\nFormal phase reconciled from prematureREVIEW toBLOCKED: matrix now real retained probe references, but source-bound pre-fix RED is not established. Native positive proof was not discarded or promoted to full gate."
+  },
+  "limits": "OriginalchronologyandmissingpreimplementationREDarepreserved; thisoriginaltaskwasnotretrospectivelydeclaredREDPASS."
+}

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "checkpoint": "sha256:9fc9b92757160f041c5d6df42d8ff6477829885aa01ec10b29b89169c96c12a3",
+  "created_at": "2026-11-14T15:57:54.729Z",
+  "authorization": "local://ship-final-completion-decisions.json",
+  "criterion": "AC-014",
+  "classification": "USER_AUTHORIZED_CURRENT_IMPLEMENTATION_REVERIFICATION",
+  "original_archive": "implementation-evidence/release-governance/t009c-original-blocked-history.json",
+  "entries": [
+    {
+      "path": "deep-review/SKILL.md",
+      "bytes": 32340,
+      "sha256": "f136c1c18ffd8f11c7517b2ba18b128bda33f4ca380d7a7a31d0473d5bf8b970",
+      "retainedNativeSha": "f136c1c18ffd8f11c7517b2ba18b128bda33f4ca380d7a7a31d0473d5bf8b970",
+      "unchanged": true
+    },
+    {
+      "path": "ship/references/integrated-delivery.md",
+      "bytes": 1997,
+      "sha256": "a4c337461de8625a1f8b1324d15256e93b4220c5d29561e9af16a4406f41ed97",
+      "retainedNativeSha": "a4c337461de8625a1f8b1324d15256e93b4220c5d29561e9af16a4406f41ed97",
+      "unchanged": true
+    },
+    {
+      "path": "tdd-orchestrator/references/handoff.md",
+      "bytes": 982,
+      "sha256": "f2a16bdb28ecf4ef0785f7f0686698fda222a2db467e30d3028e0f2c78ed2f5d",
+      "retainedNativeSha": "f2a16bdb28ecf4ef0785f7f0686698fda222a2db467e30d3028e0f2c78ed2f5d",
+      "unchanged": true
+    },
+    {
+      "path": "tdd-orchestrator/references/execution-and-resume.md",
+      "bytes": 3442,
+      "sha256": "e01b60863006bc72e7edbd5d590a3b2b7ae946d1936b7144dcae03c098ab2e01",
+      "retainedNativeSha": "e01b60863006bc72e7edbd5d590a3b2b7ae946d1936b7144dcae03c098ab2e01",
+      "unchanged": true
+    },
+    {
+      "path": "deep-review/lib/protocol.mjs",
+      "bytes": 35699,
+      "sha256": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+      "retainedNativeSha": "b97790e834cf17727e47803394cd1ba9f4a68aa3575b4d0c37be6563944f17e4",
+      "unchanged": true
+    },
+    {
+      "path": "tdd-orchestrator/lib/state.mjs",
+      "bytes": 76844,
+      "sha256": "554e2da091138d5d8faa870608265f036116ebb53a38ff2f3118e9451bd805c9",
+      "retainedNativeSha": "554e2da091138d5d8faa870608265f036116ebb53a38ff2f3118e9451bd805c9",
+      "unchanged": true
+    }
+  ],
+  "retained_native": {
+    "run_id": "624d66b1-2903-4ade-b6d5-88480942dd12",
+    "status": "PASS",
+    "evidence_sha256": "fca69919202615dc34146767b0c1a9ca654af969eff5c9540f74469dc11ddd49",
+    "scope": "Sixunchangedrelevantdocs/consumers only; oldSpec4/modelpolicycaptureisnotassertedcurrentwholepackage",
+    "consumer_cases": 20,
+    "state_cases": 13
+  },
+  "current_local_qa": {
+    "platform": "Linux",
+    "report": "/var/tmp/usefulskills-installer-47-hlmr69y4/validator-linux-post-api-vitest.json",
+    "passed": 1223,
+    "failed": 0,
+    "skipped": 14,
+    "files": 27
+  },
+  "review": {
+    "status": "APPROVED",
+    "actor": "CurrentCheckpointT009CPeer",
+    "scope": "Currentcheckpointclassificationand sixsource-equivalentbindings only; notOriginalRED/globalAC014/DONE/release"
+  },
+  "limits": [
+    "NotoriginalREDproof",
+    "Notnewnativeexecution",
+    "No criteriareduction",
+    "Originalproducerchanges/historynoterased",
+    "Wholepackage/releasegatesremainpending"
+  ]
+}

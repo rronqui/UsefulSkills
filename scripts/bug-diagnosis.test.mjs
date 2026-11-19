@@ -53,6 +53,7 @@ describe("bug-diagnosis: contrato mensurável para falhas intermitentes", () => 
     );
 
     const passingEvidence = {
+      reproducible_environment: true,
       attempts: 10,
       successes: 7,
       failures: 3,
@@ -66,10 +67,18 @@ describe("bug-diagnosis: contrato mensurável para falhas intermitentes", () => 
     expect(passingEvidence.rate).toBeCloseTo(
       passingEvidence.successes / passingEvidence.attempts,
     );
-    expect(
-      passingEvidence.attempts >= passingEvidence.minimum_sample &&
-        passingEvidence.rate >= passingEvidence.rate_threshold,
-    ).toBe(true);
+    const predicateText = deterministicSection.match(/`(reproducible_environment === true[^`]+)`/)?.[1];
+    expect(predicateText).toBeDefined();
+    // Execute the documented pure expression with synthetic bindings; each
+    // independent clause must discriminate acceptance from a blocked sample.
+    const canAdvance = (evidence) => Function(...Object.keys(evidence), `return (${predicateText});`)(...Object.values(evidence));
+    expect(canAdvance(passingEvidence)).toBe(true);
+    for (const patch of [
+      { reproducible_environment: false },
+      { rate: 0, rate_threshold: 0 },
+      { attempts: 9 },
+      { rate: 0.5 },
+    ]) expect(canAdvance({ ...passingEvidence, ...patch })).toBe(false);
   });
 
   it("declara os campos obrigatórios do bloqueio BLOCKED", () => {

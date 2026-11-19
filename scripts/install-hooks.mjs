@@ -1,54 +1,61 @@
 // Runtime suportado: Node.js >=20.
 // Instala os git hooks do projeto (npm prepare roda automaticamente no npm install).
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import fs from "node:fs";
+import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
+import crypto from "node:crypto";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { inspectTargets, transact, windowsHostPath } from "../tdd-orchestrator/lib/fs-transaction/index.mjs";
+import { createGitSession } from "./lib/git-trust-source.mjs";
 
 const root = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), ".."));
 const HOOKS = ["commit-msg", "pre-push"];
 const GENERATED_MARKER = "Gerado por scripts/install-hooks.mjs";
+const MAX_GENERATED_BYTES = 8 * 1024 * 1024;
+// Published v0.4.0 source payloads, pinned to revision 02582a867f660bf8aa387fe51f71b7fffd3a7dfd (proof: local://ship-released-hook-payloads-v040.json).
+const KNOWN_RELEASED_HOOK_HASHES = Object.freeze({
+  "commit-msg": "f00329a439c79349ef19eb0b321d6f28c744dfab4ce1973b9170da1657cfa407",
+  "pre-push": "6cbbd6ffc2a25b3ed7c3e43da9b4c6572469fd64fbdcc0cbbe5a3396e59dd1dd",
+});
 const CONSENT_MARKERS = [".usefulskills-hooks", ".usefulskills-hooks.marker", ".git-hooks-managed"];
 
-function gitExecutable() {
-  const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
-  const candidates = process.platform === "win32" ? ["git.exe", "git.cmd", "git.bat", "git"] : ["git"];
-  for (const directory of (process.env[pathKey] ?? "").split(path.delimiter)) {
-    if (!directory) continue;
-    for (const candidate of candidates) {
-      const executable = path.join(directory, candidate);
-      const result = lstatSafe(executable);
-      if (regularUnlinked(result.stat)) return executable;
-    }
-  }
-  return null;
-}
+const gitSession = createGitSession({
+  fs,
+  path,
+  crypto,
+  os,
+  spawnSync,
+  platform: process.platform,
+  env: process.env,
+  windowsHostPath,
+});
 
 function git(args) {
-  const executable = gitExecutable();
-  if (!executable) {
-    return { failure: new Error("E_UNSAFE_GIT_EXECUTABLE: nenhum executável Git regular e não vinculado foi encontrado no PATH") };
-  }
-  const result = spawnSync(executable, args, {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.error) {
+  const result = gitSession.run(args, { cwd: root });
+  if (result?.error) {
     if (result.error.code === "ENOENT") return { absent: true };
-    return { failure: result.error };
+    return {
+      failure: Object.assign(result.error, {
+        status: result.status,
+        stderr: String(result.stderr ?? ""),
+      }),
+    };
   }
-  const stderr = result.stderr || "";
-  if (result.status === 0) return { stdout: result.stdout || "", stderr };
+  const stdout = String(result?.stdout ?? "");
+  const stderr = String(result?.stderr ?? "");
+  if (result?.status === 0) return { stdout, stderr };
   if (
-    result.status === 128 &&
+    result?.status === 128 &&
     /not a git repository|outside a git work tree|no es un repositorio git|não é um repositório git|nao e um repositorio git|pas un dépôt git|pas un depot git|kein git[- ]repository|non è un repository git|non e un repository git|geen git-opslagplaats|--local can only be used inside a git repository/i.test(stderr)
   ) {
     return { absent: true };
   }
   return {
-    failure: Object.assign(new Error(stderr.trim() || `git exited with ${result.status}`), {
-      status: result.status,
+    failure: Object.assign(new Error(stderr.trim() || `git exited with ${result?.status}`), {
+      status: result?.status,
       stderr,
     }),
   };
@@ -183,7 +190,21 @@ function generatedFiles() {
     if (!regularUnlinked(sourceResult.stat)) {
       throw new Error(`origem insegura do hook ${source}: ${typeOf(sourceResult.stat)}`);
     }
+    if (sourceResult.stat.size > MAX_GENERATED_BYTES) throw new Error(`origem do hook excede o limite de ${MAX_GENERATED_BYTES} bytes: ${source}`);
     const sourceText = readFileSync(source, "utf8");
+    const sourceBytes = Buffer.byteLength(sourceText);
+    const sourceAfter = lstatSafe(source);
+    if (
+      sourceAfter.error ||
+      !regularUnlinked(sourceAfter.stat) ||
+      sourceAfter.stat.dev !== sourceResult.stat.dev ||
+      sourceAfter.stat.ino !== sourceResult.stat.ino ||
+      sourceAfter.stat.size !== sourceResult.stat.size ||
+      sourceAfter.stat.mtimeMs !== sourceResult.stat.mtimeMs
+    ) {
+      throw new Error(`origem do hook alterada durante leitura: ${source}`);
+    }
+    if (sourceBytes > MAX_GENERATED_BYTES) throw new Error(`origem do hook excede o limite de ${MAX_GENERATED_BYTES} bytes: ${source}`);
     const sidecarText = `// ${GENERATED_MARKER} — edite o original em scripts/hooks/${name}.mjs.\n${sourceText}`;
     const wrapperText = [
       "#!/bin/sh",
@@ -203,144 +224,52 @@ function generatedFiles() {
   });
 }
 
-function isManaged(destination, expected, sourceText, wrapper) {
+function isManaged(destination, expected, sourceText, wrapper, inspectedHash, name) {
   try {
     const current = readFileSync(destination);
+    const currentHash = createHash("sha256").update(current).digest("hex");
+    if (!inspectedHash || currentHash !== inspectedHash) return false;
     if (current.equals(expected)) return true;
-    if (current.length >= expected.length && current.subarray(0, expected.length).equals(expected)) return true;
-    if (!wrapper && current.equals(Buffer.from(sourceText))) return true;
-    return false;
+    const releasedHash = KNOWN_RELEASED_HOOK_HASHES[name];
+    if (!releasedHash) return false;
+    const sidecarPrefix = `// ${GENERATED_MARKER} — edite o original em scripts/hooks/${name}.mjs.\n`;
+    const payload = current.toString("utf8");
+    if (wrapper) {
+      const wrapperPrefix = [
+        "#!/bin/sh",
+        `# ${GENERATED_MARKER} — edite o original em scripts/hooks/${name}.mjs.`,
+        `exec node "$0.mjs" "$@"`,
+        "",
+        sidecarPrefix,
+      ].join("\n");
+      return payload.startsWith(wrapperPrefix) && createHash("sha256").update(payload.slice(wrapperPrefix.length), "utf8").digest("hex") === releasedHash;
+    }
+    return payload.startsWith(sidecarPrefix) && createHash("sha256").update(payload.slice(sidecarPrefix.length), "utf8").digest("hex") === releasedHash;
   } catch {
     return false;
   }
 }
 
-function replacePath(source, destination) {
-  if (process.platform !== "win32") {
-    renameSync(source, destination);
-    return;
-  }
-  const current = lstatSafe(destination).stat;
-  const previous = current?.isFile() ? readFileSync(destination) : null;
-  const previousMode = current?.isFile() ? current.mode & 0o7777 : null;
-  rmSync(destination, { force: true });
-  try {
-    renameSync(source, destination);
-  } catch (error) {
-    if (existsSync(destination)) throw error;
-    if (previous) {
-      writeFileSync(destination, previous);
-      if (previousMode !== null) chmodSync(destination, previousMode);
-    }
-    throw error;
-  }
-}
 
-function rollbackCommitted(committed, backups) {
-  const failures = [];
-  for (const destination of [...committed].reverse()) {
-    const backupPath = backups.get(destination);
-    try {
-      if (backupPath) {
-        replacePath(backupPath, destination);
-      } else {
-        rmSync(destination, { force: true });
-      }
-    } catch (error) {
-      failures.push({ destination, error });
-    }
-  }
-  return failures;
-}
-
-function stageHookFiles(hooksDir, transaction, files) {
-  const { stage, backup, backups } = transaction;
-  for (const item of files) {
-    const staged = path.join(stage, item.file);
-    writeFileSync(staged, item.content);
-    if (item.wrapper) chmodSync(staged, 0o755);
-    const destination = path.join(hooksDir, item.file);
-    const current = lstatSafe(destination).stat;
-    if (current) {
-      const backupPath = path.join(backup, item.file);
-      copyFileSync(destination, backupPath);
-      chmodSync(backupPath, current.mode & 0o7777);
-      backups.set(destination, backupPath);
-    }
-  }
-}
-
-function commitHookFiles(hooksDir, transaction, files) {
-  const { stage, committed } = transaction;
-  for (const item of files) {
-    const staged = path.join(stage, item.file);
-    const destination = path.join(hooksDir, item.file);
-    const current = lstatSafe(destination).stat;
-    const bytesEqual = current && readFileSync(destination).equals(item.content);
-    const ownerReadableExecutable = current && (current.mode & 0o500) === 0o500;
-    if (bytesEqual && (!item.wrapper || ownerReadableExecutable)) continue;
-
-    committed.push(destination);
-    if (!bytesEqual) replacePath(staged, destination);
-    if (item.wrapper) {
-      const mode = bytesEqual ? (current.mode & 0o7777) | 0o500 : 0o755;
-      chmodSync(destination, mode);
-    }
-  }
-}
-
-
-function createHookTransaction(hooksDir) {
-  const transactionRoot = path.dirname(hooksDir);
-  let stage;
-  try {
-    stage = mkdtempSync(path.join(transactionRoot, ".usefulskills-hooks-stage-"));
-    const backup = mkdtempSync(path.join(transactionRoot, ".usefulskills-hooks-backup-"));
+function commitStaged(hooksDir, files, transactionHome) {
+  const operations = files.map(item => {
+    const target = path.join(hooksDir, item.file);
+    const current = lstatSafe(target).stat;
+    const bytesEqual = current?.isFile() && readFileSync(target).equals(item.content);
     return {
-      stage,
-      backup,
-      committed: [],
-      backups: new Map(),
+      target,
+      content: item.content,
+      mode: item.wrapper ? (bytesEqual ? (current.mode & 0o7777) | 0o500 : 0o755) : undefined,
+      retainBackup: false,
+      expectedTarget: item.expectedTarget,
+      expectedParent: item.expectedParent,
     };
-  } catch (error) {
-    if (stage) {
-      try {
-        rmSync(stage, { recursive: true, force: true });
-      } catch (cleanupError) {
-        error.message = `${error.message}; limpeza do stage falhou: ${cleanupError.message}`;
-      }
-    }
-    throw error;
-  }
+  });
+  return transact(operations, {
+    home: transactionHome,
+    sourceScopes: [canonicalPath(root)],
+  });
 }
-
-function cleanupHookTransaction(transaction) {
-  rmSync(transaction.stage, { recursive: true, force: true });
-  rmSync(transaction.backup, { recursive: true, force: true });
-}
-
-function commitStaged(hooksDir, files) {
-  const transaction = createHookTransaction(hooksDir);
-  try {
-    stageHookFiles(hooksDir, transaction, files);
-    commitHookFiles(hooksDir, transaction, files);
-  } catch (error) {
-    const rollbackFailures = rollbackCommitted(transaction.committed, transaction.backups);
-    if (rollbackFailures.length > 0) {
-      const details = rollbackFailures
-        .map(({ destination, error: rollbackError }) => `${destination}: ${rollbackError.message}`)
-        .join("; ");
-      throw new Error(
-        `falha ao instalar hooks: ${error?.message || error}; rollback incompleto e estado inseguro — ${details}`,
-        { cause: error },
-      );
-    }
-    throw error;
-  } finally {
-    cleanupHookTransaction(transaction);
-  }
-}
-
 function validateHookDestinations(destinations) {
   const issues = [];
   for (const item of destinations) {
@@ -352,7 +281,7 @@ function validateHookDestinations(destinations) {
     if (!result.stat) continue;
     if (!regularUnlinked(result.stat)) {
       issues.push(`destino ${item.destination}: ${typeOf(result.stat)} — preservado`);
-    } else if (!isManaged(item.destination, item.content, item.sourceText, item.wrapper)) {
+    } else if (!isManaged(item.destination, item.content, item.sourceText, item.wrapper, item.expectedTarget?.hash, item.name)) {
       issues.push(`conflito no hook existente ${item.destination}: arquivo regular do consumidor — preservado`);
     }
   }
@@ -394,6 +323,21 @@ function main() {
   // Isso expande aliases 8.3 no Windows e também impede que um caminho textual
   // alcance as fontes canônicas por meio de um ancestral alternativo.
   const canonicalRoot = canonicalPath(root);
+  // Node's lexical normalization collapses symlink/.. before the filesystem
+  // can apply its effective meaning. Refuse that ambiguous traversal.
+  const rawParts = rawHooksDir.split(/[\\/]/);
+  let cursor = path.isAbsolute(rawHooksDir) ? path.parse(rawHooksDir).root : root;
+  let symlinkSeen = false;
+  let missingSeen = false;
+  for (const component of rawParts) {
+    if (!component || component === "." || component === path.parse(rawHooksDir).root.replace(/[\\/]/g, "")) continue;
+    if (component === ".." && (symlinkSeen || missingSeen)) throw new Error("core.hooksPath contém travessia '..' ambígua após symlink/junction ou componente ausente; configure o destino efetivo sem travessia.");
+    cursor = path.join(cursor, component);
+    const entry = lstatSafe(cursor);
+    if (entry.error) throw entry.error;
+    if (entry.stat?.isSymbolicLink()) symlinkSeen = true;
+    if (!entry.stat) missingSeen = true;
+  }
   const hooksDir = path.resolve(root, rawHooksDir);
   const canonicalHooksDir = canonicalPath(hooksDir);
   const hooksInside = inside(canonicalRoot, canonicalHooksDir);
@@ -421,13 +365,18 @@ function main() {
     name: entry.name,
     sourceText: entry.sourceText,
   })));
+  const transactionHome = hooksInside ? canonicalRoot : path.dirname(canonicalHooksDir);
+  const inspection = inspectTargets(destinations.map(item => item.destination), { home: transactionHome });
+  const inspectedByTarget = new Map(inspection.targets.map(item => [path.resolve(item.target), item]));
+  for (const item of destinations) {
+    const snapshot = inspectedByTarget.get(path.resolve(item.destination));
+    if (!snapshot) throw new Error(`inspeção nativa ausente para ${item.destination}`);
+    item.expectedTarget = { exists: snapshot.exists, hash: snapshot.hash, id: snapshot.id };
+    item.expectedParent = snapshot.parent;
+  }
   issues.push(...validateHookDestinations(destinations));
   if (issues.length > 0) throw new Error(issues.join("; "));
-
-  const hooksResult = lstatSafe(canonicalHooksDir);
-  if (hooksResult.stat && !hooksResult.stat.isDirectory()) throw new Error(`hooksDir inválido: ${canonicalHooksDir}`);
-  if (!hooksResult.stat) mkdirSync(canonicalHooksDir, { recursive: true });
-  commitStaged(canonicalHooksDir, destinations);
+  commitStaged(canonicalHooksDir, destinations, transactionHome);
 }
 
 try {
@@ -435,4 +384,13 @@ try {
 } catch (error) {
   console.error(`[install-hooks] ${error?.message || error}`);
   process.exitCode = 1;
+} finally {
+  try {
+    gitSession.close();
+  } catch (error) {
+    if (process.exitCode === undefined) {
+      console.error(`[install-hooks] falha ao fechar sessão Git: ${error?.message || error}`);
+      process.exitCode = 1;
+    }
+  }
 }

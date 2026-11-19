@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-11-19",
+  "reviewer": "delegated Codex provenance-maintenance task; current reviewer read all nine local React references and the nine fixed upstream counterparts; no React reference edits",
+  "independence": "current review separate from historical cutover; does not rely on the unretained agent://ProvenancePeer approval",
+  "method": "fixed-ref public GitHub connector fetch_file base64; Git object SHA checked; exact raw and LF-normalized local hashes; bounded semantic comparison",
+  "upstream": [
+    {
+      "id": "securityLicenseFetch",
+      "url": "https://github.com/openai/skills/blob/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices/LICENSE.txt",
+      "gitBlobSHA1": "13e25df86ce06eb6488e6a6bc5c5847f5dedc352",
+      "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9",
+      "bytes": 10776,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "fastapi",
+      "url": "https://github.com/openai/skills/blob/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices/references/python-fastapi-web-server-security.md",
+      "gitBlobSHA1": "d394a55bb86b3b2e5c2b73e65cb115a2a0ce1c05",
+      "sha256": "7383c7f4fc271190b05e562ada7e825982a2c76b6c79a9f95a1da7687b65a616",
+      "bytes": 44926,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "vue",
+      "url": "https://github.com/openai/skills/blob/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices/references/javascript-typescript-vue-web-frontend-security.md",
+      "gitBlobSHA1": "be326548bf953b6d1918727d228449ab4cb5110d",
+      "sha256": "77c6a747f9f17e3df03aad0fcb20d99ac7898001b81aef8b80908e45ac14a688",
+      "bytes": 31445,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "react-readme",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/README.md",
+      "gitBlobSHA1": "396ef38284797174c737942a9cc84fc09680b705",
+      "sha256": "9429e781e3fb2f005e619b96fe18cdc59f8db38b619a4c98f0c46c86357e56a0",
+      "bytes": 7273,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "react-skill",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/SKILL.md",
+      "gitBlobSHA1": "237988de4a66dd8a71d30a2c24ebe1a86b58d04e",
+      "sha256": "71ed7794962fa6e803ee83030517b5b93a9f70fbfeb431ec4535c5480a8d8355",
+      "bytes": 7251,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "react-metadata",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/metadata.json",
+      "gitBlobSHA1": "3bec38b176cc71d105895ec4678bbe79305dcb4c",
+      "sha256": "c4e18bac3290fbe1b471a605867d4df68b03144ea26b8befdbe8f9d8fd124354",
+      "bytes": 921,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "react-tree",
+      "url": "https://api.github.com/repos/vercel-labs/agent-skills/git/trees/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62?recursive=1",
+      "sha256": "d3a9706ccf10e95619e225d94d663f765a4ddb6abfb9c4314d3bc33fdb423cdc",
+      "entries": 477,
+      "truncated": false,
+      "licenseNoticeCopyingFilenames": [],
+      "scope": "filename inventory only; does not inspect every blob or establish legal absence"
+    },
+    {
+      "id": "rule-async-dependencies",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/async-dependencies.md",
+      "gitBlobSHA1": "0484ebab993f3db78277e8731872473d02475e6d",
+      "sha256": "16ef469f877e30c6b8e1e1b4bc3e527312fa3c6318cb785a4eca186ea236131a",
+      "bytes": 1293,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-async-parallel",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/async-parallel.md",
+      "gitBlobSHA1": "64133f6c31fec81eaaabd712586337d20122e09f",
+      "sha256": "6d2f841896279e976dfcdc1ac89e70771ac188baadfd43c096b5706cb838b961",
+      "bytes": 654,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-bundle-defer-third-party",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/bundle-defer-third-party.md",
+      "gitBlobSHA1": "db041d1510e51defeade05926ba4e6bbad1068b5",
+      "sha256": "3719fb47b191e8db4fe22686ec88448ad5af9e6838585425abbe103d0b642e37",
+      "bytes": 920,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-bundle-dynamic-imports",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/bundle-dynamic-imports.md",
+      "gitBlobSHA1": "60b62695e7a080e2020ff2242d8d841c5e3ecbc4",
+      "sha256": "401817a7369f315fc5a68a1095742ff7d53d0461906880dc9d64a41495ee1986",
+      "bytes": 791,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-client-swr-dedup",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/client-swr-dedup.md",
+      "gitBlobSHA1": "2a430f27fd6abdc1b1b2f809b7a60114ff506790",
+      "sha256": "644652c39c6cc00de8d1c77a7273612e868dc3f7edda30764164c12ec0f764a3",
+      "bytes": 1159,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-rerender-derived-state-no-effect",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/rerender-derived-state-no-effect.md",
+      "gitBlobSHA1": "3d9fe4050794ea6655add6bee50cfbc104e5dc31",
+      "sha256": "cb11ec76f50aa7b6847269f02d79b120c889a30d9ecd2c1d578f75144419c77a",
+      "bytes": 1201,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-server-auth-actions",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/server-auth-actions.md",
+      "gitBlobSHA1": "ee82c0442bc69ffae7bf20c07709d57893da1123",
+      "sha256": "a2ca8aa102839251c7971ec784560fab943c20b36fe6f80365d4110c13260c23",
+      "bytes": 2649,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-server-cache-react",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/server-cache-react.md",
+      "gitBlobSHA1": "87c9ca33168a321a59fbaaa84843e2f48c99751a",
+      "sha256": "fddeea6c870bb3da4134b61d54b7d09b83d2603f929b7547cd3dc1dc269edd5c",
+      "bytes": 2228,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    },
+    {
+      "id": "rule-server-parallel-fetching",
+      "url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/react-best-practices/rules/server-parallel-fetching.md",
+      "gitBlobSHA1": "1affc835a601a894fd02de08e6c9cdfd76d34b64",
+      "sha256": "569a2e9fc04f9606686cd75c5894ef8781b502786a7fffe241396846c7733472",
+      "bytes": 1554,
+      "capture": "decoded exact base64 from fixed-ref GitHub fetch_file; Git blob SHA recomputed"
+    }
+  ],
+  "securityCopies": [
+    {
+      "path": "deep-review/references/security/python-fastapi-web-server-security.md",
+      "sha256": "f9c3e9f0d74e76838ce6f73b6621d91ea61a7e12b5cd66d66d88fab726c3d8a9",
+      "lfSHA256": "f9c3e9f0d74e76838ce6f73b6621d91ea61a7e12b5cd66d66d88fab726c3d8a9",
+      "upstreamId": "fastapi",
+      "changes": [
+        "provenance header added 2026-11-19",
+        "pre-existing OMP advisory footer retained"
+      ],
+      "classification": "modified selective copy; Apache-2.0 under fixed skill license"
+    },
+    {
+      "path": "deep-review/references/security/javascript-typescript-vue-web-frontend-security.md",
+      "sha256": "90e9d8af4295578994e7a248186ad7431a0553205d8b3fe1096947eebe4fdcb7",
+      "lfSHA256": "90e9d8af4295578994e7a248186ad7431a0553205d8b3fe1096947eebe4fdcb7",
+      "upstreamId": "vue",
+      "changes": [
+        "provenance header added 2026-11-19",
+        "pre-existing OMP advisory footer retained",
+        "pre-existing redirect parsing/origin correction retained"
+      ],
+      "classification": "modified selective copy; Apache-2.0 under fixed skill license"
+    }
+  ],
+  "license": {
+    "upstreamId": "securityLicenseFetch",
+    "localPath": "deep-review/LICENSE.application-security.md",
+    "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9",
+    "lfSHA256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9",
+    "matchesUpstreamAfterOnlyEOLNormalization": true,
+    "copyright": "no new copyright holder or notice inferred"
+  },
+  "reactCurrent": [
+    {
+      "path": "tdd-orchestrator/references/react/async-dependencies.md",
+      "sha256": "4bd8499669c7d0131d1ae3695aa0710ff82986d2f3390de895a6f048e00146d1",
+      "lfSHA256": "4bd8499669c7d0131d1ae3695aa0710ff82986d2f3390de895a6f048e00146d1",
+      "historicalRuleSourceId": "rule-async-dependencies",
+      "technicalLinksObserved": [
+        "https://react.dev/reference/rsc/server-components",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled"
+      ],
+      "semanticReview": "Current text uses explicit account/flags/report promise edges instead of upstream better-all user/config/profile; adds authorization, cancellation, bounded resources and partial-result policy.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/async-parallel.md",
+      "sha256": "41fd09c29e46b591507e6077197b6a05c17030c208dc21fbe8e8300accd7ca0b",
+      "lfSHA256": "41fd09c29e46b591507e6077197b6a05c17030c208dc21fbe8e8300accd7ca0b",
+      "historicalRuleSourceId": "rule-async-parallel",
+      "technicalLinksObserved": [
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled",
+        "https://react.dev/reference/rsc/server-components"
+      ],
+      "semanticReview": "Current notices/recommendations/locale example and error/cancellation/budget discussion differ from upstream user/posts/comments snippet; shared Promise.all API and topic are expected.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/bundle-defer-third-party.md",
+      "sha256": "2b0818f3d43cd62276b57cbc65a2afc31810aaf095481426aa0124fa12ccd955",
+      "lfSHA256": "2b0818f3d43cd62276b57cbc65a2afc31810aaf095481426aa0124fa12ccd955",
+      "historicalRuleSourceId": "rule-bundle-defer-third-party",
+      "technicalLinksObserved": [
+        "https://nextjs.org/docs/app/guides/lazy-loading",
+        "https://nextjs.org/docs/app/guides/single-page-applications",
+        "https://react.dev/reference/react/lazy",
+        "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback"
+      ],
+      "semanticReview": "Current SupportBadge/OptionalTelemetry examples distinguish client-only from actual post-hydration gating; upstream Analytics example conflates ssr:false with timing. Current measurement/privacy/CSP limits are explicit.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/bundle-dynamic-imports.md",
+      "sha256": "71cb47f0d91c83bd85ad59f97d913552abdb4ee065b357b5f2b3171384f5e292",
+      "lfSHA256": "71cb47f0d91c83bd85ad59f97d913552abdb4ee065b357b5f2b3171384f5e292",
+      "historicalRuleSourceId": "rule-bundle-dynamic-imports",
+      "technicalLinksObserved": [
+        "https://nextjs.org/docs/app/guides/lazy-loading",
+        "https://react.dev/reference/react/lazy",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import"
+      ],
+      "semanticReview": "Current DiagramPanel toggles a DiagramEditor with loading state; upstream renders MonacoEditor immediately. Current client boundary, prerender and measurement caveats are additional.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/client-swr-dedup.md",
+      "sha256": "5539eea8a767fdb4086794369e3108a00b9e70636e03dfa994bbfb0884f47927",
+      "lfSHA256": "5539eea8a767fdb4086794369e3108a00b9e70636e03dfa994bbfb0884f47927",
+      "historicalRuleSourceId": "rule-client-swr-dedup",
+      "technicalLinksObserved": [
+        "https://swr.vercel.app/docs/advanced/performance",
+        "https://swr.vercel.app/docs/mutation",
+        "https://nextjs.org/docs/app/getting-started/fetching-data"
+      ],
+      "semanticReview": "Current Viewer/readJson and rename mutation examples differ from upstream UserList/StaticContent/UpdateButton; includes key completeness, tenant/privacy scope, response failure and rollback policy.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/rerender-derived-state-no-effect.md",
+      "sha256": "d042cfd67f8d7d2a21dd896a9593dfddf0f7d3e62fd72cb62221d7c70dca426f",
+      "lfSHA256": "d042cfd67f8d7d2a21dd896a9593dfddf0f7d3e62fd72cb62221d7c70dca426f",
+      "historicalRuleSourceId": "rule-rerender-derived-state-no-effect",
+      "technicalLinksObserved": [
+        "https://react.dev/learn/you-might-not-need-an-effect",
+        "https://react.dev/reference/react/useMemo",
+        "https://react.dev/learn/preserving-and-resetting-state"
+      ],
+      "semanticReview": "Current BasketSummary and keyed DocumentRoute examples differ from upstream firstName/lastName Form; expands measured memoization and external-system effect boundary.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/server-auth-actions.md",
+      "sha256": "46bd2493b6b8d16b46f36ee0aed5c5de190f76a948e4a0d44f2e7700248b5a4b",
+      "lfSHA256": "46bd2493b6b8d16b46f36ee0aed5c5de190f76a948e4a0d44f2e7700248b5a4b",
+      "historicalRuleSourceId": "rule-server-auth-actions",
+      "technicalLinksObserved": [
+        "https://nextjs.org/docs/app/guides/authentication",
+        "https://nextjs.org/docs/app/getting-started/mutating-data",
+        "https://nextjs.org/blog/security-nextjs-server-components-actions"
+      ],
+      "semanticReview": "Current archiveMessage flow uses parsed unknown input, session, resource authorization and revalidatePath; upstream deleteUser/updateProfile examples and direct quotation are absent from current text.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/server-cache-react.md",
+      "sha256": "eada543460533986119c9830329de82a9d2797ef3fb69f4fc164e9870ceb692c",
+      "lfSHA256": "eada543460533986119c9830329de82a9d2797ef3fb69f4fc164e9870ceb692c",
+      "historicalRuleSourceId": "rule-server-cache-react",
+      "technicalLinksObserved": [
+        "https://react.dev/reference/react/cache",
+        "https://react.dev/reference/rsc/server-components",
+        "https://nextjs.org/docs/app/getting-started/fetching-data"
+      ],
+      "semanticReview": "Current loadAccount/AccountHeader/AccountBadge example differs from upstream getCurrentUser/getUser examples; current shared-wrapper, per-request, error caching, tenant and freshness limits are explicit.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    },
+    {
+      "path": "tdd-orchestrator/references/react/server-parallel-fetching.md",
+      "sha256": "a81f85e6a55428c10820fe264d085995231ad9b9586fcf798a1884b119d543e3",
+      "lfSHA256": "a81f85e6a55428c10820fe264d085995231ad9b9586fcf798a1884b119d543e3",
+      "historicalRuleSourceId": "rule-server-parallel-fetching",
+      "technicalLinksObserved": [
+        "https://react.dev/reference/rsc/server-components",
+        "https://nextjs.org/docs/app/getting-started/fetching-data",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all"
+      ],
+      "semanticReview": "Current AccountHeading/AlertList Dashboard differs from upstream Header/Sidebar Page; adds dependency, authorization, streaming/privacy and no latency-multiplier caveats.",
+      "result": "substantially different prose and examples in compared scope; topic/title and standard API syntax overlap; no inference of universal originality"
+    }
+  ],
+  "historicalReact": {
+    "sourceCommit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+    "declaredLicense": "MIT in fixed SKILL.md frontmatter",
+    "organization": "Vercel Engineering in fixed metadata.json",
+    "completeTreeEntries": 477,
+    "licenseNoticeCopyingFilenames": [],
+    "copyrightScope": "README.md, SKILL.md and metadata.json consulted; no supplied copyright notice found there. This is not an assertion about every blob or legal status."
+  },
+  "limits": [
+    "Static provenance comparison, not legal advice or formal legal clearance.",
+    "No authorship identity proof, universal copy-absence proof, dependency/runtime/security approval, OMP/whole-Native/installation/release certification.",
+    "Raw historical React prose is not redistributed by this receipt; immutable public source URLs, Git blob SHA and SHA-256 enable external reproduction.",
+    "Technical documentation links support topics; they are not licenses for copied text.",
+    "Historical peer transcript was not retained and is not asserted as current approval."
+  ]
+}

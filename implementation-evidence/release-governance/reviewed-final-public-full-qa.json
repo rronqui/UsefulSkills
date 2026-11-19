@@ -1,0 +1,819 @@
+{
+  "schema_version": 1,
+  "kind": "REVIEWED_FINAL_PUBLIC_FULL_QA_LEDGER",
+  "classification": "LOCAL_PUBLIC_QA_EVIDENCE_NOT_WHOLE_GOAL_SDK_CI_OR_RELEASE_APPROVAL",
+  "scope_status": "PUBLIC_FULL_CONFIGURED_TESTS_PASS_GLOBAL_TRACEABILITY_PENDING",
+  "reconciliation_recorded_at": "2026-11-18T11:58:32.122Z",
+  "timestamp_semantics": "Ledger assembly from completed actual reports; not a suite rerun. Per-platform last_real_test_end records actual execution end.",
+  "source_binding": {
+    "source_revision": "32ec8eebba3214c0b0816b23a1e479d0e5e3228f",
+    "explicitly_uncommitted_reviewed_deltas": true,
+    "commit_alone_covers_tested_bytes": false,
+    "semantics": "The tested snapshot includes reviewed uncommitted deltas on top of the source revision. The exact frozen manifest, not the commit alone, binds the tested file bytes, including those deltas.",
+    "cohort_manifest": ".omp/state/release-47/proofs/final-reviewed-package-and-platform-cohort.json",
+    "cohort_manifest_file_sha256": "6adb7d5ce0cd50108e52e1fc28e6f17a37639410fa1f4b27efa40d9a4aed092e",
+    "manifest_sha256": "13977212c66a8a3db1aaf994272808072e0552f9f2bbc136f3d577f692e33dc0",
+    "total_files": 252,
+    "public_files": 214,
+    "private_files": 38,
+    "pinned_omp_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "source_frozen_at": "2026-11-18T11:32:01.487Z",
+    "source_peers": [
+      "current-core-fixed-peer-approved.json",
+      "native-opaque-git-binding-peer-approved.json",
+      "final-native-host-order-peer-approved.json",
+      "PhysicalFaultFixturesPeer47 APROVADO"
+    ],
+    "freeze_start_flags_semantics": "publicQaStarted/native49Started false in the manifest are freeze-time values, not current execution conclusions."
+  },
+  "configured_suite": {
+    "scope": "Full unfiltered configured public suite; 27 files and 1280 cases per OS. Not private implementation-evidence or actual Native SDK execution.",
+    "filters_added": false,
+    "checks_reexecuted": false,
+    "platforms": [
+      {
+        "platform": "windows",
+        "path": "reviewed-final-windows-qa.json",
+        "validator": "ReviewedFinalWindowsQa47",
+        "sha256": "2a69c8b04331e6efd47fb758e6532e794d9b11f996603c05d4f43b3e4c2b9634",
+        "total": 1280,
+        "pass": 1232,
+        "fail": 0,
+        "skipped": 48,
+        "files": 27,
+        "failed_suites": 0,
+        "success": true,
+        "last_real_test_end": "2026-11-18T11:44:05.935Z",
+        "gates": {
+          "tests": "PASS",
+          "traceability": "FAIL",
+          "spec_kit": "PASS",
+          "coverage": "NA",
+          "lint": "NA",
+          "type_check": "NA",
+          "build": "NA",
+          "security": "PASS",
+          "contract": "PASS",
+          "git_sanity": "NA"
+        },
+        "na_reasons": {
+          "coverage": "No configured coverage command/baseline",
+          "lint": "No configured lint command",
+          "type_check": "No configured type-check command",
+          "build": "ESM distribution has no build command",
+          "git_sanity": "TOOLING/scope: isolated snapshot deliberately has no .git; not a root git sanity approval"
+        },
+        "traceability_limit": "No current authenticated Native SDK49 in this QA run; global normative/delivery criteria remain pending; do not infer Goal-wide traceability from public tests",
+        "security_scope": "Manual guard inspection and scoped secret pattern scan; not universal security proof",
+        "validator_overall": "FALHOU",
+        "overall_reason": "Tests PASS; global traceability lacks current Native/delivery evidence.",
+        "setup_blocked": 0
+      },
+      {
+        "platform": "linux",
+        "path": "reviewed-final-linux-qa.json",
+        "validator": "ReviewedFinalLinuxQa47",
+        "sha256": "e5cebdafc78c30908fff56b86600a59331aaaf2857ab495d5f647ebf29a0a716",
+        "total": 1280,
+        "pass": 1262,
+        "fail": 0,
+        "skipped": 18,
+        "files": 27,
+        "failed_suites": 0,
+        "success": true,
+        "last_real_test_end": "2026-11-18T11:35:07.824Z",
+        "gates": {
+          "tests": "PASS",
+          "traceability": "FAIL",
+          "spec_kit": "PASS",
+          "coverage": "NA",
+          "lint": "NA",
+          "type_check": "NA",
+          "build": "NA",
+          "security": "PASS",
+          "contract": "PASS",
+          "git_sanity": "NA"
+        },
+        "na_reasons": {
+          "coverage": "No configured coverage command/baseline",
+          "lint": "No configured lint command",
+          "type_check": "No configured type-check command",
+          "build": "ESM distribution has no build command",
+          "git_sanity": "TOOLING/scope: isolated snapshot deliberately has no .git; not a root git sanity approval"
+        },
+        "traceability_limit": "No current authenticated Native SDK49 in this QA run; global normative/delivery criteria remain pending; do not infer Goal-wide traceability from public tests",
+        "security_scope": "Manual guard inspection and scoped secret pattern scan; not universal security proof",
+        "validator_overall": "FALHOU",
+        "overall_reason": "Tests PASS; global traceability lacks current Native/delivery evidence.",
+        "retained_copy": "reviewed-final-linux-qa-retained.json",
+        "retained_copy_sha256": "e5cebdafc78c30908fff56b86600a59331aaaf2857ab495d5f647ebf29a0a716"
+      }
+    ],
+    "unique_actual_passed_test_refs": 1355,
+    "passed_refs_evidence": {
+      "path": ".omp/state/release-47/proofs/reviewed-final-public-actual-passed-refs.json",
+      "sha256": "a5db44732a730fb7199997e76e1923327e8a44f8804a42e28c8ec7fcfa219fce",
+      "json_pointer": "/passed_refs"
+    },
+    "unique_ref_semantics": "1355 unique actual file/fullName PASS references across both platforms, not cases per OS. No skipped or private-only assertion is converted to PASS.",
+    "actual_pass_instances": 2494,
+    "actual_failed_instances": 0,
+    "actual_skipped_instances": 66,
+    "skip_records": [
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary fails closed when the target parent becomes a symlink before pathname publication — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary preserves a foreign outside target with the same basename when the parent pivots after the real quarantine rename — requires Linux parent-pivot real-FS interleavings",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary does not transiently publish through the outside parent after the real quarantine rename — requires Linux parent-pivot real-FS interleavings",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary preserves a foreign precreated quarantine reservation — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary preserves a foreign precreated backup reservation — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary preserves a foreign backup replacement during retainBackup:false cleanup — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary does not delete a foreign rollback target replacement after hardlinking the owned publication — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary does not retain a foreign outside inode in the rollback orphan after a parent pivot — requires Linux parent-pivot real-FS interleavings",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary fails closed when foreign regular bytes replaces a published operation quarantine — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/fs-transaction.test.mjs::AC-005 fs-transaction boundary fails closed when symlink to an external sentinel replaces a published operation quarantine — requires POSIX real-FS interleavings (run under WSL/Linux)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session source factory rejects an actual POSIX hardlinked Git candidate before the first Git spawn",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session source factory admits a single-link POSIX Git candidate and the first valid spawn proves the fixture legitimate",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session source factory rejects a hardlinked POSIX Git candidate on the second invocation after legitimate admission",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session materialized pre-push factory (existingVMloader) rejects an actual POSIX hardlinked Git candidate before the first Git spawn",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session materialized pre-push factory (existingVMloader) admits a single-link POSIX Git candidate and the first valid spawn proves the fixture legitimate",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session materialized pre-push factory (existingVMloader) rejects a hardlinked POSIX Git candidate on the second invocation after legitimate admission",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/hitl-loop.test.mjs::hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa substituir TRACE_FILE symlink existente — skip: symlink indisponível (EPERM)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/hitl-loop.test.mjs::hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck — skip: symlink indisponível (EPERM)",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-hooks.test.mjs::install-hooks + wrappers gerados restaura todos os destinos após falha de link em destino posterior",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-hooks.test.mjs::install-hooks + wrappers gerados restaura todos os destinos após falha de unlink em destino posterior",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-hooks.test.mjs::install-hooks + wrappers gerados reporta estado inseguro quando a restauração do rollback falha",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 restores an existing preimage when first POSIX publication fails before link — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 restores an earlier preimage while preserving a foreign later destination on link EEXIST — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 restores an existing preimage when unlinking the published stage fails — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 rejects a real parent replacement after the first stage without publishing into the replacement — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 rejects a destination hash changed after preflight without overwriting the user edit — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 rejects a source hash changed after preflight without distributing unverified bytes — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs transaction contract AC-013 rejects destination hardlink swaps without touching the linked target — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 real identities preserve a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 same exact high inode permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 same exact high device permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs preserva NOTICE symlink — skip: file symlink unsupported: EPERM",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs symlink em arquivo gerenciado — skip: file symlink unsupported: EPERM",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs --check preserva extras quando a raiz de agentes não é legível — skip: permissões POSIX não são portáveis no Windows",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs --check trata destino FIFO como drift sem bloquear ou fazer hash — skip: FIFO não é portável neste Windows; cenário gated",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs modo normal preserva destino FIFO conflitante e não aplica operações pendentes — skip: FIFO não é portável neste Windows; cenário gated",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta socket Unix no destino sem bloquear a instalação",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta device no destino sem substituí-lo — skip: device POSIX não é portável neste Windows; cenário gated",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta block device no destino sem substituí-lo — skip: block device POSIX não é portável neste Windows; cenário gated",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/quality.test.mjs::AC-002 inventory refuses symlink alias or escape",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "scripts/retro.test.mjs::AC-009 safe reads refuse real symlink evidence",
+        "status": "skipped"
+      },
+      {
+        "platform": "windows",
+        "ref": "ship/bin/lib.test.mjs::Linux native backup consumer verifica identidade bigint, cópia exata, colisão, staging nomeado ausente e alvo indisponível fail-closed",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session generated hook consumer rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/git-trust.test.mjs::AC-008 Git admission session generated hook consumer rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-hooks.test.mjs::AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.cmd com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-hooks.test.mjs::AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.bat com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-hooks.test.mjs::AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 aceita Conventional válido pelo fallback .cmd em cwd e mensagem com Unicode, espaços e metacaracteres",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-hooks.test.mjs::AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 rejeita Conventional inválido pelo fallback .cmd sem executar comando extra",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 preserves every external sentinel byte when a real worker races an ancestor after native staging — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 converts a real exclusive destination handle into native sharing drift without writes — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 revalidates an equal file after a real worker attempts a post-preflight write — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 restores multiple same-basename preimages when a later destination collides — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 restores the first publication while preserving a foreign second destination and its handle — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install-transaction.test.mjs::install.mjs filesystem boundary AC-005 preserves a foreign NOTICE created after planning before native preflight — requires Windows x64 native filesystem primitives",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "ship/bin/lib.test.mjs::performBackup propaga E_BACKUP_CLOSE sem retentar após colisão de destino",
+        "status": "skipped"
+      },
+      {
+        "platform": "linux",
+        "ref": "ship/bin/lib.test.mjs::performBackup falha fechada quando uma tentativa de troca do staging é bloqueada",
+        "status": "skipped"
+      }
+    ],
+    "skip_policy": "Raw record values copied unchanged, including Linux mknod Operation not permitted capability skips. SKIP is not PASS and these capability limits are not suppressed or rewritten."
+  },
+  "task_criterion_public_pass_coverage": [
+    {
+      "task": "T-001",
+      "criteria": [
+        {
+          "ac": "AC-002",
+          "normative": false,
+          "mapped": 18,
+          "actual_public_passed": 18,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-002",
+      "criteria": [
+        {
+          "ac": "AC-003",
+          "normative": false,
+          "mapped": 8,
+          "actual_public_passed": 8,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-003",
+      "criteria": [
+        {
+          "ac": "AC-004",
+          "normative": false,
+          "mapped": 16,
+          "actual_public_passed": 16,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-004",
+      "criteria": [
+        {
+          "ac": "AC-010",
+          "normative": true,
+          "mapped": 0,
+          "actual_public_passed": 0,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-005",
+      "criteria": [
+        {
+          "ac": "AC-005",
+          "normative": false,
+          "mapped": 19,
+          "actual_public_passed": 19,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-006A",
+      "criteria": [
+        {
+          "ac": "AC-006",
+          "normative": false,
+          "mapped": 11,
+          "actual_public_passed": 11,
+          "non_public": 0,
+          "missing_public": []
+        },
+        {
+          "ac": "AC-007",
+          "normative": false,
+          "mapped": 5,
+          "actual_public_passed": 5,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-006B",
+      "criteria": [
+        {
+          "ac": "AC-007",
+          "normative": false,
+          "mapped": 32,
+          "actual_public_passed": 32,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-006C",
+      "criteria": [
+        {
+          "ac": "AC-021",
+          "normative": false,
+          "mapped": 16,
+          "actual_public_passed": 16,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-007",
+      "criteria": [
+        {
+          "ac": "AC-008",
+          "normative": false,
+          "mapped": 104,
+          "actual_public_passed": 104,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-008",
+      "criteria": [
+        {
+          "ac": "AC-009",
+          "normative": false,
+          "mapped": 11,
+          "actual_public_passed": 0,
+          "non_public": 11,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-009A",
+      "criteria": [
+        {
+          "ac": "AC-012",
+          "normative": false,
+          "mapped": 12,
+          "actual_public_passed": 0,
+          "non_public": 12,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-009B",
+      "criteria": [
+        {
+          "ac": "AC-013",
+          "normative": false,
+          "mapped": 8,
+          "actual_public_passed": 8,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-009C",
+      "criteria": [
+        {
+          "ac": "AC-014",
+          "normative": false,
+          "mapped": 35,
+          "actual_public_passed": 0,
+          "non_public": 35,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-010A",
+      "criteria": [
+        {
+          "ac": "AC-011",
+          "normative": true,
+          "mapped": 0,
+          "actual_public_passed": 0,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-010B",
+      "criteria": [
+        {
+          "ac": "AC-015",
+          "normative": false,
+          "mapped": 3,
+          "actual_public_passed": 3,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-011",
+      "criteria": [
+        {
+          "ac": "AC-016",
+          "normative": false,
+          "mapped": 311,
+          "actual_public_passed": 0,
+          "non_public": 311,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-014",
+      "criteria": [
+        {
+          "ac": "AC-017",
+          "normative": false,
+          "mapped": 1355,
+          "actual_public_passed": 1355,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-015",
+      "criteria": [
+        {
+          "ac": "AC-020",
+          "normative": false,
+          "mapped": 2,
+          "actual_public_passed": 0,
+          "non_public": 2,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-012A",
+      "criteria": [
+        {
+          "ac": "AC-018",
+          "normative": true,
+          "mapped": 0,
+          "actual_public_passed": 0,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-012B",
+      "criteria": [
+        {
+          "ac": "AC-019",
+          "normative": true,
+          "mapped": 0,
+          "actual_public_passed": 0,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-013A",
+      "criteria": [
+        {
+          "ac": "AC-001",
+          "normative": true,
+          "mapped": 0,
+          "actual_public_passed": 0,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    },
+    {
+      "task": "T-013B",
+      "criteria": [
+        {
+          "ac": "AC-016",
+          "normative": false,
+          "mapped": 7,
+          "actual_public_passed": 7,
+          "non_public": 0,
+          "missing_public": []
+        }
+      ]
+    }
+  ],
+  "coverage_interpretation": "Current official mapping counts after adding the 30 newly executed regression refs; the source proof retains its earlier baseline counts and lists every new actual PASS ref separately. Original RED arrays are unchanged. Counts are not additive unique totals; missing_public empty establishes mapped public assertions only. non_public does not establish SDK execution. Normative zero-test/NA mappings are neither automatic failures nor approvals; require their own evidence.",
+  "validator_gates": {
+    "overall": "FALHOU",
+    "tests": "PASS",
+    "traceability": "FAIL",
+    "reason": "Global normative Native and delivery traceability remains unresolved despite actual public suite PASS.",
+    "security": "PASS",
+    "security_scope": "Bounded manual guard inspection and scoped secret-pattern scan only; not universal security assurance.",
+    "clone_git_sanity": "NA",
+    "clone_git_sanity_reason": "TOOLING: isolated snapshots deliberately lack .git; not root repository git sanity PASS.",
+    "whole_goal": "NOT_APPROVED"
+  },
+  "history": {
+    "prior_ledger": "implementation-evidence/release-governance/post-native48-final-platform-suite-summary.json",
+    "prior_ledger_status": "Historical, preserved unchanged; this versioned ledger records newer actual public runs without rewriting prior evidence.",
+    "prior_failures_preserved": ".omp/state/release-47/proofs/current-public-full-qa-failures-preserved.json",
+    "original_red_failure_lists_unchanged": true,
+    "policy": "Original failed runs, original RED arrays, and historical Native results remain immutable evidence. Later public PASS does not erase earlier FAIL or establish a current SDK result."
+  },
+  "official_state_observation": {
+    "proof": ".omp/state/release-47/proofs/reviewed-final-public-qa-state-integrity.json",
+    "at": "2026-11-18T11:55:38.944Z",
+    "tasks": 22,
+    "formal_done": 14,
+    "green_resolved": 19,
+    "review_approved": 19,
+    "gates": {
+      "PASS": 103,
+      "pending": 26,
+      "NA": 89,
+      "FAIL": 2
+    },
+    "original_red_failure_lists_unchanged": true,
+    "current_public_matrix": 1355,
+    "public_mapping_missing": [],
+    "method": "JSON parse; actual report assertion-set reconciliation; before/current original RED list equality; no suite rerun or new Source/native claim",
+    "progress_modified": false
+  },
+  "exclusions": {
+    "native49": "Independent evaluation bg_3 outcome unknown to this ledger. No current authenticated Native49 result is asserted; public QA is not SDK.",
+    "ci": "No hosted CI execution or approval is established.",
+    "release": "No release, tag, publication, delivery, or readiness approval is established.",
+    "private_sources": "No claim that this public suite exercises all private collector/probe or implementation-evidence sources.",
+    "root_git_sanity": "No root repository git sanity approval.",
+    "readiness_packet": "Not changed.",
+    "formal_done": "Not changed.",
+    "publication_performed": false
+  },
+  "evidence_registry": [
+    {
+      "path": ".omp/state/release-47/proofs/reviewed-final-public-full-qa-results.json",
+      "sha256": "98534990b867157ce7262f4af065db79f344726b3e509af9682e659fad5f8f41"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/reviewed-final-public-actual-passed-refs.json",
+      "sha256": "a5db44732a730fb7199997e76e1923327e8a44f8804a42e28c8ec7fcfa219fce"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/reviewed-final-public-qa-state-integrity.json",
+      "sha256": "449a2da84a2f87bd8b3faa105cabe42890687986ad78455f1f6554f21441f5fc"
+    },
+    {
+      "path": ".omp/state/release-47/proofs/final-reviewed-package-and-platform-cohort.json",
+      "sha256": "6adb7d5ce0cd50108e52e1fc28e6f17a37639410fa1f4b27efa40d9a4aed092e"
+    }
+  ],
+  "report_locator_semantics": "Report filenames are portable retained-artifact locators, not repository files. Existing sha256 binds the original report. Raw reports are not bundled; host-private paths in diagnostic titles were redacted without claiming a rerun."
+}

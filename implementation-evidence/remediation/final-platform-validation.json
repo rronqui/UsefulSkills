@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-19T17:21:13.045Z",
+  "candidate_manifest_sha256": "86ff94c7eefdadf63ea243d831aabb98d5b08d74b5f8b70cbd4b0e5463f29f28",
+  "candidate_manifest_locator": "git:dea01dbe298432d8b6b18ad4be8c619d72176050:implementation-evidence/remediation/source-manifest.json",
+  "scope": "Complete local platform suites; Windows current frozen workspace, Linux copied candidate with native Linux Node. Raw reports retained locally by hash. Native OMP and hosted CI/release are separate gates.",
+  "platforms": [
+    {
+      "platform": "windows",
+      "node": "22.23.2",
+      "vitest": "4.1.12",
+      "command": "npm test -- --reporter=json --outputFile=<local report>",
+      "success": true,
+      "total": 1370,
+      "passed": 1318,
+      "failed": 0,
+      "omitted": 52,
+      "raw_report_sha256": "74d35b36ac8f6d8ec1002f5bfed1d1d21b51ab9c4b9462631c22566d6b1c47c8",
+      "omitted_cases": [
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary fails closed when the target parent becomes a symlink before pathname publication — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary preserves a foreign outside target with the same basename when the parent pivots after the real quarantine unlink — requires Linux parent-pivot real-FS interleavings",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary does not transiently publish through the outside parent after the real quarantine unlink — requires Linux parent-pivot real-FS interleavings",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary rejects a live-parent pivot after real link publication before commit — requires Linux parent-pivot real-FS interleavings",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary preserves a foreign precreated quarantine reservation — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary preserves a foreign precreated backup reservation — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary fails closed when a foreign quarantine reservation appears after the missing check — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary preserves a foreign backup replacement during retainBackup:false cleanup — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary does not delete a foreign rollback target replacement after hardlinking the owned publication — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary does not retain a foreign outside inode in the rollback orphan after a parent pivot — requires Linux parent-pivot real-FS interleavings",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary fails closed when foreign regular bytes replaces a published operation quarantine — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary fails closed when symlink to an external sentinel replaces a published operation quarantine — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary rejects an equal-plan snapshot when the source changes before transaction execution — requires POSIX real-FS interleavings (run under WSL/Linux)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session source factory rejects an actual POSIX hardlinked Git candidate before the first Git spawn",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session source factory admits a single-link POSIX Git candidate and the first valid spawn proves the fixture legitimate",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session source factory rejects a hardlinked POSIX Git candidate on the second invocation after legitimate admission",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session materialized pre-push factory (existingVMloader) rejects an actual POSIX hardlinked Git candidate before the first Git spawn",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session materialized pre-push factory (existingVMloader) admits a single-link POSIX Git candidate and the first valid spawn proves the fixture legitimate",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session materialized pre-push factory (existingVMloader) rejects a hardlinked POSIX Git candidate on the second invocation after legitimate admission",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/hitl-loop.test.mjs",
+          "test": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa substituir TRACE_FILE symlink existente — skip: symlink indisponível (EPERM)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/hitl-loop.test.mjs",
+          "test": "hitl-loop redaction (Bash disponível (C:/Program Files/Git/bin/bash.exe); AWK disponível (/usr/bin/awk)) AC-015 recusa symlink para diretório TRACE_FILE que surge depois do precheck — skip: symlink indisponível (EPERM)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "install-hooks + wrappers gerados restaura todos os destinos após falha de link em destino posterior",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "install-hooks + wrappers gerados restaura todos os destinos após falha de unlink em destino posterior",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "install-hooks + wrappers gerados reporta estado inseguro quando a restauração do rollback falha",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 restores an existing preimage when first POSIX publication fails before link — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 restores an earlier preimage while preserving a foreign later destination on link EEXIST — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 restores an existing preimage when unlinking the published stage fails — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 rejects a real parent replacement after the first stage without publishing into the replacement — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 rejects a destination hash changed after preflight without overwriting the user edit — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 rejects a source hash changed after preflight without distributing unverified bytes — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs transaction contract AC-013 rejects destination hardlink swaps without touching the linked target — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 real identities preserve a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of an existing file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high inode permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 same exact high device permits uncontested restoration — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created file — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high inode preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs exact identity RED_REVISION AC-013 P1 exact high device preserves a replacement of a transaction-created directory — explicit Node fs seam is POSIX-only; Windows native race coverage exercises the same contract",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preserva NOTICE symlink — skip: file symlink unsupported: EPERM",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs symlink em arquivo gerenciado — skip: file symlink unsupported: EPERM",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs --check preserva extras quando a raiz de agentes não é legível — skip: permissões POSIX não são portáveis no Windows",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs --check trata destino FIFO como drift sem bloquear ou fazer hash — skip: FIFO não é portável neste Windows; cenário gated",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs modo normal preserva destino FIFO conflitante e não aplica operações pendentes — skip: FIFO não é portável neste Windows; cenário gated",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preflight detecta socket Unix no destino sem bloquear a instalação",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preflight detecta device no destino sem substituí-lo — skip: device POSIX não é portável neste Windows; cenário gated",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: block device POSIX não é portável neste Windows; cenário gated",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/quality.test.mjs",
+          "test": "AC-002 inventory refuses symlink alias or escape",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/retro.test.mjs",
+          "test": "AC-009 safe reads refuse real symlink evidence",
+          "status": "skipped"
+        },
+        {
+          "file": "bin/lib.test.mjs",
+          "test": "Linux native backup consumer verifica identidade bigint, cópia exata, colisão, staging nomeado ausente e alvo indisponível fail-closed",
+          "status": "skipped"
+        },
+        {
+          "file": "bin/ship.test.mjs",
+          "test": "release remediation preflight fails before stop when system Python prerequisite fails",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "platform": "linux",
+      "node": "22.23.2",
+      "vitest": "4.1.12",
+      "command": "npm test -- --reporter=json --outputFile=<local report>",
+      "success": true,
+      "total": 1370,
+      "passed": 1351,
+      "failed": 0,
+      "omitted": 19,
+      "raw_report_sha256": "a6cfc361c48210a2d7fe7d84c4dc22a37838514431452a32f8cd9d0f3b66f163",
+      "omitted_cases": [
+        {
+          "file": "scripts/fs-transaction.test.mjs",
+          "test": "AC-005 fs-transaction boundary rejects a real hardlink added after initial pinning before commit — requires Windows x64 native FS interleaving",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session generated hook consumer rejects an owned binary replaced after metadata admission before the first Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/git-trust.test.mjs",
+          "test": "AC-008 Git admission session generated hook consumer rejects an owned binary replaced after an admitted call before a later Git spawn (Windows-only: pinned Git bytes and hardlink identities are required)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.cmd com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "AC-008/AUD-019 wrappers Git Windows não confiáveis rejeita git.bat com E_UNSAFE_GIT_EXECUTABLE sem executar wrapper",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 aceita Conventional válido pelo fallback .cmd em cwd e mensagem com Unicode, espaços e metacaracteres",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-hooks.test.mjs",
+          "test": "AC-008 fallback commit-msg direto sem setup do instalador AC-008/AUD-018 rejeita Conventional inválido pelo fallback .cmd sem executar comando extra",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 preserves every external sentinel byte when a real worker races an ancestor after native staging — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 converts a real exclusive destination handle into native sharing drift without writes — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 revalidates an equal file after a real worker attempts a post-preflight write — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 restores multiple same-basename preimages when a later destination collides — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 restores the first publication while preserving a foreign second destination and its handle — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install-transaction.test.mjs",
+          "test": "install.mjs filesystem boundary AC-005 preserves a foreign NOTICE created after planning before native preflight — requires Windows x64 native filesystem primitives",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-final-Jbf9NV/.test-temp/install-device-mYrj6z/device: Operation not permitted\n)",
+          "status": "skipped"
+        },
+        {
+          "file": "scripts/install.test.mjs",
+          "test": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-final-Jbf9NV/.test-temp/install-block-device-SBfl8q/device: Operation not permitted\n)",
+          "status": "skipped"
+        },
+        {
+          "file": "bin/lib.test.mjs",
+          "test": "performBackup propaga E_BACKUP_CLOSE sem retentar após colisão de destino",
+          "status": "skipped"
+        },
+        {
+          "file": "bin/lib.test.mjs",
+          "test": "performBackup falha fechada quando uma tentativa de troca do staging é bloqueada",
+          "status": "skipped"
+        }
+      ]
+    }
+  ]
+}

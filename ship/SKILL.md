@@ -9,10 +9,25 @@ Companheira da skill `release-bootstrap` (que instala o maquinário): esta skill
 fluxo. O motor determinístico é `bin/ship.mjs` (nesta skill); decisões de implementação
 seguem o protocolo abaixo.
 
+## Integração e autorização de entrega
+
+Leia [entrega integrada](references/integrated-delivery.md) antes dos efeitos.
+O fluxo abaixo só opera as ações Git/publicação/deploy autorizadas. Alignment
+mantém short/full; entrega local fica com caller/TDD sem bootstrap obrigatório.
+Antes de revisão/validação, use a fonte única
+[qualidade](../tdd-orchestrator/references/quality-policy.md).
+TDD external transfere prova ao ship; após entrega, ship coordena uma única
+[triagem retro](../retro/references/protocol.md), nunca durante implementação.
+Preserve recursos existentes de automerge/rollback quando autorizados. Modelos
+pertencem aos perfis nomeados conforme a [referência única](../tdd-orchestrator/references/model-policy.md);
+caller/global/helpers permanecem na configuração existente. Use o schema nativo
+observado, sem novo launcher ou flags inventadas.
+[Origem/licença](SOURCE.md).
+
 ## Pré-requisitos
 
 - Repo já bootstrapped (`skill://release-bootstrap`): ruleset/CI/release-please/hooks.
-- `gh` autenticado, git, Node >= 20.
+- Nas rotas `setup`, `new`, `ship` e `deploy`: `gh` autenticado, git, Node >= 20.
 - `ship.config.json` na raiz do repo (crie com `bin/ship.mjs setup` e preencha).
 - Skill `deep-review` (`skill://deep-review`) e o agente `deep-reviewer.md`
   instalados (`<repo>/.omp/agents/` ou `~/.omp/agent/agents/`).
@@ -54,13 +69,21 @@ Se a configuração for multi-package e não houver exatamente uma unidade raiz 
 
 ## Subcomandos do motor
 
-Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>` a partir da raiz do repo.
+Rode com `node <caminho desta skill>/bin/ship.mjs <subcomando>`. As rotas de execução usam a raiz do repo; `plan` também funciona fora de Git e aceita `--root`.
 
 | Comando | Efeito |
 |---|---|
 | `bin/ship.mjs new --bug "título"` / `--feat "título"` (`--desc` opcional) | Valida fontes de versão e pré-requisitos antes dos efeitos e novamente após atualizar a default; depois cria issue + branch `fix/N-slug` / `feat/N-slug` a partir da default validada |
+| `bin/ship.mjs plan --target <branch> [--root <diretório>] [--report <relativo>] [--context <relativo>]` | Valida qualidade e contexto independentes obrigatórios; emite JSON declarativo `PLANNED`, com sete passos `NOT_EXECUTED`, sem Git/GitHub, subprocessos, rede, escrita, publicação ou deploy |
 | `bin/ship.mjs ship "descrição"` | Valida fontes de versão e pré-requisitos; depois faz commit `<tipo>: descrição (#N)` (prefixo vem da branch), push, PR com exatamente um `Closes #N` canônico, auto-merge squash; `--body-file <arquivo>` valida todos os marcadores `Closes #N` contra a issue da branch antes de qualquer commit/push/PR e, em PR existente, faz retry body-only sem exigir commit |
 | `bin/ship.mjs deploy` | Valida configuração/comandos, `versionCheckUnit` e fontes SemVer antes de qualquer efeito; também revalida as fontes e a unidade após o pull antes do build novo, preservando `build: NA` com reason/evidence quando aplicável. Falha após `stopCommand` aciona o rollback idempotente descrito a seguir. |
+
+`plan` requer somente Node e provas válidas: `--root` usa o cwd por padrão;
+report/context usam `.omp/state/quality.json` e `.omp/state/quality-context.json`.
+Flags são únicas; valores ausentes, outra flag, desconhecidos ou posicionais
+bloqueiam. Não há modo legado sem relatório. O target é solicitado, não resolvido
+ou verificado remotamente; o plano não autoriza entrega nem atesta prontidão.
+
 
 ### Fronteiras de validação e rollback do deploy
 
@@ -79,6 +102,38 @@ O deploy separa validação de efeitos em duas fronteiras:
   próprio rollback é reportada.
 
 ## Protocolo de entrega (agente)
+
+### Qualidade compartilhada em todos os caminhos
+
+Configurações criadas pelo setup atual usam `qualityPolicyVersion: 1` e
+`qualityReport: ".omp/state/quality.json"`. Antes de iniciar novo trabalho via
+este fluxo, migre explicitamente configurações antigas para esses campos e
+prepare o relatório; não recapture baseline após implementar. O argumento
+`--quality-report <caminho-relativo>` seleciona outro relatório para a chamada.
+O motor valida a prova antes de commit/push/publicação quando a versão 1 exige
+o gate, e sempre que um relatório for fornecido. Configuração legada sem versão
+mantém compatibilidade de CLI com aviso; esse modo não comprova execução do gate
+novo e não atende a política para novo trabalho até a migração.
+
+Antes de implementar, leia a fonte única
+`skill://tdd-orchestrator/references/quality-policy.md` e resolva a skill real no
+OMP. Capture baseline, classifique risco e planeje documentação/verificações no
+relatório de qualidade. Trivial, diagnóstico e TDD compartilham essa política;
+não execute um segundo ciclo TDD para um bug já diagnosticado.
+
+O gate mecânico de qualidade usa `tdd-orchestrator/lib/quality.mjs` e sua CLI
+`bin/quality.mjs`; `planning` verifica prontidão antes da implementação e
+`delivery` exige relatório, documentação e revisão atuais antes da publicação.
+Consulte o contrato de argumentos da CLI e forneça o relatório ao motor ship.
+Uma aprovação TDD vigente pode ser reaproveitada se escopo, conteúdo, critérios,
+ambiente, independência e protocolo satisfizerem a rodada de entrega. Se faltar
+alguma prova, complete a rodada existente; não invente uma aprovação.
+
+Documentação funcional e segurança são avaliadas semanticamente pelos revisores
+já atribuídos, na mesma revisão do código/testes. A validação de hashes não
+substitui essa leitura. P0/P1 válidos abertos bloqueiam a entrega, inclusive após
+o teto de rodadas; o teto interrompe a automação para decisão de correção ou
+adiamento, sem conceder dispensa do gate.
 
 1. **Intake**: rode `new`. Se o usuário já forneceu issue/branch, pule.
 2. **Alinhamento (obrigatório para todo pedido)**: leia `skill://alignment` e
@@ -117,8 +172,10 @@ O deploy separa validação de efeitos em duas fronteiras:
    commit não acontece. Depois verifique `git rev-list --count <default>..HEAD`
    com `git status --short` vazio: zero → nada para revisar; informe o usuário e
    PARE (não dispare revisores sem material). Se após o commit ainda sobrarem
-   mudanças não commitadas (arquivos regenerados por hook/build), ignore-as — o
-   gate revisa commits, não artefatos. Com material e a implementação
+   mudanças não commitadas (arquivos regenerados por hook/build), classifique-as
+   no inventário de qualidade e determine se afetam o produto revisado. Alteração
+   relevante exige nova revisão sobre o conteúdo que será entregue; não a ignore.
+   O gate de branch revisa commits. Com material e a implementação
    concluída (suíte verde no caso TDD), leia `skill://deep-review` e execute-a em
    modo **branch base** com base = branch default do repo (informe-a como chamador;
    NUNCA pergunte ao usuário nem use outro modo), passando como instruções
@@ -143,7 +200,7 @@ O deploy separa validação de efeitos em duas fronteiras:
      - (b) corrigir agora no loop mesmo assim — registrada na evidência, essa
        escolha isenta o fix da reclassificação de contrato em 4.3 (a decisão já foi
        do usuário);
-     - (c) shipar com o achado documentado na evidência do passo 5.
+     - (c) adiar a entrega e registrar o achado ainda aberto; não publicar.
      A espera pela decisão não consome rodada do teto de 2; a correção pela escolha
      (b) acontece dentro do ciclo normal de rodadas (4.3/4.4).
 
@@ -180,10 +237,9 @@ O deploy separa validação de efeitos em duas fronteiras:
      achado estrutural).
    - Com P0/P1 válido após a 2ª rodada → PARE e pergunte ao usuário:
      - (a) corrigir os achados restantes mesmo assim → aplique a disciplina de 4.3
-       aos achados restantes, commite e siga ao passo 5 SEM nova re-review (o teto
-       de rodadas é final);
-     - (b) shipar com os achados documentados na evidência do passo 5 → siga ao
-       passo 5;
+       aos achados restantes e obtenha autorização para nova rodada de revisão
+       independente; somente sua aprovação atual permite seguir ao passo 5;
+     - (b) adiar a entrega com os achados documentados, mantendo o gate bloqueado;
      - (c) abandonar → este ship encerra; registre os achados na evidência apenas;
        não execute 4.5 (não commitar feedback em branch que não será publicada).
      Registre a escolha na evidência. Nunca shipar por conta própria nesse estado.
@@ -230,7 +286,26 @@ O deploy separa validação de efeitos em duas fronteiras:
    tag.
 7. **Deploy**: rode `deploy` e confira a saída (backup, versão servida).
 
+## Pós-entrega — retrospectiva
+
+Após registrar a entrega efetivamente concluída, aplique `skill://retro` para
+uma triagem evidenciada e eventual análise. Ship é o único dono dessa triagem
+quando TDD foi invocado com `delivery: external`; reutilize suas fontes em vez
+de repetir análise. Uma release/deploy posterior só cria outro escopo de retro
+se houver episódio novo pertinente. Entrega pendente não vira concluída para
+liberar retro. Falha da triagem é pendência pós-entrega, sem reabrir produto ou
+aplicar melhorias automaticamente. O protocolo e os gatilhos têm uma fonte em
+`skill://retro/references/protocol.md`.
+
 ## Armadilhas
+
+- `new` aceita somente pares `--bug`/`--feat` e `--desc`; argumentos não consumidos
+  e `--body-file` repetido em `ship` falham antes de efeitos. Uma unidade usa
+  `include-component-in-tag: false`; múltiplas unidades exigem `true`. A versão
+  corrente não pode ser inferior a `initial-version`.
+- Backup Linux exige Python >=3.8 em instalação de sistema protegida. O preflight resolve e
+  verifica o interpretador antes de parar o serviço; o snapshot usa execução
+  isolada `-I -S`. Deploy/rollback de host Linux é ensaiado em serviço descartável.
 
 - Número de PR ≠ número de issue no GitHub (contagem compartilhada) — use a URL que os
   comandos retornam.

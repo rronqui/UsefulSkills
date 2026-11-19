@@ -1,0 +1,268 @@
+{
+  "schema_version": "1.0",
+  "kind": "goal47-local-prepublication-readiness",
+  "goal": "issue47/specs005-omp-compatible-release",
+  "task": "T-013A",
+  "criterion": "AC-001",
+  "at": "2026-11-18T19:16:34.589Z",
+  "status": "LOCAL_PREREQUISITES_SATISFIED_FINAL_COMMITTED_REVIEW_PENDING",
+  "publication_authorized": false,
+  "task_completion_claim": false,
+  "supersedes_local_current_status_only": "implementation-evidence/release-governance/goal47-prepublication.json remains immutable dated PARTIAL history; no retrospective Native success or lost receipt claim",
+  "repository": {
+    "slug": "rronqui/UsefulSkills",
+    "issue": 47,
+    "issue_url": "https://github.com/rronqui/UsefulSkills/issues/47",
+    "branch": "feat/47-omp-compatible-release",
+    "merge_target": "main",
+    "delivery": "external",
+    "precommit_head": "9226dbe338a976c3d14284ff9e0c79a2c53fe19f",
+    "local_merge": false,
+    "host_deploy": false
+  },
+  "intake": {
+    "alignment_closed": true,
+    "plan_approved": true,
+    "known_failing_baseline_override_only": true,
+    "issue_and_branch_history": "Retained actual recovered bounded chronology in historical packet; no new intake/rename performed",
+    "original_snapshot": "Actual191/191reconstructedbyte-exactbackup; not complete.gitbackup or untouchedinitialdirectory",
+    "historical_references": [
+      ".omp/state/release-47/proofs/recovered-ship-user-approval.json",
+      ".omp/state/release-47/proofs/recovered-ship-intake.json",
+      ".omp/state/release-47/proofs/resumed-original191-recovered-exact.json"
+    ],
+    "no_universal_user_byte_preservation_claim": true
+  },
+  "official_state_at_packet": {
+    "done": 19,
+    "total": 22,
+    "green_resolved": 20,
+    "review_approved": 20,
+    "gates": {
+      "PASS": 117,
+      "NA": 89,
+      "FAIL": 1,
+      "pending": 13
+    },
+    "remaining": [
+      "T-010B actualfeatureCI",
+      "T-013A currentreadinessreview/validationandexternalAC001boundary",
+      "T-013B actualterminaldelivery/release"
+    ],
+    "no_weighted_percent": true
+  },
+  "local_completed": [
+    "T-009C AC014 independentlyvalidatedcurrentcheckpoint",
+    "T-014 AC017 actualWin/LinuxQAandpostcommitvalidator",
+    "T-015 AC020 independentlyvalidatedHISTORICALmetrics/no current-coreefficiencyclaim",
+    "T-009B AC013 currentactualwire/negative/malformed/fallback/retryaccepted",
+    "T-011 AC016 currentactualNative01-10accepted aftercanonicalpeer andindependentsemanticchecks",
+    "T-012A AC018 currenttraceability/7Docmanifestaccepted",
+    "T-012B AC019 independent6boundedsecuritycontrolsaccepted"
+  ],
+  "actual_native": {
+    "lifecycle50": {
+      "status": "PASS",
+      "phases": 11,
+      "capture_sha256": "3147c87138b783404c2e8321d4991b2a12853758600be11d0f34e18bef994067",
+      "immutable_private_contract_label": "0.6.0",
+      "semantic_contract_review": "0.7.0targetedPASS; wholeoldreviewBLOCKEDmissing05/06notconverted"
+    },
+    "fallback52": {
+      "status": "PASS",
+      "normal_independent_peer": "APROVADO",
+      "capture_sha256": "d196241aee5b47674a5776a5db0f4bccd2b760a0478a1a77725666cffca961d3",
+      "private_driver_sha256": "ebe75f49add96720601cd21ffb888c5421fcdf01578d596e220fe2ba22a0fca0",
+      "immutable_private_contract_label": "0.5.0",
+      "root_reads": 31,
+      "tool_events": 118,
+      "native_peers": 2,
+      "expected_private_fixture_negative_aggregate": "BLOCKED",
+      "new_N5_mode_not_selected": true
+    },
+    "malformed53": {
+      "status": "BLOCKED",
+      "launcher_exit": 2,
+      "wall_seconds": 172.79,
+      "capture_sha256": "803a32c66a4c6b2b1e46697df25647fee7c049cf3183a3ade9981439341662dc",
+      "reason": "SDKexposesnumericouterexitonlyonfailure; observerrequirementincompatiblewithsuccessfulSDKmetadata",
+      "outer_exit_NOT_inferred_zero": true,
+      "Source64_fixture_project_binary_preserved": true
+    },
+    "current_corrective_candidate": {
+      "status": "PASS",
+      "actual_run_id": "6eca85d6-7ebd-4702-ad53-2fcd2521421e",
+      "capture_sha256": "46c82e127c4961fbc0c99bd1a6182555ae08350e1495e7453d45464804c68dc3",
+      "source_sha256": "10cda7f9bb01e571ebe5020611e809ceccc446a253d0a59cdaa64ba11276c5c8",
+      "scope": "Controlled malformed input through actual SDK caller, not malformed SDK producer; Native54 BLOCKED retained.",
+      "required_reads": 34,
+      "actual_reads": 34,
+      "observed_child_exit": 0,
+      "SDK_outer_exit": null,
+      "SDK_outer_exit_observed": false,
+      "source_cases_pass": 46,
+      "whole_peer_pending": false
+    },
+    "negative57": {
+      "status": "PASS",
+      "scope": "Actual TDD peer BLO on fresh owned fixture; same-execution binarybefore/after equal,13inputs unchanged, completed+settled Root",
+      "capture_sha256": "b2e2d0cf27545a4f8ade4011a24406064e224bfccb560e050c3aaf9bca8a6d4d",
+      "fixture_revision": "24be28229c24f3059b20e3a30a6f148ff22bd9e6",
+      "different_fixture_revision_explicit": true,
+      "old_missing_binary_before_never_backfilled": true,
+      "Native56_and57_preSDK_failures_retained": true,
+      "Goal_code_changes": false
+    },
+    "retained_routes": 4,
+    "retained_route_assertions_pass": 576,
+    "current_131_runtime_inputs_unchanged": true,
+    "whole_native_approved": false,
+    "original_raw_payloads_immutable": true,
+    "retained_approval_scope": "Historical Native approvals apply only to their exact captured sources and runtime. Equality of a derived subset does not renew whole-package approval for the current candidate."
+  },
+  "actual_qa": {
+    "windows": {
+      "total": 1280,
+      "pass": 1232,
+      "fail": 0,
+      "skip": 48
+    },
+    "linux": {
+      "total": 1280,
+      "pass": 1262,
+      "fail": 0,
+      "skip": 18
+    },
+    "public_source_files_exact_to_both_clones": 214,
+    "configured_test_files": 27,
+    "unique_actual_pass_refs": 1355,
+    "raw_skip_records": 66,
+    "full_public_suite_rerun_for_private_only_changes": false,
+    "prior_source_guard_checks": 33,
+    "new_observed_child_END_regressions": {
+      "actual_assertion_RED": 12,
+      "old_positive_cases_preserved": 12,
+      "Source_only": true,
+      "current_GREEN_not_yet_known": true
+    },
+    "historical_failures_preserved": true
+  },
+  "review_validation": {
+    "whole_t011_peer": "APROVADO actualNative57WholeNativeRecheck47 exactcomposited807; completeconfidence0.98serialization accepted by realcanonicalreceiver. Not automaticTaskDONE/finalShip/delivery.",
+    "current_consolidated_local_validator": "ActualNative57ConsolidatedClosure47 behavioral/schema/security/contract/git PASS and objectiveNA; originaloverallFALHOU preserved, solepriorPENDING-status circularity adjudicated against exactspec331/334. native57-current-local-acceptance-adjudication.json plus actualofficialschema19DONE valid; not forgedPASSOU or releaseapproval.",
+    "native52_capture_peer": "APROVADO",
+    "native52_versioned_scoped_ledger_peer": "APROVADO sha256:b726696a0d2b77a326418e9ab6cb91c718a935b426360a4ad2f9b8c84de81cc6",
+    "current_N5_instrumentation_Source_peer": "ActualNative55 helpered4 and actualNative57negative accepted in composite. Currentfallback8b formatting-onlydelta retains byteidentical generatedhelpered4 provedby10actualSourcecases; originalcapture10cnotrelabellednewdriverexecution. native57-byte-preserving-owned-whitespace-fixed.json; committedShipround2pending.",
+    "final_committed_Ship_review_round2": "NOT_STARTED",
+    "seven_SpecKit_consumer_docs_protected": true,
+    "contract_version": "0.7.0 UNRELEASED",
+    "security": "Native55CurrentSecurity47 independent sixcontrols PASSOU/no confirmedP0P1 scoped; native55-current-security-independent.json. Not universal certification or Ship/delivery approval.",
+    "git_sanity": "ActualRootselectivepubliccommits6fc3ca1/9226dbeandexpectedforeignworkpreserved. Finalprivate/artifactcommitandcommittedbranchreviewpending; nocleantree/manualre-auditclaim.",
+    "unconfigured_tools_na": {
+      "coverage": "Noconfiguredtool/baseline",
+      "lint": "Noconfiguredcommand/tool",
+      "type_check": "Noconfiguredcommand/tool",
+      "build": "ship.config.json buildCommand=null; ESMdistributionwithoutproductioncompilation"
+    }
+  },
+  "metrics": {
+    "criterion": "AC-020 / PV-017",
+    "criterion_status": "VALIDATED_HISTORICAL_BOUNDED",
+    "immutable_cutoff": "2026-11-15T22:11:52.751Z",
+    "retained_four_file_bundle_unchanged": true,
+    "historical_sessions": 5,
+    "historical_spawns": 10,
+    "historical_admissions": 5,
+    "historical_duplicate_metadata_admissions": 0,
+    "current_guard_differs_from_measured": true,
+    "current_helper_differs_from_measured": true,
+    "current_core_efficiency_NOT_measured": true,
+    "current_startup": null,
+    "current_resource_benchmark": null,
+    "current_tokens": null,
+    "current_cost": null,
+    "current_physical_serving": null,
+    "claimed_speedup": null,
+    "global_no_duplicate_claim": false,
+    "whole_Native_durations_NOT_model_or_review_latency": true,
+    "limits": "ActualindependentAC020validatoracknowledgesguard8514e2→c32da6/helperb5b2aa→2cf7be/script8e4626unchanged. Historicalobservationsvalidwithintheircutoff; no current-core/comparative/isolatedACL/scheduler/servingclaim."
+  },
+  "inventory": {
+    "file": "implementation-evidence/release-governance/goal47-local-readiness-inventory.json",
+    "status": "CURRENT_WORKTREE_INPUTS_NOT_COMMIT_APPROVAL",
+    "entries": 257,
+    "entries_sha256": "089c757046cccdfd12311c3e2c60edc1b87d47656a67176febb5009cbff228cb",
+    "historical_entries": 235,
+    "historical_entries_sha256": "a4b2a24be62e4ae8bf77082950221425adacadd9a88d49e4c64c70e9562d0f61",
+    "additional_self_excluded_packet_files": 2,
+    "intended_present_files_including_packet": 259,
+    "intended_prior_deletion": [
+      "scripts/alignment.test.mjs"
+    ],
+    "precommit_worktree_not_git_blob_claim": true,
+    "refresh_required_after_current_Source_and_actual_N5_closure": false
+  },
+  "proof_references": [
+    ".omp/state/release-47/proofs/ac014020-current-task-local-closure-actual.json",
+    ".omp/state/release-47/proofs/ac014020-current-formal-closure-schema-valid.json",
+    ".omp/state/release-47/proofs/reviewed-final-public-full-qa-results.json",
+    ".omp/state/release-47/proofs/t014-post-commit-boundary-pass.json",
+    ".omp/state/release-47/proofs/native52-default-fallback-actual-pass.json",
+    ".omp/state/release-47/proofs/native52-current-fallback-peer-approved.json",
+    ".omp/state/release-47/proofs/native53-sdk-bash-exit-observability-blocked.json",
+    ".omp/state/release-47/proofs/native54-observed-child-and-failed-end-red.json",
+    ".omp/state/release-47/proofs/native54-actual-missing-helper-json.json",
+    ".omp/state/release-47/proofs/native55-actual-controlled-wire-pass.json",
+    ".omp/state/release-47/proofs/native55-current-composed-review-candidate.json",
+    ".omp/state/release-47/proofs/native57-whole-native-peer-canonical-approved.json",
+    ".omp/state/release-47/proofs/native57-current-local-acceptance-adjudication.json",
+    ".omp/state/release-47/proofs/native57-current-local-closure-schema-valid.json",
+    ".omp/state/release-47/proofs/native57-final-selective-candidate-scope-pass.json",
+    ".omp/state/release-47/proofs/current-publication-readonly-prereqs.json"
+  ],
+  "versioned_final_receipts": [
+    "implementation-evidence/release-governance/reviewed-final-public-full-qa.json",
+    "implementation-evidence/release-governance/native50-lifecycle-scoped-receipt.json",
+    "implementation-evidence/release-governance/native52-fallback-scoped-receipt.json",
+    "implementation-evidence/release-governance/native55-wire-scoped-receipt.json",
+    "implementation-evidence/release-governance/native57-negative-wire-scoped-receipt.json"
+  ],
+  "versioned_receipts_are_scoped_NOT_whole_package_final_approval": true,
+  "github_retained_prerequisites": {
+    "ruleset": 20563693,
+    "required_job": "quality",
+    "requires_pr": true,
+    "squash_only": true,
+    "read_only_current_main": "02582a867f660bf8aa387fe51f71b7fffd3a7dfd",
+    "current_feature_PRs": 0,
+    "release_secret_metadata_present_historically": true,
+    "secret_value_read": false,
+    "secret_validity_proven": false,
+    "manifest_published_version": "0.4.0",
+    "fresh_publication_boundary_recheck_required": true
+  },
+  "external_flow_not_performed": {
+    "implementation_commit": false,
+    "scoped_public_commits": [
+      "6fc3ca1b157f8ad41c0ce95e0a2f46387ace07de",
+      "9226dbe338a976c3d14284ff9e0c79a2c53fe19f"
+    ],
+    "committed_branch_review": false,
+    "push": false,
+    "feature_pr": false,
+    "feature_ci": false,
+    "feature_merge": false,
+    "release_pr": false,
+    "tag": false,
+    "release": false
+  },
+  "next_steps": [
+    "Current19localtasksDONE/schema-valid; actualNative50/52/55/57 currentcompositionaccepted withoutrepeatingpublicQA",
+    "Finishindependentcurrentreadinessreview/semanticlocalgate usingcaller-suppliedexternalrevision; no self-hash requirement",
+    "Selectiveprivate/artifactcommitpreservingalluserwork; mandatorycommittedbranchShipround2",
+    "ActualfeaturePR/qualityCIandterminaldecisionboundtoactualPR/head/checks; notcircularlocalprerequisites",
+    "Actualauthorizedsquashmerge/release-pleasePR/tag/release; nolocalmerge/deploy"
+  ],
+  "acceptance_boundary": "Packet documents local readiness, not authorization or Task/Goal100/featureCI/remote effect. AC001 remains globallyopen until external terminal delivery completed. T010B futureCI/T013B publication are not circular prerequisites for local T013A.",
+  "current_candidate_approval": "PENDING fresh candidate validation; historical local readiness is not current release approval"
+}

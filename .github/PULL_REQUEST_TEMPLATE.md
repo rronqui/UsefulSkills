@@ -2,6 +2,10 @@
 
 **Issue relacionada**: Closes #N
 
+<!-- Substitua #N por uma issue existente deste repositório. O job quality valida
+a referência e rejeita números de PR. Exceção: PR gerado por release-please do
+autor de release autorizado, com branch e label canônicos de release. -->
+
 ## O que mudou
 
 <!-- Descrição objetiva da mudança -->
