@@ -1,5 +1,33 @@
 # Funcionalidades e uso do UsefulSkills
 
+## Correções de confiabilidade de novembro de 2026
+
+O gate de qualidade está explícito no manifesto do projeto e no bootstrap. A
+decisão revalida os bytes do relatório, contexto independente, recibos e fontes;
+aprovação TDD com finding P0/P1 é contraditória e bloqueia. Evidências OMP exigem
+correlação com o dispatch observado, sucesso do canal e conteúdo de leituras.
+Histórico RUNNING antigo conserva o bloqueio até resolução da execução.
+
+Instalações idênticas verificam conteúdo sem reescrever arquivos readonly.
+Verificações por conteúdo usam o hash desejado; sourceScopes vazio não concede
+leitura de origem. Quarentena POSIX reserva o destino sem substituir entrada
+estrangeira. O hook limita tamanho antes da leitura e preserva a resolução
+efetiva de hooksPath; combinação de link e `..` ambígua é rejeitada. O guard Git
+revalida a closure admitida antes de cada spawn e mantém refs legítimas em argv.
+
+Sanitização HITL cobre atribuições indexadas e identificadores AWS STS, preserva
+diagnósticos posteriores a valores YAML explícitos e grava somente texto limpo.
+O CLI ship rejeita entradas não consumidas e body-file repetido, valida política
+de tags por unidade e piso initial-version. Backup Linux verifica Python >=3.8
+antes do stop. A CI instala pelo lock, valida issue real, verifica segredos e
+dependências e executa testes em Windows/Linux. Exceções do scanner são somente
+fingerprints de fixtures sintéticas documentadas; não excluem regras ou arquivos.
+
+O [plano de remediação](../implementation-evidence/remediation/plan.md) delimita
+os 59 apontamentos. Ledgers por módulo e evidências datadas distinguem correção
+local, validação nativa e publicação; uma aprovação histórica não se estende por
+equivalência derivada ao candidato atual.
+
 Este documento é a referência funcional atual do pacote. As specs registram
 mudanças delimitadas e os relatórios comprovam execuções; nenhum desses artefatos
 substitui esta descrição durável. A política normativa compartilhada está em

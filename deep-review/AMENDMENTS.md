@@ -23,11 +23,21 @@ são:
 | `deep-review/references/security/python-django-web-server-security.md` | `skills/.curated/security-best-practices/references/python-django-web-server-security.md` |
 | `deep-review/references/security/javascript-typescript-react-web-frontend-security.md` | `skills/.curated/security-best-practices/references/javascript-typescript-react-web-frontend-security.md` |
 | `deep-review/references/security/python-flask-web-server-security.md` | `skills/.curated/security-best-practices/references/python-flask-web-server-security.md` |
+| `deep-review/references/security/python-fastapi-web-server-security.md` | `skills/.curated/security-best-practices/references/python-fastapi-web-server-security.md` |
+| `deep-review/references/security/javascript-typescript-vue-web-frontend-security.md` | `skills/.curated/security-best-practices/references/javascript-typescript-vue-web-frontend-security.md` |
 
-A revisão do snapshot é a identidade de origem disponível nesta árvore; nenhum
-hash de blob adicional é inventado. As referências FastAPI e Vue que existem no
-catálogo local não foram incluídas nesta lista histórica de emendas porque não
-há entrada correspondente na atribuição original acima.
+A omissão histórica de FastAPI e Vue nesta tabela foi corrigida em 2026-11-19.
+Os dois blobs e a licença do próprio skill foram obtidos na revisão fixada,
+com SHA Git verificado a partir dos bytes e SHA-256 registrado no
+[recibo público](../implementation-evidence/remediation/provenance/public-source-captures.json).
+A [licença Apache-2.0 fixada](https://github.com/openai/skills/blob/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices/LICENSE.txt)
+corresponde ao texto local de LICENSE.application-security.md após normalizar
+somente CRLF/LF. Não se inventa aviso copyright para os documentos.
+
+FastAPI preserva o corpo upstream e acrescenta o footer consultivo OMP; Vue
+também contém a correção local de parsing/origem do redirect. Ambos recebem
+aviso explícito de modificação/proveniência. Os hashes distinguem upstream,
+bytes locais e conteúdo normalizado; essas comparações não são prova executada.
 
 ## Fontes primárias consultadas
 
@@ -50,5 +60,5 @@ consultivos até serem exercitados no cenário autorizado.
 
 A adaptação OMP de 2026-11-08 atualizou os links para este documento, renomeou
 o aviso de adaptação e explicitou o escopo. Os hashes de inventário local e os
-bytes finais pertencem às evidências da auditoria; a revisão upstream acima é a
-única revisão de origem fixada neste arquivo.
+bytes finais da correção de proveniência estão no recibo público acima; a revisão
+upstream acima continua sendo a origem fixada destes assets de segurança.

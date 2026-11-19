@@ -35,9 +35,10 @@ select * from orders where customer_id = 123 and status = 'pending';
 Key things to look for:
 
 ```sql
--- Seq Scan on large tables = missing index
--- Rows Removed by Filter = poor selectivity or missing index
--- Buffers: read >> hit = data not cached, needs more memory
+-- Seq Scan: inspect selectivity, table size, statistics and available indexes;
+-- a sequential scan can be the cheapest correct plan, even with an index.
+-- Rows Removed by Filter: inspect the predicate and estimated versus actual rows.
+-- Buffers: read >> hit indicates reads; measure I/O and cache behavior before tuning memory.
 -- Nested Loop with high loops = consider different join strategy
 -- Sort Method: external merge = work_mem too low
 ```

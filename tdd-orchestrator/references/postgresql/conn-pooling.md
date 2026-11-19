@@ -36,7 +36,12 @@ select count(*) from pg_stat_activity;  -- 10 connections
 Pool modes:
 
 - **Transaction mode**: connection returned after each transaction (best for most apps)
-- **Session mode**: connection held for entire session (needed for prepared statements, temp tables)
+- **Session mode**: connection held for the entire session; use it for session state such as persistent temporary tables or SQL `PREPARE`/`EXECUTE`.
+
+SQL `PREPARE`/`EXECUTE` differs from protocol-level named prepared statements.
+PgBouncer transaction pooling can support the latter with a compatible version
+and `max_prepared_statements` enabled. Check the driver and pooler configuration;
+do not infer support for SQL `PREPARE` from protocol support.
 
 Reference: [Connection Pooling](https://supabase.com/docs/guides/database/connecting-to-postgres#connection-pooler)
 

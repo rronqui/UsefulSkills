@@ -1,3 +1,5 @@
+> Modified locally: provenance notice added on 2026-11-19; pre-existing redirect validation corrections and the OMP consultation footer are retained. Source: openai/skills at `49f948faa9258a0c61caceaf225e179651397431`, same reference filename; Apache-2.0, [license](../../LICENSE.application-security.md), [source and changes](../../AMENDMENTS.md). This is consultative guidance, not an upstream release or runtime verification.
+
 # Vue.js Web Security Spec (Vue 3.x, TypeScript/JavaScript, common tooling: Vite)
 
 This document is designed as a **security spec** that supports:
