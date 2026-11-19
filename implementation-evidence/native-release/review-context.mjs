@@ -1046,7 +1046,7 @@ function safeYieldItems(items) {
 function safeOperationalRecord(record) {
   if (!isOperationalObject(record)) return null;
   const output = { observed_keys: Object.keys(record) };
-  for (const key of ["id", "index", "agent", "agentSource", "status", "exitCode", "aborted", "truncated", "durationMs", "parentToolCallId", "taskFile", "taskFileSha256", "sourceFile", "sourceSha256"]) {
+  for (const key of ["id", "index", "agent", "agentSource", "status", "exitCode", "isError", "aborted", "truncated", "durationMs", "parentToolCallId", "taskFile", "taskFileSha256", "sourceFile", "sourceSha256"]) {
     if (Object.prototype.hasOwnProperty.call(record, key)) output[key] = safeValue(record[key]);
   }
   const yielded = yieldItems(record);
@@ -1078,6 +1078,7 @@ function subagentObservation(frame) {
     frame_keys: Object.keys(frame),
     payload_path: payloadPath,
     payload_keys: Object.keys(payload),
+    parentToolCallId: payload.parentToolCallId ?? progress?.parentToolCallId ?? null,
     id: identity,
     agent,
     agentSource,
@@ -1415,6 +1416,7 @@ class NativeRpcSession {
         : nonEmpty(observed.agent) && nonEmpty(observed.task) ? [observed] : [];
       const call = {
         sequence,
+        toolCallId,
         type: frame.type,
         kind: items.length > 0 ? "dispatch" : "control",
         item_count: items.length,
@@ -1432,6 +1434,9 @@ class NativeRpcSession {
       if (call.kind === "dispatch" && forbiddenKey) blocked("native task wire contained a forbidden field", { key: forbiddenKey });
     }
     if (/^tasks?(?:$|[_.:])/i.test(name) && frame.type === "tool_execution_end") {
+      if (summary.isError !== false || summary.failed === true || summary.success === false || frame.aborted === true) blocked("Root TASK END did not succeed");
+      const starts = this.evidence.task_calls.filter((call) => call.toolCallId === toolCallId && call.type === "tool_execution_start");
+      if (!toolCallId || starts.length !== 1) blocked("Root TASK END lacks a unique correlated START");
       for (const details of taskDetailsEnvelopes(frame.result ?? frame.output)) {
         this.captureOperational("task_details", {
           sequence,
@@ -1441,7 +1446,8 @@ class NativeRpcSession {
           async: details.async === true,
         });
         for (const result of details.results ?? []) {
-          if (isOperationalObject(result)) this.recordTerminal(result, result, "task_tool_details", frame.type);
+          if (result?.parentToolCallId && result.parentToolCallId !== toolCallId) blocked("review result contradicts its owning Root dispatch");
+          if (isOperationalObject(result)) this.recordTerminal(result, { ...result, parentToolCallId: toolCallId }, "task_tool_details", frame.type);
         }
       }
     }
@@ -1451,12 +1457,18 @@ class NativeRpcSession {
     const observed = subagentObservation(frame);
     this.captureOperational("subagent_frames", observed.capture);
     if (frame.type !== "subagent_progress" || !observed.progress) return;
+    const parents = new Set([observed.progress.parentToolCallId, observed.payload.parentToolCallId, ...this.evidence.subagent_frames.filter((item) => item.id === observed.identity).map((item) => item.parentToolCallId)].filter(nonEmpty));
+    if (parents.size > 1) blocked("native review progress contains contradictory dispatch parents");
     this.recordTerminal(observed.progress, {
       id: observed.identity,
       agent: observed.agent,
       agentSource: observed.agentSource,
       status: observed.status,
       exitCode: observed.progress.exitCode,
+      isError: observed.progress.isError === true || observed.payload.isError === true ? true : observed.progress.isError ?? observed.payload.isError ?? null,
+      aborted: observed.progress.aborted === true || observed.payload.aborted === true ? true : observed.progress.aborted ?? observed.payload.aborted ?? null,
+      error: observed.progress.error ?? observed.payload.error,
+      parentToolCallId: [...parents][0] ?? null,
     }, "native_subagent_progress", frame.type);
   }
 
@@ -1494,6 +1506,11 @@ class NativeRpcSession {
       status: metadata.status ?? null,
       exitCode: hasObservedExitCode ? metadata.exitCode : null,
       exit_code_observed: hasObservedExitCode,
+      exit_code_invalid: metadata.exitCode != null && !hasObservedExitCode,
+      parentToolCallId: metadata.parentToolCallId ?? null,
+      isError: metadata.isError === true || raw.isError === true ? true : metadata.isError === false || raw.isError === false ? false : null,
+      aborted: metadata.aborted === true || raw.aborted === true ? true : metadata.aborted === false || raw.aborted === false ? false : null,
+      error_observed: metadata.error != null || raw.error != null,
       reviewedRevision: isOperationalObject(normalizedData) ? normalizedData.reviewed_revision ?? null : null,
       protocolMode: isOperationalObject(normalizedData) ? normalizedData.protocol_mode ?? null : null,
       structured: data !== undefined,
@@ -1563,6 +1580,9 @@ class NativeRpcSession {
     this.stdinEnded = true;
     this.child.stdin.end();
     const closed = await withTimeout(this.closed.promise, 30_000, "OMP process drain");
+    if (this.fatal) blocked("OMP RPC parser entered a fatal state during process drain", { error: this.fatal.message });
+    if (this.rawBuffer.byteLength !== 0) blocked("OMP RPC stdout drain left an incomplete frame", { bytes: this.rawBuffer.byteLength });
+    if (this.chunk) blocked("OMP RPC stdout drain left an incomplete rpc_chunk", { chunkId: this.chunk.chunkId, next: this.chunk.next, count: this.chunk.count });
     if (closed.code !== 0) blocked("OMP exited unsuccessfully", { code: closed.code });
   }
 
@@ -1656,7 +1676,16 @@ function inspectNativeEvidence(evidence, contexts, sourceRoot, executionRoot) {
     }
     const record = terminals[0];
     if (record.agent !== "deep-reviewer" || record.agentSource !== "project") failures.push(`${id} terminal profile identity/source was not proven`);
-    if (record.exit_code_observed ? record.exitCode !== 0 : !SUCCESS_TASK_STATUSES.has(String(record.status).toLowerCase())) failures.push(`${id} terminal did not complete successfully`);
+    const dispatchCalls = dispatches.filter((call) => call.assignments?.some((item) => item.id === id));
+    if (dispatchCalls.length !== 1 || !record.parentToolCallId || record.parentToolCallId !== dispatchCalls[0]?.toolCallId) failures.push(`${id} terminal is not bound to the exact Root dispatch`);
+    const status = String(record.status ?? "").toLowerCase();
+    const requiresStatus = record.source_kind === "native_subagent_progress";
+    const owningEnd = (evidence.tool_events ?? []).some((event) => event.type === "tool_execution_end" && /^tasks?(?:$|[_.:])/i.test(event.tool ?? "") && event.toolCallId === record.parentToolCallId && event.isError === false);
+    if ((requiresStatus && (!owningEnd || status !== "completed"))
+      || (!requiresStatus && !record.exit_code_observed) || record.exit_code_invalid === true
+      || (record.exit_code_observed && record.exitCode !== 0)
+      || ((!record.exit_code_observed || requiresStatus || status !== "") && !SUCCESS_TASK_STATUSES.has(status))
+      || record.isError === true || record.aborted === true || record.error_observed === true) failures.push(`${id} terminal did not complete successfully`);
     if (!record.structured || record.reviewedRevision !== context.headRevision || record.protocolMode !== "DEEP_REVIEW") failures.push(`${id} terminal was not structured DEEP_REVIEW at the independently pinned revision`);
     if (record.consumer_validation?.ok !== true) failures.push(`${id} terminal was rejected or unavailable to the actual validateReviewerResult consumer`);
   }

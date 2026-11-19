@@ -943,6 +943,8 @@ function taskCompletionBinding(observation, definition, label) {
   const dispatch = firstObject(observation?.host?.dispatch);
   if (records.length === 1) {
     const record = records[0];
+    const role = label === "first" ? definition.roles?.first_validator : definition.roles?.second_validator;
+    if (record.agent !== role?.role || record.agentSource !== "project") failures.push(`${label}_task_record_role_source_mismatch`);
     const hostJobId = record.source_kind === "task_wait_result" ? firstString(record.wait_result?.host_binding?.job_id) : firstString(record.jobId);
     const hostInstanceId = record.source_kind === "task_wait_result" ? firstString(record.wait_result?.host_binding?.instance_id) : firstString(record.instanceId);
     if (!dispatch || hostJobId !== dispatch.job_id || hostInstanceId !== dispatch.instance_id) failures.push(`${label}_task_record_domain_dispatch_mismatch`);
@@ -2317,8 +2319,8 @@ function inspectTechnicalRetryScenario(observations) {
   if (!execution.complete) failures.push("execution_consumer_completion_missing");
   if (!execution.resumed) failures.push("execution_consumer_resume_missing");
   if (native && first.task_id === null && second.task_id === null && (first.task_id_exposed || second.task_id_exposed)) failures.push("task_id_exposure_contradictory");
-  const firstEligible = firstCheck.ok && firstCount === 1 && firstTask.ok;
-  const secondEligible = secondCheck.ok && secondCount === 1 && secondTask.ok;
+  const firstEligible = firstCheck.ok && firstCount === 1 && firstTask.ok && firstHost.ok;
+  const secondEligible = secondCheck.ok && secondCount === 1 && secondTask.ok && secondHost.ok;
   const identity = {
     first: { task_id: first.task_id, task_id_exposed: first.task_id_exposed, job_id: first.job_id, instance_id: first.instance_id, session_id: first.session_id, tool_call_id: first.tool_call_id, parent_tool_call_id: first.parent_tool_call_id, agent_id: first.agent_id, payload_id: first.payload_id, result_ids: first.result_ids, adapter_derived_execution_id: adapterDerivedId(definition, first) },
     second: { task_id: second.task_id, task_id_exposed: second.task_id_exposed, job_id: second.job_id, instance_id: second.instance_id, session_id: second.session_id, tool_call_id: second.tool_call_id, parent_tool_call_id: second.parent_tool_call_id, agent_id: second.agent_id, payload_id: second.payload_id, result_ids: second.result_ids, adapter_derived_execution_id: adapterDerivedId(definition, second) },

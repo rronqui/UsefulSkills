@@ -499,7 +499,7 @@ function createNativeEnvironment() {
     if (inherited[key] !== undefined && inherited[key] !== "") throw new ProbeError("BLOCKED", `ambient global/agent override ${key} is present; refusing to reinterpret the native session`);
   }
   for (const key of NATIVE_ENV_ALLOWLIST) if (inherited[key] !== undefined) env[key] = inherited[key];
-  const missing = ["HOME", "USERPROFILE"].filter((key) => !env[key]);
+  const missing = [process.platform === "win32" ? "USERPROFILE" : "HOME"].filter((key) => !env[key]);
   if (missing.length) throw new ProbeError("BLOCKED", `native authenticated environment is missing ${missing.join(", ")}`);
   return {
     env,
@@ -1316,6 +1316,14 @@ async function runQualityConsumers(project, qualityFixture, quality, ship, exter
       reason: externalPlan?.status === "PASS" ? "Actual overlay Ship plan CLI receipt observed locally; native validator END binding is still required for EXTERNAL acceptance." : "Actual overlay Ship plan CLI did not produce an accepted AC021 receipt.",
     },
   };
+}
+function revalidateDeliveryConsumers(project, qualityResult, ship) {
+  const current = ship.validateShipQuality(project, { reportPath: ".omp/state/quality.json", contextPath: ".omp/state/quality-context.json", required: true });
+  const sameProof = typeof qualityResult.ship_gate?.proof_digest === "string"
+    && current.proofDigest === qualityResult.ship_gate.proof_digest;
+  const gate = { ...resultSummary(current), proof_digest: current.proofDigest ?? null };
+  if (!sameProof) { gate.ok = false; gate.errors.push("delivery evidence changed since the original quality decision"); }
+  return { ...qualityResult, ship_gate: gate, delivery_revalidated: true };
 }
 function stateProgress(status = "VALIDATED", phase = "DONE") {
   const revision = "a".repeat(40);
@@ -4583,6 +4591,7 @@ class NativeRpcSession {
     if (this.validatorCalls?.size) blocked("settled Root retained validator START without a correlated END");
     if (this.writeCalls?.size) blocked("settled Root retained child write START without a correlated END");
     if (this.rootWriteCalls?.size) blocked("settled Root retained Root write START without a correlated END");
+    if (this.waitCalls?.size) blocked("settled Root retained wait START without a correlated END");
     await this.close(); return this.evidence;
   }
   async close() {
@@ -7329,7 +7338,8 @@ async function main() {
   };
   const workloadReceiptAfter = { path: path.relative(fixture.project, workloadReceiptPath).replaceAll("\\", "/"), bytes: fs.statSync(workloadReceiptPath).size, sha256: sha256Bytes(fs.readFileSync(workloadReceiptPath)) };
   const workloadReceiptStable = workloadReceiptInfo.bytes === workloadReceiptAfter.bytes && workloadReceiptInfo.sha256 === workloadReceiptAfter.sha256;
-  const lifecycleResult = evaluateLifecycle(native, qualityResult, stateResult, executionResult, retroResult, nativeFailure, retry, retryExecution, alignmentBinding, nativeRetro, routeResults);
+  const deliveryQuality = revalidateDeliveryConsumers(fixture.project, qualityResult, ship);
+  const lifecycleResult = evaluateLifecycle(native, deliveryQuality, stateResult, executionResult, retroResult, nativeFailure, retry, retryExecution, alignmentBinding, nativeRetro, routeResults);
   const sourceAfter = fingerprint(options.source, fingerprintPaths);
   const binaryAfter = { path: options.omp, bytes: fs.statSync(options.omp).size, sha256: sha256Bytes(fs.readFileSync(options.omp)) };
   const sourceChanged = compareFingerprints(sourceBefore, sourceAfter);
@@ -7346,14 +7356,14 @@ async function main() {
     note: "Native core is reported separately from integrated lifecycle; EXTERNAL and any missing native fields remain unresolved.",
   };
   const routeReady = routeResults.length === 4 && routeResults.every((item) => item?.status === "PASS" && item?.native === true);
-  const native10Ready = nativeCoreReady && routeReady && lifecycleResult.status === "PASS" && workloadReady && stateReady && workloadReceiptStable && qualityResult.direct.ok && qualityResult.ship_gate.ok && executionResult.native_observed === true && executionResult.complete && retroResult.required.validation.ok && catalogResult.status === "PASS" && sourceChanged.length === 0 && !binaryChanged;
+  const native10Ready = nativeCoreReady && routeReady && lifecycleResult.status === "PASS" && workloadReady && stateReady && workloadReceiptStable && deliveryQuality.direct.ok && deliveryQuality.ship_gate.ok && executionResult.native_observed === true && executionResult.complete && retroResult.required.validation.ok && catalogResult.status === "PASS" && sourceChanged.length === 0 && !binaryChanged;
   const overall = native10Ready && retry.status === "PASS" ? "PASS" : native10Ready ? "PENDING_NATIVE09" : "PENDING_NATIVE";
   const unresolvedExternal = lifecycleResult.uncovered.filter((item) => item.phase === "EXTERNAL");
   const evidence = {
     status: overall, task: "T-011", acceptance_criteria: ["AC-016"], contract: "0.6.0", phase: options.phase, run_id: runId, logical_run_id: fixture.logicalRunId, started_at: evaluationStartedAt, finished_at: null,
     source_root: options.source, lab_root: options.lab, private_project: fixture.project, home_observer: { normal_home: normalHome, guard: "equal-or-contains-only; lab below UserTemp is not treated as a real HOME overlap" }, source_before: sourceBefore, source_after: sourceAfter, omp_binary_before: binaryBefore, omp_binary_after: binaryAfter, preservation: { source_changed: sourceChanged, binary_changed: binaryChanged, workload_receipt_stable: workloadReceiptStable }, receipts: { workload: { before: workloadReceiptInfo, after: workloadReceiptAfter } },
     catalog: catalogResult, alignment_binding: alignmentBinding, route_matrix: retainedRoutes?.route_matrix ?? { run_id: routeRunId, revision, nonce: routeNonce, fixtures: routeFixtures, cases: routeResults }, technical_retry_preparation: technicalRetryPrepared, library_controls: { quality: qualityResult, state: stateResult, execution: libraryExecutionResult, native_execution: executionResult, ship: qualityResult.external_dry_path, retro: retroResult, phases },
-    lifecycle: lifecycleResult, native_core: nativeCore, native_retro: nativeRetro, unresolved_external: unresolvedExternal, native10: native, native09_probe_allowed: native09ProbeAllowed, native09_failure_observation: native09FailureObservation, native09_failure: nativeFailure, native09_retry: retry, native09_execution_consumer: retryExecution, retry_native_observation: retryNative, retry_control: retryControl,
+    delivery_quality: deliveryQuality, lifecycle: lifecycleResult, native_core: nativeCore, native_retro: nativeRetro, unresolved_external: unresolvedExternal, native10: native, native09_probe_allowed: native09ProbeAllowed, native09_failure_observation: native09FailureObservation, native09_failure: nativeFailure, native09_retry: retry, native09_execution_consumer: retryExecution, retry_native_observation: retryNative, retry_control: retryControl,
     commands_not_run: ["git publication/remote operations", "gh", "npm", "ship.mjs ship/deploy commands", "node --test", "vitest", "npm test", "build", "lint", "format", "commit outside disposable route fixtures", "push", "issue", "pull request", "release", "deploy", "domain/publication network operations; native SDK provider transport is outside this list", "alignment short/full/local/Git 20-minute probes"],
     evidence_levels: { library_controls: "actual imported source consumers over private fixture bytes; not native proof", catalog: "static-source-binding", alignment: alignmentBinding.status === "PASS" ? "historical retained native capture with exact six-target source binding" : "PENDING_NATIVE", native_core: nativeCore.status === "PASS" ? "authentic OMP RPC task/tool/terminal records and installed profile schemas, excluding unresolved lifecycle gates" : "PENDING_NATIVE", native10: native.status === "PASS" && lifecycleResult.status === "PASS" ? "authentic OMP RPC task/tool/terminal records, bounded artifacts and installed profile schemas" : "PENDING_NATIVE", native09: retry.status === "PASS" && retryExecution?.status === "PASS" ? "authentic native solution retry plus execution consumer" : "PENDING_NATIVE" },
     limitations: ["The driver is not an OS sandbox; the private lab boundary and tool guard are bounded process controls.", "Missing native fields remain PENDING; no model/serving/agentSource field is inferred.", "Native core is reported separately; unresolved EXTERNAL and any missing lifecycle gate prevent overall PASS.", "External publication remains unexecuted; the local plan receipt is LOCAL_PROGRAM_ONLY and native EXTERNAL requires a correlated validator tool_execution_end receipt.", "Tooling/auth/network/quota/configuration failures are never promoted to technical retry."],

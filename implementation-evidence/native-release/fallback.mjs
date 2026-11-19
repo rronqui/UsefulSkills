@@ -453,7 +453,7 @@ function publicReviewData(value) {
   const result = {};
   for (const key of PUBLIC_REVIEW_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-    if (key === "findings") result.findings = Array.isArray(value.findings) ? value.findings.map(publicFinding).filter(Boolean) : sanitizeValue(value.findings);
+    if (key === "findings") result.findings = Array.isArray(value.findings) ? value.findings.map(publicFinding) : sanitizeValue(value.findings);
     else result[key] = typeof value[key] === "string" ? scrubText(value[key], 4096) : sanitizeValue(value[key]);
   }
   return result;
@@ -472,7 +472,7 @@ function publicAggregateData(value) {
     agent: typeof item?.agent === "string" ? scrubText(item.agent, 256) : null,
   }));
   if (value.counts && typeof value.counts === "object" && !Array.isArray(value.counts)) result.counts = sanitizeValue(value.counts);
-  if (Array.isArray(value.findings)) result.findings = value.findings.map(publicFinding).filter(Boolean);
+  if (Array.isArray(value.findings)) result.findings = value.findings.map(publicFinding);
   if (Array.isArray(value.blockers)) result.blockers = value.blockers.map(publicFinding).filter(Boolean);
   return result;
 }
@@ -488,7 +488,7 @@ function safeYieldEntries(value) {
       const labels = Array.isArray(item.type) ? item.type.filter((label) => typeof label === "string" && label.trim() !== "") : [];
       if (labels.includes("findings")) {
         result.data = Array.isArray(item.data)
-          ? item.data.map(publicFinding).filter(Boolean)
+          ? item.data.map(publicFinding)
           : publicFinding(item.data);
       } else if (labels.length === 0 || labels.every((label) => PUBLIC_REVIEW_FIELDS.has(label))) {
         result.data = publicReviewData(item.data);
@@ -849,7 +849,11 @@ function successfulReadEnd(frame) {
   const result = frame.result ?? frame.output ?? frame.error;
   const success = trustedBooleanState([frame, result], ["success"]);
   const failure = trustedBooleanState([frame, result], ["isError", "is_error", "failed"]);
-  return frame.isError === false
+  const content = typeof result === "string" ? result : result?.content;
+  const observedContent = typeof content === "string" ? content.length > 0
+    : Array.isArray(content) && content.some((item) => item?.type === "text" && typeof item.text === "string" && item.text.length > 0);
+  return observedContent && frame.error === undefined && frame.aborted !== true && result?.aborted !== true
+    && frame.isError === false
     && !success.contradictory
     && !success.negative
     && !failure.positive
@@ -1145,6 +1149,7 @@ class RpcSession {
         if (details) this.evidence.task_details.push({ sequence, origin: "tool_execution", details });
       } else {
         const start = this.openTools.get(callId ?? "");
+        if (/^read(?:$|[_:.])/i.test(toolName) && (!callId || !start?.readPaths || start.toolName !== toolName)) blocked("Root READ END was not correlated to its START");
         if (isProbeBash && (!start?.probe || !this.evidence.probe_bash_start || this.evidence.probe_bash_start.tool_call_id !== callId)) {
           throw new DriverError("BLOCKED", "configured probe Bash END was not correlated to its START");
         }
@@ -1674,10 +1679,10 @@ function assembleFallback(record) {
         seen.add(label);
       } else if (label === "findings") {
         if (!Array.isArray(result.findings)) result.findings = [];
-        if (Array.isArray(item.data)) result.findings.push(...item.data.map(publicFinding).filter(Boolean));
+        if (Array.isArray(item.data)) result.findings.push(...item.data.map(publicFinding));
         else {
           const finding = publicFinding(item.data);
-          if (finding) result.findings.push(finding);
+          result.findings.push(finding);
         }
       }
     }
@@ -1685,6 +1690,7 @@ function assembleFallback(record) {
   const requiredTypedFields = ["agent", "protocol_mode", "status", "reviewed_revision", "overall_correctness", "explanation", "confidence"];
   if (!requiredTypedFields.every((label) => seen.has(label))) return undefined;
   if (result.__terminal !== undefined) {
+    if (result.findings?.some((finding) => finding === null)) return undefined;
     const terminal = result.__terminal;
     if (!terminal || typeof terminal !== "object" || Array.isArray(terminal)) return undefined;
     for (const label of requiredTypedFields) if (!Object.prototype.hasOwnProperty.call(terminal, label)) terminal[label] = result[label];

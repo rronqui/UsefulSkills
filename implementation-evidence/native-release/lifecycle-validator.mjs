@@ -42,7 +42,7 @@ function isRegularFile(file) {
       if (path.relative(privateRoot, parent) === "") break;
     }
     const stat = lstatSync(file);
-    return stat.isFile() && !stat.isSymbolicLink();
+    return stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1;
   } catch {
     return false;
   }

@@ -19,20 +19,20 @@ const READING_TAG_RULE = "instance_id is exactly the full host-observed Root get
 const ALIGNMENT_SOURCES = Object.freeze([
   Object.freeze({
     path: "alignment/SKILL.md",
-    bytes: 14090,
-    sha256: "bf2b2dd4d10d8635b4ad746ffc462b6bbe7962fe90d5294e3dabc0249b820f18",
+    bytes: 15594,
+    sha256: "199ff8b2bb5546a1861666905d7098693076fc393a68ef33f81a9c5f65eb56b5",
     overlay: ".omp/skills/alignment/SKILL.md",
   }),
   Object.freeze({
     path: "alignment/agents/requirements-reader.md",
-    bytes: 3156,
-    sha256: "4c59206dcdb8d4043d26621de713bb440e87221b1c6a5b3ad833c0831b3a6a82",
+    bytes: 3473,
+    sha256: "4dce707a9af220d638ef862c45d723b79834f7dd4185ce05ddcc4af1f7702186",
     overlay: ".omp/agents/requirements-reader.md",
   }),
   Object.freeze({
     path: "alignment/references/comprehension-review.md",
-    bytes: 1810,
-    sha256: "ef9d9eaae580db6242ab4b4ed27facadb270689c7487c284343499264805b4e2",
+    bytes: 2374,
+    sha256: "9c40f76171fa2b297dbbb4df7207a27f09175d362f1ac228318f5248d1214bc8",
     overlay: ".omp/skills/alignment/references/comprehension-review.md",
   }),
   Object.freeze({
@@ -43,8 +43,8 @@ const ALIGNMENT_SOURCES = Object.freeze([
   }),
   Object.freeze({
     path: "alignment/references/routing-and-persistence.md",
-    bytes: 7079,
-    sha256: "46a9121501f1b00f6f08e0aa722f783789a9d3fcc5b572ee66cb8428943dabf5",
+    bytes: 7492,
+    sha256: "2a54023f5973eabf18e763e2922410ac2bbb4ff01e07a9b517bb121a72087c9a",
     overlay: ".omp/skills/alignment/references/routing-and-persistence.md",
   }),
   Object.freeze({

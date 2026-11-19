@@ -17,6 +17,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   existsSync,
   lstatSync,
+  openSync, closeSync, fstatSync, readSync,
   mkdirSync,
   readdirSync,
   realpathSync,
@@ -364,7 +365,7 @@ function safeSubagentPayload(frameType, payload, subagentId) {
     frame_type: frameType,
     subagent_id: subagentId ?? null,
   };
-  for (const key of ["id", "index", "agent", "agentSource", "status", "sessionFile", "parentToolCallId"]) {
+  for (const key of ["id", "index", "agent", "agentSource", "status", "isError", "aborted", "sessionFile", "parentToolCallId"]) {
     if (Object.prototype.hasOwnProperty.call(payload, key)) output[key] = typeof payload[key] === "string" ? scrubText(payload[key]) : sanitizeValue(payload[key]);
   }
   for (const key of ["task", "assignment", "description"]) {
@@ -411,7 +412,11 @@ function nativeProgressTerminalRecord(payloadEvidence) {
     agent: progress.agent ?? payloadEvidence.agent ?? null,
     agentSource: progress.agentSource ?? payloadEvidence.agentSource ?? null,
     status: progress.status ?? payloadEvidence.status ?? null,
-    exitCode: status === "completed" || status === "complete" || status === "success" || status === "succeeded" ? 0 : 1,
+    exitCode: Number.isFinite(progress.exitCode) && Number.isInteger(progress.exitCode) ? progress.exitCode : null,
+    exit_code_invalid: progress.exit_code_invalid === true,
+    parentToolCallId: progress.parentToolCallId ?? payloadEvidence.parentToolCallId ?? null,
+    isError: progress.isError === true || payloadEvidence.isError === true ? true : progress.isError === false || payloadEvidence.isError === false ? false : null,
+    aborted: progress.aborted === true || payloadEvidence.aborted === true ? true : progress.aborted === false || payloadEvidence.aborted === false ? false : null,
     progress,
   };
   for (const key of ["resolvedModel", "resolvedModelIdentity", "resolvedThinkingLevel", "resolvedModelIsFallback", "taskFile", "taskFileSha256", "structuredOutput", "yield", "yield_source", "failure", "error", "retryFailure", "retryState"]) {
@@ -1095,9 +1100,11 @@ function extractOfflinePeerFrame(parsed, fixture) {
     : [];
   if (terminals.length !== 1) blocked("offline peer evidence did not contain exactly one captured PeerPositive native progress terminal", { count: terminals.length });
   const terminal = terminals[0];
-  if (terminal.source_kind !== "native_subagent_progress" || terminal.frame_type !== "subagent_progress" || terminal.status !== "completed" || terminal.exitCode !== 0) {
+  if (terminal.source_kind !== "native_subagent_progress" || terminal.frame_type !== "subagent_progress" || terminal.status !== "completed") {
     blocked("offline full evidence PeerPositive terminal was not a completed native progress record");
   }
+  observedSuccessfulTerminal(terminal, REVIEW_ASSIGNMENTS.peerPositive.id, "native_subagent_progress", true);
+  assertTerminalDispatch({ nativeEvidence: native }, REVIEW_ASSIGNMENTS.peerPositive.id, terminal);
   const peerCases = Array.isArray(native?.peer_cases)
     ? native.peer_cases.filter((entry) => entry && entry.id === REVIEW_ASSIGNMENTS.peerPositive.id)
     : [];
@@ -1108,7 +1115,7 @@ function extractOfflinePeerFrame(parsed, fixture) {
     || peerCase.status !== "APROVADO"
     || peerCase.actual?.source_kind !== "native_subagent_progress"
     || peerCase.actual?.status !== "completed"
-    || peerCase.actual?.exitCode !== 0
+    || peerCase.actual?.exitCode !== terminal.exitCode
     || peerCase.consumer_validation?.accepted !== true
     || peerCase.consumer_validation?.status !== "APROVADO"
   ) {
@@ -1122,6 +1129,10 @@ function extractOfflinePeerFrame(parsed, fixture) {
       subagent_id: terminal.id,
       agent: terminal.agent,
       agentSource: terminal.agentSource,
+      parentToolCallId: terminal.parentToolCallId,
+      exitCode: terminal.exitCode,
+      isError: terminal.isError,
+      aborted: terminal.aborted,
       status: terminal.status,
       progress: terminal.progress,
     },
@@ -1132,7 +1143,21 @@ function extractOfflinePeerFrame(parsed, fixture) {
 }
 
 function loadOfflinePeerProgress(evidencePath, fixture) {
-  const bytes = readFileSync(evidencePath);
+  const fd = openSync(evidencePath, "r");
+  let bytes;
+  try {
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_REASSEMBLED_FRAME_BYTES) blocked("offline peer evidence exceeds the bounded regular-file limit");
+    const buffer = Buffer.alloc(stat.size + 1);
+    let total = 0;
+    while (total < buffer.length) {
+      const count = readSync(fd, buffer, total, buffer.length - total, null);
+      if (count === 0) break;
+      total += count;
+    }
+    if (total > stat.size) blocked("offline peer evidence changed beyond its bounded size");
+    bytes = buffer.subarray(0, total);
+  } finally { closeSync(fd); }
   let parsed;
   try {
     parsed = JSON.parse(bytes.toString("utf8"));
@@ -1169,7 +1194,8 @@ function loadOfflinePeerProgress(evidencePath, fixture) {
     progress,
   };
   const record = nativeProgressTerminalRecord(payload);
-  if (!record || record.exitCode !== 0) blocked("offline peer evidence did not contain a completed native progress terminal");
+  if (!record) blocked("offline peer evidence did not contain a completed native progress terminal");
+  observedSuccessfulTerminal(record, REVIEW_ASSIGNMENTS.peerPositive.id, "offline_peer_progress", true);
   const data = assembleNativeYield(record);
   if (!data || typeof data !== "object" || Array.isArray(data) || data.protocol_mode !== "TDD_PEER_REVIEW" || data.agent !== "peer-reviewer" || data.status !== "APROVADO") {
     blocked("offline peer evidence did not contain the documented native APROVADO JTD");
@@ -1479,7 +1505,7 @@ function safeStructuredOutput(value) {
 function safeTaskRecord(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) return { malformed: true, value: opaqueError(item) };
   const output = {};
-  for (const key of ["index", "id", "agent", "agentSource", "exitCode", "status", "aborted", "truncated", "durationMs", "tokens", "requests", "contextTokens", "contextWindow"]) {
+  for (const key of ["index", "id", "agent", "agentSource", "exitCode", "status", "isError", "aborted", "parentToolCallId", "truncated", "durationMs", "tokens", "requests", "contextTokens", "contextWindow"]) {
     if (Object.prototype.hasOwnProperty.call(item, key)) output[key] = sanitizeValue(item[key]);
   }
   for (const [target, candidates] of [
@@ -1538,8 +1564,12 @@ function safeYieldEntries(value) {
 function safeSubagentProgress(progress) {
   if (!progress || typeof progress !== "object" || Array.isArray(progress)) return null;
   const output = {};
-  for (const key of ["index", "id", "agent", "agentSource", "status", "durationMs", "toolCount", "requests", "tokens", "contextTokens", "contextWindow", "resolvedThinkingLevel", "resolvedModelIsFallback"]) {
+  for (const key of ["index", "id", "agent", "agentSource", "status", "isError", "aborted", "parentToolCallId", "durationMs", "toolCount", "requests", "tokens", "contextTokens", "contextWindow", "resolvedThinkingLevel", "resolvedModelIsFallback"]) {
     if (Object.prototype.hasOwnProperty.call(progress, key)) output[key] = sanitizeValue(progress[key]);
+  }
+  if (Object.prototype.hasOwnProperty.call(progress, "exitCode")) {
+    output.exitCode = Number.isFinite(progress.exitCode) && Number.isInteger(progress.exitCode) ? progress.exitCode : null;
+    output.exit_code_invalid = output.exitCode === null;
   }
   for (const [target, candidates] of [
     ["resolvedModel", ["resolvedModel", "resolved_model"]],
@@ -1636,13 +1666,23 @@ function taskDetailsSnapshot(details) {
   return snapshot;
 }
 
-function addTaskDetails(evidence, value, origin) {
+function addTaskDetails(evidence, value, origin, parentToolCallId = null) {
   for (const details of collectTaskDetails(value)) {
     const snapshot = taskDetailsSnapshot(details);
     if (!snapshot) continue;
+    if (origin === "tool_execution_end" && parentToolCallId && [...(snapshot.results ?? []), ...(snapshot.progress ?? [])].some((record) => record.parentToolCallId && record.parentToolCallId !== parentToolCallId)) blocked("task result contradicts its owning Root dispatch");
     const digest = sha256Text(JSON.stringify(snapshot));
-    if (evidence.task_details.some((entry) => entry.digest === digest)) continue;
-    evidence.task_details.push({ origin, digest, details: snapshot });
+    const existing = evidence.task_details.find((entry) => entry.digest === digest);
+    if (existing) {
+      // Nested telemetry can precede the owning Root END for the same snapshot.
+      if (origin === "tool_execution_end" && parentToolCallId) {
+        if (existing.parentToolCallId && existing.parentToolCallId !== parentToolCallId) blocked("task snapshot appeared under conflicting Root dispatches");
+        existing.origin = origin;
+        existing.parentToolCallId = parentToolCallId;
+      }
+      continue;
+    }
+    evidence.task_details.push({ origin, digest, parentToolCallId, details: snapshot });
   }
 }
 
@@ -1652,6 +1692,7 @@ function taskCallShape(frame) {
   const isForbidden = (key) => TASK_WIRE_FORBIDDEN_KEYS.has(key) || TASK_WIRE_FORBIDDEN_KEYS.has(key.toLowerCase());
   const shape = {
     tool: eventToolName(frame),
+    toolCallId: eventCorrelationId(frame),
     keys: Object.keys(raw).sort(),
     hasModelField: Object.keys(raw).some(isForbidden),
     items: [],
@@ -1948,8 +1989,9 @@ class RpcSession {
       }
       this.evidence.tool_events.push(summary);
       if (summary.taskCall) this.evidence.task_calls.push(summary.taskCall);
-      if (frame.type === "tool_execution_end") {
-        addTaskDetails(this.evidence, frame.result ?? frame.output ?? frame.error, "tool_execution_end");
+      if (frame.type === "tool_execution_end" && /^tasks?(?:$|[_:.])/i.test(knownToolName)) {
+        if (frame.isError !== false || frame.error !== undefined || [frame, frame.result ?? frame.output].some(value => value && (value.isError === true || value.aborted === true || value.failed === true || value.success === false || value.error !== undefined))) blocked("Root TASK END did not succeed");
+        addTaskDetails(this.evidence, frame.result ?? frame.output, "tool_execution_end", eventCorrelationId(frame));
       }
       return;
     }
@@ -1960,6 +2002,7 @@ class RpcSession {
       const taskId = [nested?.id, progress?.id, frame.agentId, frame.agent_id, frame.taskId, frame.task_id, frame.id].find((value) => typeof value === "string" && value !== "") ?? null;
       const summary = {
         type: frame.type,
+        parentToolCallId: nested?.parentToolCallId ?? progress?.parentToolCallId ?? null,
         id: taskId,
         agent: typeof nested?.agent === "string" ? nested.agent : typeof progress?.agent === "string" ? progress.agent : typeof frame.agent === "string" ? frame.agent : null,
         agentSource: typeof nested?.agentSource === "string" ? nested.agentSource : typeof progress?.agentSource === "string" ? progress.agentSource : typeof frame.agentSource === "string" ? frame.agentSource : null,
@@ -2396,8 +2439,8 @@ function peerTask(assignment, fixture, kind, expected) {
 function flattenTaskRecords(context) {
   const records = [];
   for (const event of context.nativeEvidence.task_details) {
-    for (const record of event.details.results ?? []) records.push({ ...record, origin: event.origin, details_digest: event.digest });
-    for (const record of event.details.progress ?? []) records.push({ ...record, origin: event.origin, details_digest: event.digest, progress: true });
+    for (const record of event.details.results ?? []) records.push({ ...record, origin: event.origin, parentToolCallId: event.parentToolCallId ?? record.parentToolCallId, details_digest: event.digest });
+    for (const record of event.details.progress ?? []) records.push({ ...record, origin: event.origin, parentToolCallId: event.parentToolCallId ?? record.parentToolCallId, details_digest: event.digest, progress: true });
   }
   return records;
 }
@@ -2511,14 +2554,39 @@ function requireTerminalRecord(context, id) {
     });
   }
   const record = matches[0];
-  if (record.exitCode !== undefined && record.exitCode !== 0) blocked(`native task ${id} failed before a usable terminal result`, { exitCode: record.exitCode, error: record.error ?? null });
-  if (record.output_error !== undefined) blocked(`native task ${id} exposed only an error terminal payload`, { error: record.output_error });
-  if (record.aborted === true || ["failed", "error", "aborted", "canceled", "cancelled"].includes(String(record.status ?? "").toLowerCase())) blocked(`native task ${id} did not complete successfully`, { status: record.status ?? null });
+  if (!hasTaskTerminalPayload(record)) blocked(`native task ${id} did not expose a usable terminal payload`, { exitCode: record.exitCode ?? null, status: record.status ?? null });
+  return observedSuccessfulTerminal(record, id, "task_tool_details");
+}
+function observedSuccessfulTerminal(record, id, sourceKind, requiresStatus = false) {
+  const status = String(record?.status ?? "").toLowerCase();
+  const failureStatuses = new Set(["failed", "error", "aborted", "canceled", "cancelled"]);
+  const successStatuses = new Set(["completed", "complete", "success", "succeeded"]);
+  // OMP v18.18.6 AgentProgress has status, not exitCode. task/index.ts
+  // #registerSpawnJob derives completed only after checking the real SingleResult
+  // exit/error/abort fields. Keep the absent numeric field unknown; inline
+  // SingleResult still requires its observed numeric zero.
+  const progressChannel = ["native_subagent_progress", "offline_peer_progress"].includes(sourceKind);
+  const observedExit = Number.isFinite(record?.exitCode) && Number.isInteger(record.exitCode);
+  if (record.exit_code_invalid === true || (!progressChannel && !observedExit)) {
+    blocked(`native task ${id} did not expose an observed terminal exitCode`, { source_kind: sourceKind, exitCode: record?.exitCode ?? null, status: record?.status ?? null });
+  }
+  if (observedExit && record.exitCode !== 0) {
+    blocked(`native task ${id} failed before a usable terminal result`, { source_kind: sourceKind, exitCode: record.exitCode, status: record?.status ?? null, error: record?.error ?? null });
+  }
+  if (record.isError === true || record.aborted === true || failureStatuses.has(status)) {
+    blocked(`native task ${id} did not complete successfully`, { source_kind: sourceKind, status: record?.status ?? null, exitCode: record.exitCode });
+  }
+  if ((progressChannel && status !== "completed") || ((requiresStatus || status !== "") && !successStatuses.has(status))) {
+    blocked(`native task ${id} exposed an unknown or contradictory terminal status`, { source_kind: sourceKind, status: record?.status ?? null, exitCode: record.exitCode });
+  }
+  if (record.output_error !== undefined || record.error !== undefined || record.failure !== undefined) {
+    blocked(`native task ${id} exposed an error terminal payload`, { source_kind: sourceKind, error: record.output_error ?? record.error ?? record.failure });
+  }
   return record;
 }
 function requireObservedTerminalRecord(context, id) {
   const taskMatches = terminalRecords(context).filter((record) => record.id.toLowerCase() === id.toLowerCase() && hasTaskTerminalPayload(record));
-  if (taskMatches.length === 1) return { record: taskMatches[0], source_kind: "task_tool_details" };
+  if (taskMatches.length === 1) return { record: observedSuccessfulTerminal(taskMatches[0], id, "task_tool_details"), source_kind: "task_tool_details" };
   const progressMatches = nativeProgressRecords(context, id);
   if (progressMatches.length > 1) {
     blocked(`native task ${id} exposed duplicate native progress terminal records`, {
@@ -2529,10 +2597,22 @@ function requireObservedTerminalRecord(context, id) {
   }
   if (progressMatches.length === 1) {
     const record = progressMatches[0];
-    if (record.exitCode !== 0) blocked(`native task ${id} failed before a usable native progress terminal result`, { source_kind: record.source_kind, exitCode: record.exitCode, error: record.error ?? null, failure: record.failure ?? null });
-    return { record, source_kind: record.source_kind };
+    return { record: observedSuccessfulTerminal(record, id, record.source_kind, true), source_kind: record.source_kind };
   }
   return { record: requireTerminalRecord(context, id), source_kind: "task_tool_details" };
+}
+
+function assertTerminalDispatch(context, id, record) {
+  if (record.source_kind !== "native_subagent_progress" && record.origin !== "tool_execution_end") blocked(`native task ${id} terminal did not originate in its Root task channel`);
+  const calls = (context.nativeEvidence.task_calls ?? []).filter((call) => call.items?.some((item) => item.name === id));
+  if (calls.length !== 1 || !calls[0].toolCallId) blocked(`native task ${id} lacks a unique Root dispatch`);
+  const call = calls[0];
+  const assignments = call.items.filter((item) => item.name === id);
+  if (assignments.length !== 1 || assignments[0].agent !== record.agent || record.agentSource !== "project") blocked(`native task ${id} role/source does not match its Root dispatch`);
+  const parents = new Set([record.parentToolCallId, ...(context.nativeEvidence.subagent_frames ?? []).filter((frame) => frame.id === record.id).map((frame) => frame.parentToolCallId)].filter((value) => typeof value === "string" && value !== ""));
+  if (parents.size !== 1 || !parents.has(call.toolCallId)) blocked(`native task ${id} terminal is not bound to its exact Root dispatch`);
+  if (record.source_kind === "native_subagent_progress" && !(context.nativeEvidence.task_details ?? []).some((entry) => entry.origin === "tool_execution_end" && entry.parentToolCallId === call.toolCallId)) blocked(`native task ${id} progress lacks its successful owning Root TASK END`);
+  return record;
 }
 
 function assertTaskWire(context) {
@@ -2572,6 +2652,7 @@ function assertProfileRecords(context, fixture) {
       }
       : requireObservedTerminalRecord(context, name);
     const record = observedTerminal.record;
+    if (!observedTerminal.coverage_source) assertTerminalDispatch(context, name, record);
     if (seenIds.has(record.id.toLowerCase())) assertion("native profile dispatch reused a task id", { expectedRed: true, id: record.id });
     seenIds.add(record.id.toLowerCase());
     if (record.agent !== agent) assertion(`native task ${name} resolved a different agent type`, { expectedRed: true, expected: agent, actual: record.agent });
@@ -2716,6 +2797,7 @@ function assertPeerCase(context, protocol, fixture, assignment, expectedStatus) 
       digests: nativeProgress.map((record) => record.digest),
     });
     const record = nativeProgress[0];
+    assertTerminalDispatch(context, assignment.id, record);
     const nativeFailure = nativeProtocolFailure(record);
     if (nativeFailure) {
       const rejected = {
@@ -2746,6 +2828,7 @@ function assertPeerCase(context, protocol, fixture, assignment, expectedStatus) 
         native_failure: nativeFailure,
       });
     }
+    observedSuccessfulTerminal(record, assignment.id, record.source_kind, true);
     const assembled = assembleNativeYield(record);
     const data = assembled && typeof assembled === "object" && !Array.isArray(assembled) ? assembled : null;
     const text = typeof assembled === "string" ? assembled.trim() : "";
@@ -2835,6 +2918,7 @@ function assertPeerCase(context, protocol, fixture, assignment, expectedStatus) 
     }
   }
   const record = requireTerminalRecord(context, assignment.id);
+  assertTerminalDispatch(context, assignment.id, record);
   const text = reviewText(record);
   const structured = structuredData(record);
   const caseEvidence = {
@@ -2898,6 +2982,7 @@ function assertDeepCases(context, protocol, fixture) {
   const results = [];
   for (const assignment of [REVIEW_ASSIGNMENTS.deepOne, REVIEW_ASSIGNMENTS.deepTwo]) {
     const observedTerminal = requireObservedTerminalRecord(context, assignment.id);
+    assertTerminalDispatch(context, assignment.id, observedTerminal.record);
     const record = observedTerminal.record;
     const data = observedTerminal.source_kind === "native_subagent_progress"
       ? assembleNativeYield(record, DEEP_REVIEW_YIELD_SHAPES)
