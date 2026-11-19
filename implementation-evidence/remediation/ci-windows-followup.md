@@ -85,3 +85,23 @@ in 84.29 seconds; 42 other cases were excluded by the directed selector rather
 than certified as platform skips. Coordinator review retained all assertions
 and added termination on readiness timeout. Syntax/diff checks passed. The
 complete hosted matrix must validate the resulting candidate.
+
+On `493210b8bebbd59b3278fc90e1df3efc411df482`, the Windows suite recorded
+1324 passed, one failed and 46 platform/capability skips (1371 total). The
+aggregate `quality` failed because the test matrix failed; security succeeded.
+The remaining rollback-race failure occurred before any transaction: all four
+seeded v0.4.0 hooks were rejected as unmanaged files, so no attacker marker
+could exist. This was a distinct fixture admission failure.
+
+A fresh `git -c core.autocrlf=true checkout-index` reproduced changed fixture
+hashes: `3414f1866d836af96c40c7fd65391ea673216c314a6978c1f64941deeb801d29`
+and `410e7a4ae37844595cab020a5ef7a5b221abae04778ab3f4da2ddf3f5f6b337a`.
+The two historical `.mjs` fixtures now have `text eol=lf` attributes. Repeating
+the same Windows-converting checkout produced the exact pinned release hashes
+`f00329a439c79349ef19eb0b321d6f28c744dfab4ce1973b9170da1657cfa407` and
+`6cbbd6ffc2a25b3ed7c3e43da9b4c6572469fd64fbdcc0cbbe5a3396e59dd1dd`.
+The real Windows rollback-race case passed in 26.61 seconds; 43 other cases
+were excluded by the selector. No runtime acceptance hash, transaction guard,
+race assertion or timeout changed. The coordinator handled this two-line
+attribute correction directly, avoiding delegation cost. Full hosted CI must
+still validate the new candidate.

@@ -5,7 +5,7 @@
     "implementation-evidence/remediation/",
     "implementation-evidence/release-governance/"
   ],
-  "manifest_sha256": "631f9f4cfa8429ae044ec52f4e46fa610eff1de425c948861f27e28e8916e8ce",
+  "manifest_sha256": "7c79816490ee79a34247020c9531681df4a7f61bcdcd5be3e701d53985e6fbe7",
   "files": [
     {
       "path": ".commitlintrc.json",
@@ -14,8 +14,8 @@
     },
     {
       "path": ".gitattributes",
-      "bytes": 17,
-      "sha256": "1d5d71dcc6ccd28ab46a335349ecc74742ca4b81f4fcad212f8d134f70f1f13e"
+      "bytes": 137,
+      "sha256": "d85a5730fa68cc15ef2640050de5d0b6ccc1302ceaf221b2b05c072ab0a4f285"
     },
     {
       "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
