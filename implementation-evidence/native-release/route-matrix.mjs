@@ -406,6 +406,7 @@ function buildRouteTaskDescriptor(definition, step, alignmentSources) {
     run_id: definition?.binding?.run_id ?? null,
     revision: definition?.binding?.revision ?? null,
     nonce: definition?.binding?.nonce ?? null,
+    reading_purpose: "Independently comprehend the complete copied release specification and interface contract as documents: explain their stated scope, acceptance criteria, scenarios, limits and material ambiguities. This assignment does not request implementation inspection, current readiness, code approval or a new product decision. Report genuine unresolved documentary gaps as INCOMPLETE; no result status is prescribed.",
     reader_context: isObject(alignmentSources?.reader_context) ? clone(alignmentSources.reader_context) : null,
     source_fingerprints: Array.isArray(alignmentSources?.reader_sources) ? clone(alignmentSources.reader_sources) : [],
     reading_tag_rule: READING_TAG_RULE,

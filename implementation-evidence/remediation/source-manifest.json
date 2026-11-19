@@ -5,7 +5,7 @@
     "implementation-evidence/remediation/",
     "implementation-evidence/release-governance/"
   ],
-  "manifest_sha256": "31aea48cd8236bbdd5c0856adb59a18b64428fd637b7f0ecca925875d33e8583",
+  "manifest_sha256": "48aa46d93feb2f6a90d02c0edd23cfcde0c0568a375c344eb266a8883066da2c",
   "files": [
     {
       "path": ".commitlintrc.json",
@@ -34,8 +34,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 3892,
-      "sha256": "490c109d5554bb1d801067a377fddf2196de17ee1731336bc79d221819096b51"
+      "bytes": 5007,
+      "sha256": "9cbef3c7bda16f8374f3787ec3178dc984b43c3750b5a907f8333b4ab3a1a3f5"
     },
     {
       "path": ".github/workflows/release-please.yml",
@@ -509,8 +509,8 @@
     },
     {
       "path": "implementation-evidence/native-release/route-matrix.mjs",
-      "bytes": 183669,
-      "sha256": "96d6ba6366d08632d2bf9b27bb98a22e0f0d3ffa3dd26fe13869fdf30c8533f8"
+      "bytes": 184099,
+      "sha256": "c9c1571563d3956d0d942b6d006db8dbb7a2b669ded359cb9aafb96070fc3d4f"
     },
     {
       "path": "implementation-evidence/native-release/technical-retry-scenario.mjs",
@@ -769,8 +769,8 @@
     },
     {
       "path": "scripts/native-evidence.test.mjs",
-      "bytes": 22233,
-      "sha256": "34c48d984dab39f7d645cf6f417f89be8afe5fcdfaeb5b1d55b308b86a7544f7"
+      "bytes": 22923,
+      "sha256": "d5df11238b292d19a81f6da6a410f03cf08a46fb07fc56bf3d700a24c675dd92"
     },
     {
       "path": "scripts/pre-push-default.test.mjs",

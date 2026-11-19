@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import * as quality from "../tdd-orchestrator/lib/quality.mjs";
 import * as ship from "../ship/bin/lib.mjs";
 import { validateReviewerResult } from "../deep-review/lib/protocol.mjs";
+import { buildRouteTaskDescriptor, buildRouteCases } from "../implementation-evidence/native-release/route-matrix.mjs";
 
 // Export-only seams over the actual consumers: no OMP, network, or model calls.
 let root, profiles, review, fallback, retry, lifecycle;
@@ -55,6 +56,13 @@ it("binds fresh route source receipts to actual files rather than historical ali
   expect(receipt.sources).toEqual(artifacts.preservationBefore.source.before.files);
   expect(receipt.sources).toHaveLength(6);
   for (const row of receipt.sources) expect(row.bytes).toBe(fs.statSync(path.join(source, row.path)).size);
+  const definition = buildRouteCases({ runId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", revision: "a".repeat(64), nonce: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" })[0];
+  const descriptor = buildRouteTaskDescriptor(definition, "initial", receipt);
+  expect(descriptor.reading_purpose).toBeTypeOf("string");
+  expect(descriptor.reading_purpose.length).toBeGreaterThan(0);
+  expect(descriptor).not.toHaveProperty("expected_output");
+  expect(descriptor.reader_context).toEqual(receipt.reader_context);
+  expect(descriptor.source_fingerprints).toEqual(receipt.reader_sources);
 });
 function profileContext(record) {
   return { nativeEvidence: {
