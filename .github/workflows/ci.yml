@@ -53,6 +53,17 @@ jobs:
         with:
           node-version: 22.23.2
           cache: npm
+      - name: Prepare supported Git for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'Git-2.54.0-64-bit.exe'
+          Invoke-WebRequest 'https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe' -OutFile $installer
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne '2b96e7854f0520f0f6b709c21041d9801b1be44d5e1a0d9fa621b2fbc40f1983') { throw 'Git installer checksum mismatch' }
+          $install = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/DIR="C:\Program Files\Git"' -Wait -PassThru -WindowStyle Hidden
+          if ($install.ExitCode -ne 0) { throw "Git installer failed: $($install.ExitCode)" }
+          if ((& 'C:\Program Files\Git\cmd\git.exe' --version) -ne 'git version 2.54.0.windows.1') { throw 'Unexpected Git version' }
+          'C:\Program Files\Git\cmd' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - run: npm ci
       - run: npm test
   # Keep the existing required check name as the aggregate gate. It must not

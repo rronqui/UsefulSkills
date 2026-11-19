@@ -39,7 +39,9 @@ function linkFixtureNodeModules(dir) {
   symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), process.platform === "win32" ? "junction" : "dir");
 }
 function initRepo(name) {
-  const dir = mkdtempSync(join(tmpdir(), `hooks-${name}-`));
+  // Windows runners may expose TEMP through an 8.3 alias. The installer uses
+  // the physical directory; race observers and expected diagnostics must too.
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), `hooks-${name}-`)));
   spawnSync("git", ["init", "-q"], { cwd: dir });
   mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
   spawnSync("git", ["config", "init.defaultBranch", name], { cwd: dir });
