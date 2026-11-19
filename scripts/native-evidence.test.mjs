@@ -20,7 +20,7 @@ beforeAll(async () => {
     "review-context": ["NativeRpcSession", "inspectNativeEvidence"],
     fallback: ["RpcSession", "successfulReadEnd", "assembleFallback", "publicReviewData"],
     "technical-retry-scenario": ["taskCompletionBinding"],
-    lifecycle: ["revalidateDeliveryConsumers", "makeQualityFixture", "createNativeEnvironment"],
+    lifecycle: ["revalidateDeliveryConsumers", "makeQualityFixture", "createNativeEnvironment", "prepareRouteHostArtifacts", "ALIGNMENT_RETAINED_PATHS"],
   };
   for (const [name, names] of Object.entries(exports)) {
     let text = fs.readFileSync(`implementation-evidence/native-release/${name}.mjs`, "utf8").replaceAll("\r\n", "\n");
@@ -38,6 +38,24 @@ beforeAll(async () => {
 afterAll(() => { if (root) fs.rmSync(root, { recursive: true, force: true }); });
 
 const assignment = { id: "PeerPositive", agent: "peer-reviewer" };
+it("binds fresh route source receipts to actual files rather than historical alignment pins", () => {
+  const source = path.join(root, "fresh-route-source");
+  const project = path.join(root, "fresh-route-project");
+  fs.mkdirSync(project, { recursive: true });
+  const transactionEntry = path.join(project, ".omp/skills/tdd-orchestrator/lib/fs-transaction/index.mjs");
+  fs.mkdirSync(path.dirname(transactionEntry), { recursive: true });
+  fs.copyFileSync("tdd-orchestrator/lib/fs-transaction/index.mjs", transactionEntry);
+  for (const relative of lifecycle.ALIGNMENT_RETAINED_PATHS) {
+    const file = path.join(source, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `current route source: ${relative}\n`);
+  }
+  const artifacts = lifecycle.prepareRouteHostArtifacts(project, { entries: [] }, { source, omp: process.execPath }, "route-run", "revision", "nonce", []);
+  const receipt = JSON.parse(fs.readFileSync(path.join(project, artifacts.sourceFingerprints.path), "utf8"));
+  expect(receipt.sources).toEqual(artifacts.preservationBefore.source.before.files);
+  expect(receipt.sources).toHaveLength(6);
+  for (const row of receipt.sources) expect(row.bytes).toBe(fs.statSync(path.join(source, row.path)).size);
+});
 function profileContext(record) {
   return { nativeEvidence: {
     task_calls: [{ toolCallId: "root-dispatch", items: [{ name: assignment.id, agent: assignment.agent }] }],

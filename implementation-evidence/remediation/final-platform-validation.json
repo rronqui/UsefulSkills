@@ -2,6 +2,7 @@
   "schema_version": 1,
   "recorded_at": "2026-11-19T17:21:13.045Z",
   "candidate_manifest_sha256": "86ff94c7eefdadf63ea243d831aabb98d5b08d74b5f8b70cbd4b0e5463f29f28",
+  "candidate_manifest_locator": "git:dea01dbe298432d8b6b18ad4be8c619d72176050:implementation-evidence/remediation/source-manifest.json",
   "scope": "Complete local platform suites; Windows current frozen workspace, Linux copied candidate with native Linux Node. Raw reports retained locally by hash. Native OMP and hosted CI/release are separate gates.",
   "platforms": [
     {

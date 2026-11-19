@@ -5,7 +5,7 @@
     "implementation-evidence/remediation/",
     "implementation-evidence/release-governance/"
   ],
-  "manifest_sha256": "86ff94c7eefdadf63ea243d831aabb98d5b08d74b5f8b70cbd4b0e5463f29f28",
+  "manifest_sha256": "31aea48cd8236bbdd5c0856adb59a18b64428fd637b7f0ecca925875d33e8583",
   "files": [
     {
       "path": ".commitlintrc.json",
@@ -34,8 +34,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 2841,
-      "sha256": "5fa98b90b0b87bb0cab534b00ae5605215350ce5879ee939a3f0e098b311babf"
+      "bytes": 3892,
+      "sha256": "490c109d5554bb1d801067a377fddf2196de17ee1731336bc79d221819096b51"
     },
     {
       "path": ".github/workflows/release-please.yml",
@@ -429,8 +429,8 @@
     },
     {
       "path": "implementation-evidence/native-release/lifecycle.mjs",
-      "bytes": 576298,
-      "sha256": "ac61420c84f7691f5ac4cace31cd262a20a9af4bfdf32f82ae73aecfe49123da"
+      "bytes": 576867,
+      "sha256": "9a532accd8d218323b01adfdb25623f0ce91b6e41530a23214f5cd0858214c8d"
     },
     {
       "path": "implementation-evidence/native-release/machine-report-boundary-red-probe.mjs",
@@ -744,8 +744,8 @@
     },
     {
       "path": "scripts/install-hooks.test.mjs",
-      "bytes": 66884,
-      "sha256": "a6b44e0a0bf40c0755022bc8604367e7885266ead7f292eb8afa4f27c283cf4e"
+      "bytes": 67061,
+      "sha256": "423269671b2e2e73112ffcb5f0404af2c0e27fa6f7149865d6c2473480c80921"
     },
     {
       "path": "scripts/install-transaction.test.mjs",
@@ -769,8 +769,8 @@
     },
     {
       "path": "scripts/native-evidence.test.mjs",
-      "bytes": 20906,
-      "sha256": "ebef4f61ba86b9482275fc15bf8124cdeb85beb74e8ac0e243c34d450efb0ea0"
+      "bytes": 22233,
+      "sha256": "34c48d984dab39f7d645cf6f417f89be8afe5fcdfaeb5b1d55b308b86a7544f7"
     },
     {
       "path": "scripts/pre-push-default.test.mjs",

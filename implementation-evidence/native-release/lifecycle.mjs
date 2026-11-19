@@ -1023,7 +1023,7 @@ function prepareRouteHostArtifacts(project, packageInfo, options, runId, revisio
   const manifestDigest = routeManifestDigest(manifestEntries);
   const binding = atomicWrite(path.join(root, "package-binding.json"), `${JSON.stringify({ run_id: runId, revision, nonce, scope: "current-installed-package", manifest_path: `${NATIVE_ROUTE_ARTIFACT_ROOT}/package-manifest.json`, manifest_sha256: manifest.sha256, manifest_digest: manifestDigest }, null, 2)}
 `, project, "route package binding");
-  const sourceRows = ALIGNMENT_RETAINED_SOURCE.map((item) => ({ path: item.path, bytes: item.bytes, sha256: item.sha256 }));
+  const sourceRows = fingerprint(options.source, ALIGNMENT_RETAINED_PATHS);
   const readerSources = readerPaths.map((relative) => {
     const file = fileRecord(path.join(project, relative), "private reader source binding");
     return { path: relative, bytes: file.bytes, sha256: file.sha256 };
@@ -6023,7 +6023,8 @@ async function runNativeTechnicalRetry(options, fixture, retryApi, prepared, exe
   if (!repairEvidenceReady || !repairTransportReady) return { status: "PENDING_NATIVE", failure_eligible: options.native === true && firstObservation.native === true, definition, first: firstObservation, repair, immutable_package: immutablePackage, captures: { first: firstCapture, repair: repairCapture }, contract: { before: contractBefore, after: contractAfterRepair }, reason: "authoritative unique completed backend repair requires one exact write plus two correlated backend command terminals and immutable source proofs before peer/second dispatch" };
   const peerTaskBundle = buildPeerTask(definition, afterHashes.subject.sha256);
   const peerTask = peerTaskBundle.task;
-  const peerCapture = await executeNativeCapture(captureOptions, { ...retryFixture, retryPhase: "peer" }, [peerTask], "native09-technical-retry-peer-review", peerTaskBundle.prompt + privateReadBoundary);
+  const peerRootScope = `\nThis Root phase only dispatches the exact peer task and retains its genuine result. The first failure and backend repair have already been independently observed by the host. Their first-terminal receipt is at ${JSON.stringify(path.resolve(definition.cwd, firstReceipt.path))}; never guess its location from a basename. After dispatch returns async running, no independent Root work remains: yield immediately, without additional receipt reads or inspection of prior capture files. Let the real async result resume this Root; do not infer peer success from the prior repair.`;
+  const peerCapture = await executeNativeCapture(captureOptions, { ...retryFixture, retryPhase: "peer" }, [peerTask], "native09-technical-retry-peer-review", peerTaskBundle.prompt + privateReadBoundary + peerRootScope);
   const peerName = definition.roles.peer_review.name;
   const peerRecords = terminalRecords(peerCapture).filter((item) => item?.assignment_id === peerName && item?.run_id === definition.run_id);
   const peerRecord = peerRecords.length === 1 ? peerRecords[0] : null;
