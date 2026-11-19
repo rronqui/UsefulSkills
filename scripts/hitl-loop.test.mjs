@@ -1051,6 +1051,7 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason}; ${awkGateReason})`, () => 
     expect(output).toContain("normal: visible");
   });
   const rawCredentialFixtures = [
+    ["AWS STS", "ASIA11TESTONLY12345678"],
     [
       "JWT",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.s3cr3tSignature",
@@ -1059,14 +1060,39 @@ hitlDescribe(`hitl-loop redaction (${bashGateReason}; ${awkGateReason})`, () => 
     ["Stripe", "sk_live_51TEST_ONLY_12345678901234567890"],
   ];
 
+  it.each(["password[0]=indexed-secret", 'config.token["prod"]=indexed-secret'])("redacts indexed assignments: %s", (line) => {
+    const traceDir = mkdtempSync(join(tmpdir(), "hitl-indexed-"));
+    const traceFile = join(traceDir, "trace");
+    try {
+      const result = runCapture([line, "normal: visible"], { TRACE_FILE: traceFile });
+      expect(result.status, result.stderr).toBe(0);
+      for (const output of [result.stdout, readFileSync(traceFile, "utf8")]) {
+        expect(output).not.toContain("indexed-secret");
+        expect(output).toContain("normal: visible");
+      }
+    } finally { rmSync(traceDir, { recursive: true, force: true }); }
+  });
+
+  it("resets explicit YAML after a plain scalar and preserves following diagnostics", () => {
+    const result = runCapture(["? password", ": yaml-secret", "  diagnostic: visible", "normal: visible"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("yaml-secret");
+    expect(result.stdout).toContain("diagnostic: visible");
+  });
+
   for (const [kind, credential] of rawCredentialFixtures) {
     it(`redacts a raw ${kind} credential before it reaches output`, () => {
-      const result = runCapture([`payload: ${credential}`, "normal: visible"]);
-      expect(result.status, result.stderr).toBe(0);
-      const output = `${result.stdout}\n${result.stderr}`;
-      expect(output).not.toContain(credential);
-      expect(output).toContain("<REDACTED>");
-      expect(output).toContain("normal: visible");
+      const traceDir = mkdtempSync(join(tmpdir(), "hitl-raw-credential-"));
+      const traceFile = join(traceDir, "trace");
+      try {
+        const result = runCapture([`payload: ${credential}`, "normal: visible"], { TRACE_FILE: traceFile });
+        expect(result.status, result.stderr).toBe(0);
+        for (const output of [result.stdout, result.stderr + readFileSync(traceFile, "utf8")]) {
+          expect(output).not.toContain(credential);
+          expect(output).toContain("<REDACTED>");
+          expect(output).toContain("normal: visible");
+        }
+      } finally { rmSync(traceDir, { recursive: true, force: true }); }
     });
   }
 

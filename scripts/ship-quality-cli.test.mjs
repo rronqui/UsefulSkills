@@ -150,6 +150,22 @@ test('AC-004 real quality CLI capture rejects an empty extra argument and valid 
  assert.deepEqual(fs.readFileSync(path.join(root,reportPath)),reportBefore);
  assert.deepEqual(fs.readFileSync(path.join(root,contextPath)),contextBefore);
 });
+
+test('Review09-05 quality CLI accepts confined absolute context and rejects outside context',async()=>{
+ const {spawnSync}=await vi.importActual('node:child_process');const {root,reportPath,contextPath}=await project();
+ const bin=path.join(repo,'tdd-orchestrator/bin/quality.mjs'),before=fs.readFileSync(path.join(root,contextPath));
+ const checked=spawnSync(process.execPath,[bin,'check',root,path.join(root,reportPath),'delivery','--quality-context',path.join(root,contextPath)],{encoding:'utf8'});
+ assert.equal(checked.status,0,checked.stderr+checked.stdout);assert.equal(JSON.parse(checked.stdout).ok,true);
+ // A delivery fixture is not a planning approval. Both path forms must reach
+ // the same planning-policy diagnostics, rather than fail context confinement.
+ const planning=context=>spawnSync(process.execPath,[bin,'check',root,reportPath,'planning','--quality-context',context],{encoding:'utf8'});
+ const relativePlan=planning(contextPath),absolutePlan=planning(path.join(root,contextPath));
+ assert.equal(absolutePlan.status,relativePlan.status);assert.deepEqual(JSON.parse(absolutePlan.stdout),JSON.parse(relativePlan.stdout));
+ const outside=newRoot();put(outside,'context.json',before);
+ const rejected=spawnSync(process.execPath,[bin,'check',root,reportPath,'delivery','--quality-context',path.join(outside,'context.json')],{encoding:'utf8'});
+ assert.equal(rejected.status,1,rejected.stdout+rejected.stderr);assert.equal(JSON.parse(rejected.stderr||rejected.stdout).ok,false);
+ assert.deepEqual(fs.readFileSync(path.join(root,contextPath)),before);
+});
 test('AC-004 real quality CLI rejects a report replaced while reading independent context',async()=>{
  const {spawnSync}=await vi.importActual('node:child_process');const {root,reportPath,contextPath}=await project();
  const outside=newRoot(),sentinel=path.join(outside,'sentinel.txt');put(outside,'sentinel.txt','untouched');

@@ -21,6 +21,27 @@ const roots = [];
 afterEach(() => { vi.restoreAllMocks(); syncBuiltinESMExports(); for (const root of roots.splice(0)) fs.rmSync(root, {recursive:true, force:true}); });
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 const newRoot = () => { const root=fs.mkdtempSync(path.join(os.tmpdir(),'useful-quality-')); roots.push(root); return root; };
+
+for (const target of ['context', 'receipt', 'source']) test(`delivery refuses a consumed ${target} changed before the decision`, async () => {
+  const f = await fixture();
+  const options = shipOptions(f);
+  const receipt = JSON.parse(fs.readFileSync(path.join(f.root, f.report.review.evidence.path), 'utf8'));
+  const victim = target === 'context' ? options.contextPath : target === 'receipt' ? f.report.review.evidence.path : receipt.source.path;
+  const trigger = path.join(f.root, f.report.security.checks.at(-1).evidence.path);
+  const originalOpen = fs.openSync.bind(fs);
+  let changed = false;
+  vi.spyOn(fs, 'openSync').mockImplementation((file, ...args) => {
+    const fd = originalOpen(file, ...args);
+    if (!changed && typeof file === 'string' && path.resolve(file) === trigger) {
+      changed = true;
+      fs.writeFileSync(path.join(f.root, victim), 'replaced after consumption');
+    }
+    return fd;
+  });
+  syncBuiltinESMExports();
+  assert.throws(() => api.validateQualityReportFile(f.root, options.reportPath, options.contextPath), /proof changed/);
+  assert.equal(changed, true);
+});
 function put(root, name, value) { const target=path.join(root,name); fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,value); }
 function proof(root, name, body='Synthetic fixture evidence, inspected by peer.') { put(root,name,body); return {path:name,sha256:sha(body)}; }
 const approved=new WeakMap();

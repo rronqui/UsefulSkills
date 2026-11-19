@@ -23,6 +23,7 @@ try {
     // Delivery consumes the report through the pinned-file validation seam so
     // its identity and bytes remain bound until the decision is returned.
     const relative = path.isAbsolute(reportPath) ? path.relative(path.resolve(root), reportPath).split(path.sep).join('/') : reportPath;
+    if (contextPath !== undefined && path.isAbsolute(contextPath)) contextPath = path.relative(path.resolve(root), contextPath).split(path.sep).join('/');
     if (stage === 'delivery' && contextPath !== undefined) {
       result = validateQualityReportFile(root, relative, contextPath, stage);
     } else {

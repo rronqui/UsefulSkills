@@ -609,6 +609,14 @@ describe("deep-review — costura executável T-002", () => {
     }
   });
   describe("AC-013 — peer-reviewer native structured TDD wire", () => {
+    it.each([0, 1])("rejects approval with P%s while preserving a valid block", (priority) => {
+      const { validateReviewerResult } = protocolApi();
+      const findings = [finding(priority)];
+      const rejected = validateReviewerResult(nativePeerResult("APROVADO", { findings }), NATIVE_PEER_EXPECTED);
+      expect(rejected.ok).toBe(false);
+      expect(rejected.errors.join(" ")).toMatch(/P0\/P1/);
+      expect(validateReviewerResult(nativePeerResult("BLOQUEADO", { findings }), NATIVE_PEER_EXPECTED).ok).toBe(true);
+    });
     it.each(["APROVADO", "BLOQUEADO"])("aceita status nativo %s com o expected TDD padrão e preserva o status real", (status) => {
       const { validateReviewerResult } = protocolApi();
       const checked = validateReviewerResult(nativePeerResult(status), NATIVE_PEER_EXPECTED);

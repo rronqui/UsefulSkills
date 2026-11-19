@@ -3,7 +3,7 @@
 // ship.mjs importa daqui; os testes em ship/bin/lib.test.mjs cobrem os contratos.
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, linkSync, mkdirSync, openSync, readFileSync, readSync, writeSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, linkSync, mkdirSync, openSync, readFileSync, readSync, writeSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateQualityReportFile } from "../../tdd-orchestrator/lib/quality.mjs";
@@ -267,7 +267,42 @@ function parseLinuxProtocol(result, nonce, target) {
   return message.status;
 }
 
-function performLinuxBackup(src, sourceStat, dir, root) {
+// Resolve the supported interpreter before the service-stop boundary as well
+// as for direct backup callers. -I/-S exclude user modules and site hooks.
+export function requireBackupPrerequisites(cfg) {
+  if (!cfg.dbPath || process.platform !== "linux") return null;
+  let interpreter;
+  for (const candidate of ["/usr/bin/python3", "/usr/local/bin/python3", "/bin/python3"]) {
+    try { interpreter = realpathSync(candidate); }
+    catch (error) { if (error.code === "ENOENT") continue; throw error; }
+    // Admit the system installation independently of caller PATH and loader
+    // environment. Every resolved ancestor and the executable must be owned by
+    // root and not writable by group/others.
+    let current = interpreter;
+    while (true) {
+      const stat = lstatSync(current);
+      if (stat.uid !== 0 || (stat.mode & 0o022) !== 0 || stat.isSymbolicLink()) throw backupError("E_BACKUP_PREREQUISITE", "Python installation is not protected");
+      if (current === interpreter && (!stat.isFile() || !(stat.mode & 0o111))) throw backupError("E_BACKUP_PREREQUISITE", "Python executable is not regular and executable");
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    break;
+  }
+  if (!interpreter) throw backupError("E_BACKUP_PREREQUISITE", "Linux backup requires protected system Python >=3.8");
+  const probe = spawnSync(interpreter, ["-I", "-S", "-c", "import sys; assert sys.version_info >= (3, 8); print(sys.executable)"], {
+    cwd: "/", env: { LANG: "C", LC_ALL: "C" },
+    encoding: "utf8", timeout: 10000, maxBuffer: 4096, windowsHide: true,
+  });
+  if (probe.error || probe.status !== 0 || probe.signal || typeof probe.stdout !== "string") {
+    throw backupError("E_BACKUP_PREREQUISITE", "Linux backup requires protected system Python >=3.8 before stopping the service");
+  }
+  const observed = probe.stdout.trim();
+  if (!path.isAbsolute(observed) || /[\r\n]/.test(observed) || realpathSync(observed) !== interpreter) throw backupError("E_BACKUP_PREREQUISITE", "Python returned a different executable path");
+  return interpreter;
+}
+
+function performLinuxBackup(src, sourceStat, dir, interpreter) {
   if (!Number.isInteger(constants.O_DIRECTORY)) {
     throw backupError("E_BACKUP_UNSUPPORTED", "Linux backup directory capability is unavailable");
   }
@@ -290,7 +325,7 @@ function performLinuxBackup(src, sourceStat, dir, root) {
         verifySourceFd(src, sourceStat, openedFd, "before copying");
         const nonce = randomUUID();
         const result = spawnSync(
-          "/usr/bin/python3",
+          interpreter,
           [
             "-I",
             "-S",
@@ -352,6 +387,7 @@ function performLinuxBackup(src, sourceStat, dir, root) {
 
 export function performBackup(cfg, root) {
   if (!cfg.dbPath) return null;
+  const interpreter = requireBackupPrerequisites(cfg);
   const src = path.resolve(root, cfg.dbPath);
   const sourceStat = readSourceStat(src);
   if (sourceStat === null) return null;
@@ -361,5 +397,5 @@ export function performBackup(cfg, root) {
   const dir = path.resolve(root, cfg.backupDir ?? path.join(path.dirname(cfg.dbPath), "backup"));
   mkdirSync(dir, { recursive: true });
   if (process.platform === "win32") return performWindowsBackup(src, sourceStat, dir);
-  return performLinuxBackup(src, sourceStat, dir, root);
+  return performLinuxBackup(src, sourceStat, dir, interpreter);
 }

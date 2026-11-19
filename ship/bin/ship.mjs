@@ -4,7 +4,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { extractServedVersion, flagValue, isValidSemVer, performBackup, resolveSchemaWatch, slugify, validateShipQuality } from "./lib.mjs";
+import { extractServedVersion, flagValue, isValidSemVer, performBackup, requireBackupPrerequisites, resolveSchemaWatch, slugify, validateShipQuality } from "./lib.mjs";
 import { validateQualityReportFile } from "../../tdd-orchestrator/lib/quality.mjs";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -116,6 +116,24 @@ function packagePathForUnit(unit) {
   return repoRegularPath(packagePath, `package.json da unidade '${unit}'`);
 }
 
+function semverLessThan(left, right) {
+  const split = value => value.split('+')[0].split(/-(.*)/s);
+  const [leftCore, leftPre] = split(left), [rightCore, rightPre] = split(right);
+  const leftParts = leftCore.split('.').map(BigInt), rightParts = rightCore.split('.').map(BigInt);
+  for (let i = 0; i < 3; i++) if (leftParts[i] !== rightParts[i]) return leftParts[i] < rightParts[i];
+  if (leftPre === undefined || rightPre === undefined) return leftPre !== undefined && rightPre === undefined;
+  const a = leftPre.split('.'), b = rightPre.split('.');
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] === b[i]) continue;
+    if (a[i] === undefined || b[i] === undefined) return a[i] === undefined;
+    const an = /^\d+$/.test(a[i]), bn = /^\d+$/.test(b[i]);
+    if (an && bn) return BigInt(a[i]) < BigInt(b[i]);
+    if (an !== bn) return an;
+    return a[i] < b[i];
+  }
+  return false;
+}
+
 function validateVersionSources() {
   const rootPackagePath = path.join(root, "package.json");
   const releaseConfigPath = path.join(root, "release-please-config.json");
@@ -155,6 +173,9 @@ function validateVersionSources() {
     if (units.length > 1 && unitConfig["include-component-in-tag"] !== true) {
       versionSourceError(`unidade '${unit}' deve exigir include-component-in-tag=true para múltiplas unidades`);
     }
+    if (units.length === 1 && unitConfig["include-component-in-tag"] !== false) {
+      versionSourceError(`unidade '${unit}' deve exigir include-component-in-tag=false para unidade única`);
+    }
     if (Object.hasOwn(unitConfig, "release-as")) {
       versionSourceError(`unidade '${unit}' não pode congelar a versão com release-as`);
     }
@@ -171,6 +192,9 @@ function validateVersionSources() {
     }
     if (manifest[unit] !== packageJson.version) {
       versionSourceError(`manifesto e package.json divergem para a unidade '${unit}'`);
+    }
+    if (semverLessThan(packageJson.version, unitConfig["initial-version"])) {
+      versionSourceError(`versão da unidade '${unit}' é inferior a initial-version`);
     }
     versions.set(unit, packageJson.version);
   }
@@ -547,6 +571,10 @@ function parseNewFlag(argv, name) {
 }
 
 function parseNewInput(argv) {
+  const allowed = new Set(["--bug", "--feat", "--desc"]);
+  for (let i = 0; i < argv.length; i += 2) {
+    if (!allowed.has(argv[i])) throw new Error(`argumento não reconhecido: ${argv[i]}`);
+  }
   for (const name of ["--bug", "--feat", "--desc"]) {
     if (argv.filter((item) => item === name).length > 1) {
       throw new Error(`${name} não pode ser informado mais de uma vez`);
@@ -735,6 +763,7 @@ function cmdNew(argv) {
 
 // ---------- ship ----------
 function cmdShip(argv) {
+  if (argv.filter(arg => arg === "--body-file").length > 1) fail("--body-file não pode ser informado mais de uma vez");
   const contextIndex = argv.indexOf("--quality-context");
   let contextOverride;
   if (contextIndex !== -1) {
@@ -1041,6 +1070,8 @@ async function deploy() {
     console.error("Deploy cancelado: startCommand inválido antes de executar stopCommand.");
     process.exit(1);
   }
+  try { requireBackupPrerequisites(cfg); }
+  catch (error) { fail(`Deploy cancelado antes de stopCommand: ${error.message}`); }
   let stopped = false;
   let quiescenceConfirmed = false;
   if (cfg.stopCommand) {
@@ -1107,6 +1138,8 @@ async function deploy() {
         quiescenceConfirmed,
       );
     }
+    try { requireBackupPrerequisites(cfg); }
+    catch (error) { failAfterStoppedDeploy(stopped, oldHead, oldCfg, error.message, cfg, quiescenceConfirmed); }
     const postPullConfigChanged =
       cfg.stopCommand !== oldCfg.stopCommand ||
       cfg.startCommand !== oldCfg.startCommand ||

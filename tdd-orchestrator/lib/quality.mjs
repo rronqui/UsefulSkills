@@ -139,6 +139,12 @@ function recordProof(proofs, file, bytes) {
   proofs.set(file, sha256);
 }
 
+function revalidateProofs(root, proofs) {
+  for (const [file, sha256] of proofs) {
+    if (hash(readQualityFile(root, file)) !== sha256) throw Error(`proof changed during validation: ${file}`);
+  }
+}
+
 function proofReference(value) {
   return object(value) && typeof value.path === 'string' && typeof value.sha256 === 'string' && HASH.test(value.sha256);
 }
@@ -177,7 +183,7 @@ export function validateQualityReportFile(root, reportPath, contextPath, stage =
   }, proofs);
   // The report must remain the exact artifact that was consumed through the
   // validation decision, not merely the object parsed before context loading.
-  recordProof(proofs, reportPath, readQualityFile(root, reportPath));
+  revalidateProofs(root, proofs);
   return { ...validation, report: validation.ok ? report : null, proofDigest: validation.ok ? digest(Object.fromEntries(proofs)) : null };
 }
 
@@ -357,7 +363,11 @@ function snapshot(value, errors) {
 }
 
 export function validateQuality(projectRoot, report, { stage = 'delivery', expectedContextDigest } = {}) {
-  return validateQualityInternal(projectRoot, report, { stage, expectedContextDigest }, new Map());
+  const proofs = new Map();
+  const validation = validateQualityInternal(projectRoot, report, { stage, expectedContextDigest }, proofs);
+  try { revalidateProofs(projectRoot, proofs); }
+  catch (error) { return { ok: false, errors: [...validation.errors, error.message] }; }
+  return validation;
 }
 
 function validateQualityInternal(projectRoot, report, { stage, expectedContextDigest, forbiddenPaths = [] }, proofs) {

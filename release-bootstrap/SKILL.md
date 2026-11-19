@@ -207,7 +207,10 @@ teste ou permissões implícitas ao ruleset.
     "buildCommand": "<comando de build ou null>",
     "stopCommand": "<comando de stop ou null>",
     "startCommand": "<comando de start ou null>",
-    "versionCheckUrl": "<URL para checar a versão servida ou null>"
+    "versionCheckUrl": "<URL para checar a versão servida ou null>",
+    "qualityPolicyVersion": 1,
+    "qualityReport": ".omp/state/quality.json",
+    "qualityContext": ".omp/state/quality-context.json"
   }
   ```
   Exemplo FinMonitor: dbPath `data/finmonitor.db`, schemaWatchPaths `["src/lib/db.ts"]`,

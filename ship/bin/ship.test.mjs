@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,11 +6,29 @@ import { join } from "node:path";
 const childProcess = vi.hoisted(() => ({
   execFileSync: vi.fn(),
   spawnSync: vi.fn(),
+  backupProbe: vi.fn(),
 }));
 
-vi.mock("node:child_process", () => childProcess);
+vi.mock("node:child_process", () => ({
+  ...childProcess,
+  spawnSync(command, args, options) {
+    if (Array.isArray(args) && args[0] === "-I" && args[1] === "-S" && args[2] === "-c") return childProcess.backupProbe(command, args, options);
+    return childProcess.spawnSync(command, args, options);
+  },
+}));
 
 const originalArgv = process.argv.slice();
+const originalCwd = process.cwd();
+let isolatedRoot;
+beforeEach(() => {
+  childProcess.backupProbe.mockImplementation(command => ({ status: 0, stdout: command + "\n" }));
+  isolatedRoot = mkdtempSync(join(tmpdir(), "ship-isolated-project-"));
+  writeFileSync(join(isolatedRoot, "package.json"), JSON.stringify({ name: "ship-fixture", version: "0.4.0" }));
+  writeFileSync(join(isolatedRoot, "release-please-config.json"), JSON.stringify({ packages: { ".": { "release-type": "node", "include-component-in-tag": false, "initial-version": "0.1.0" } } }));
+  writeFileSync(join(isolatedRoot, ".release-please-manifest.json"), JSON.stringify({ ".": "0.4.0" }));
+  writeFileSync(join(isolatedRoot, "ship.config.json"), JSON.stringify({ dbPath: null, buildCommand: null, stopCommand: null, startCommand: null, versionCheckUrl: null }));
+  process.chdir(isolatedRoot);
+});
 
 async function runRetry({ bodyFile, description }) {
   process.argv = [process.argv[0], "ship/bin/ship.mjs", "ship", description, "--body-file", bodyFile];
@@ -46,6 +64,8 @@ async function createMinimalGitFixture() {
 
 describe("T-006B AC-007: parser de new falha antes de qualquer efeito", () => {
   it.each([
+    ["opção desconhecida", ["new", "--feat", "título", "--unknown", "valor"]],
+    ["argumento posicional", ["new", "--feat", "título", "ignorado"]],
     ["título --bug sem valor", ["new", "--bug"]],
     ["título --feat sem valor", ["new", "--feat"]],
     ["título --bug seguido por opção", ["new", "--bug", "--desc", "texto"]],
@@ -213,8 +233,53 @@ function unmockShipFs() {
   vi.resetModules();
 }
 
+describe("release remediation preflight", () => {
+  it.skipIf(process.platform !== "linux")("fails before stop when system Python prerequisite fails", async () => {
+    writeFileSync(join(isolatedRoot, "ship.config.json"), JSON.stringify({ dbPath: "db.sqlite", stopCommand: "stop-server", startCommand: "start-server" }));
+    const calls = configureDefaultGitGh();
+    childProcess.backupProbe.mockReturnValue({ status: 1, stdout: "" });
+    const exit = trapProcessExit(), error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runShip(["deploy"])).rejects.toThrow("__SHIP_EXIT_1__");
+      expect(error.mock.calls.flat().join(" ")).toMatch(/antes de stopCommand/);
+      expect(calls.some(c => c.kind === "spawn")).toBe(false);
+      const [command, , options] = childProcess.backupProbe.mock.calls[0];
+      expect(command).toMatch(/^\/(?:usr\/)?(?:local\/)?bin\/python3/);
+      expect(options.env).toEqual({ LANG: "C", LC_ALL: "C" });
+      expect(options.cwd).toBe("/");
+    } finally { exit.mockRestore(); error.mockRestore(); }
+  });
+  it.each([
+    ["component tag on single package", "0.4.0", "0.1.0", true],
+    ["version below initial", "0.0.9", "0.1.0", false],
+    ["prerelease below stable initial", "0.1.0-rc.1", "0.1.0", false],
+  ])("rejects %s before GitHub effects", async (_label, version, initial, component) => {
+    writeFileSync(join(isolatedRoot, "package.json"), JSON.stringify({ name: "fixture", version }));
+    writeFileSync(join(isolatedRoot, ".release-please-manifest.json"), JSON.stringify({ ".": version }));
+    writeFileSync(join(isolatedRoot, "release-please-config.json"), JSON.stringify({ packages: { ".": { "release-type": "node", "initial-version": initial, "include-component-in-tag": component } } }));
+    const calls = configureDefaultGitGh();
+    const exit = trapProcessExit(), error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runShip(["new", "--feat", "valid title"])).rejects.toThrow("__SHIP_EXIT_1__");
+      expect(error.mock.calls.flat().join(" ")).toContain("E_VERSION_SOURCE");
+      expect(calls.some(c => c.command === "gh")).toBe(false);
+    } finally { exit.mockRestore(); error.mockRestore(); }
+  });
+  it("rejects duplicate body-file before reading files or publishing", async () => {
+    const calls = configureDefaultGitGh();
+    const exit = trapProcessExit(), error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runShip(["ship", "valid title", "--body-file", "missing-one", "--body-file", "missing-two"])).rejects.toThrow("__SHIP_EXIT_1__");
+      expect(error.mock.calls.flat().join(" ")).toMatch(/body-file.*mais de uma/);
+      expect(calls.filter(c => c.command !== "git" || c.args[0] !== "rev-parse")).toEqual([]);
+    } finally { exit.mockRestore(); error.mockRestore(); }
+  });
+});
+
 
 afterEach(() => {
+  process.chdir(originalCwd);
+  rmSync(isolatedRoot, { recursive: true, force: true });
   process.argv = originalArgv;
   vi.clearAllMocks();
 });
@@ -1113,7 +1178,7 @@ describe("T-001 guards e invariantes de release/deploy", () => {
     let realLinuxBackupInvoked = false;
     const calls = configureDefaultGitGh({
       spawnImplementation(command, args, options) {
-        if (command === "/usr/bin/python3") {
+        if (Array.isArray(args) && String(args[2]).endsWith("backup-linux.py")) {
           realLinuxBackupInvoked = true;
           return actualChildProcess.spawnSync(command, args, options);
         }
@@ -1131,7 +1196,7 @@ describe("T-001 guards e invariantes de release/deploy", () => {
       const buildIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "build-server");
       const startIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "start-server");
       if (process.platform === "linux") {
-        const backupIndex = calls.findIndex(({ kind, command }) => kind === "spawn" && command === "/usr/bin/python3");
+        const backupIndex = calls.findIndex(({ kind, args }) => kind === "spawn" && String(args?.[2]).endsWith("backup-linux.py"));
         expect(realLinuxBackupInvoked).toBe(true);
         expect(backupIndex).toBeGreaterThan(stopIndex);
         expect(backupIndex).toBeLessThan(pullIndex);
@@ -2017,7 +2082,7 @@ describe("RED_REVISION: gaps adicionais de retry, deploy e readiness", () => {
     writeFileSync(packagePath, JSON.stringify({ name: "fixture", version: "1.2.3" }));
     writeFileSync(
       join(tempRoot, "release-please-config.json"),
-      JSON.stringify({ packages: { ".": { "release-type": "node", "initial-version": "0.1.0" } } }),
+      JSON.stringify({ packages: { ".": { "release-type": "node", "initial-version": "0.1.0", "include-component-in-tag": false } } }),
     );
     writeFileSync(join(tempRoot, ".release-please-manifest.json"), JSON.stringify({ ".": "1.2.3" }));
     const oldConfig = {

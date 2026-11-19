@@ -417,6 +417,9 @@ function validateReviewerResult(result, expected) {
       const index = Number(key);
       errors.push(...validateFinding(findings[index], index));
     }
+    if (tddPeer && result.status === "APROVADO" && findings.some(finding => finding?.priority === 0 || finding?.priority === 1)) {
+      errors.push("TDD APROVADO contradicts blocking P0/P1 findings");
+    }
   }
   const expectedPair = REVIEWER_PRIORITY.find(({ agent }) => agent === result.agent);
   if (expectedPair && !tddPeer && result.protocol_mode !== expectedPair.protocol_mode) {

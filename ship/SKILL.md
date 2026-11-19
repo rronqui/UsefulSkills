@@ -299,6 +299,14 @@ aplicar melhorias automaticamente. O protocolo e os gatilhos têm uma fonte em
 
 ## Armadilhas
 
+- `new` aceita somente pares `--bug`/`--feat` e `--desc`; argumentos não consumidos
+  e `--body-file` repetido em `ship` falham antes de efeitos. Uma unidade usa
+  `include-component-in-tag: false`; múltiplas unidades exigem `true`. A versão
+  corrente não pode ser inferior a `initial-version`.
+- Backup Linux exige Python >=3.8 em instalação de sistema protegida. O preflight resolve e
+  verifica o interpretador antes de parar o serviço; o snapshot usa execução
+  isolada `-I -S`. Deploy/rollback de host Linux é ensaiado em serviço descartável.
+
 - Número de PR ≠ número de issue no GitHub (contagem compartilhada) — use a URL que os
   comandos retornam.
 - Commitlint valida o commit: a descrição passada a `ship` não deve duplicar o prefixo

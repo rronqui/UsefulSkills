@@ -80,7 +80,8 @@ fallback genérico ou anônimo.
 
 `deep-review/lib/protocol.mjs` é o seam puro e determinístico do protocolo. Ele
 exporta `validateRequest(request)`, `validateReviewerResult(result, expected)`,
-`aggregateReview(results, expectedRevision, expectedReviewers)` e
+`aggregateReview(results, expectedRevision, expectedReviewers)`,
+`aggregateReviewInstances(results, expectedRevision, assignments)` e
 `resolveReviewer({ projectCandidates, userCandidates })`. Cada chamada retorna um
 envelope `{ ok, value?, errors }`; por compatibilidade operacional, os campos
 normalizados também ficam no nível superior (`status`, `findings`, etc.).
