@@ -301,9 +301,12 @@ type ProofStatus = "PENDING" | "PASS" | "FAIL" | "BLOCKED" | "NA";
 fixture/mocked Git, `ok:true`, `VALID`, frontmatter ou texto autodeclarado não
 promove qualquer estado nativo.
 
-No estado persistido, uma tarefa com AC normativo deve conter exatamente um AC
-(`acceptance.length === 1`); `NA` normativo só é válido nesse caso e exige razão
-objetiva. Não misturar AC normativo e behavioral em uma tarefa para fabricar NA.
+Emenda delimitada Review09-01 do plano de produção Windows/Linux: no estado
+persistido, uma tarefa pode conter um ou vários ACs, desde que todos sejam
+explicitamente `type: normative` e cada AC tenha sua entrada NA exata com razão,
+`validator: "spec-kit-validator"`, evidência e referência ao token exato do
+próprio AC. A extensão substitui o limite anterior `acceptance.length === 1`;
+não mistura AC normativo e behavioral em uma tarefa nem dispensa review/gates.
 NATIVE-09 continua podendo estar `PENDING` durante execução e bloqueia a
 conclusão sem mecanismo seguro ou decisão expressa. R-02 e proveniência devem
 ser classificados pelo receipt live; qualquer recuperação contrato 0.2/no-SHA

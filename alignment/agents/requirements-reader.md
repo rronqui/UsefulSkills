@@ -34,6 +34,10 @@ conforme schema efetivamente disponível, preservando retorno bruto. Inclua todo
 campos do envelope e conteúdo específico; fontes são paths/hashes efetivamente
 lidos, nunca lista presumida. Campo/documento inacessível ou lacuna material
 impõe INCOMPLETE e próxima ação; COMPLETE não aprova produto/spec/código.
+Resultado INCOMPLETE nunca fecha entendimento nem é promovido a COMPLETE pelo
+coordenador: preserve o retorno e bloqueie somente as decisões e tarefas que
+dependem da leitura. Resolva a lacuna e obtenha novo retorno COMPLETE com fontes
+atuais antes de promover esses dependentes; trabalho independente pode seguir.
 Não inventar relato de comando, autoria, leitura ou sandbox. Frontmatter não
 comprova contenção de ferramentas; confira a autoridade real no escopo autorizado.
 Selecione este perfil pelo nome no catálogo OMP; seu model/thinkingLevel define

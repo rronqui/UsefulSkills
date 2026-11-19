@@ -63,7 +63,14 @@ substituí-la por scanner. Redija segredos antes de reportar qualquer saída.
 - `NA` — não aplicável ao escopo, **com justificativa objetiva** e prova. Ferramenta inexistente não torna uma verificação obrigatória inaplicável: use método equivalente verificável ou reporte FAIL de origem TOOLING. **Nunca use `NA` para esconder FAIL ou ausência de evidência.**
 
 ## Gates (rode todos, reporte um a um)
-1. `traceability` — 100% dos critérios mapeados para testes que passam.
+1. `traceability` — 100% dos critérios executáveis mapeados para testes que passam.
+   Em tarefa exclusivamente normativa (um ou vários ACs), confira cada entrada
+   NA exata (`status`, `reason`, `validator: "spec-kit-validator"`, `evidence`,
+   `reference` ao token exato do próprio AC), a classificação `type: normative`
+   e a prova semântica independente atual. Esse mapeamento justificado satisfaz
+   rastreabilidade sem inventar teste executado; reporte `traceability: PASS`
+   pela conferência realizada. Testes de runtime inaplicáveis podem ser `NA`
+   com motivo e prova; tarefa mista deve ser separada antes de implementar.
 2. `tests` — suíte completa verde, incluindo pré-existentes (sem regressão).
 3. `coverage` — não regrediu o baseline.
 4. `spec_kit` — arquivos em `progress.json.spec_kit` existem fisicamente **e o conteúdo é coerente com a implementação**. Verifique: (a) cada AC testado está descrito na `spec.md`; (b) o comportamento implementado corresponde ao descrito na spec; (c) a `plan.md` reflete a arquitetura real; (d) o contrato é respeitado. Existência sozinha NÃO é suficiente — conteúdo divergente = FAIL.

@@ -66,6 +66,31 @@ test('AC-006: AC-019 is behavioral unless explicitly typed normative',()=>{
   assert.equal(validateCriteriaMatrix(taskOf(p)).ok,false);
  }
 });
+
+test('Review09-01: several normative ACs complete and promote with independent proofs for every AC',()=>{
+ const p=fixture('AC-016','normative'),t=taskOf(p);t.implemented_by='spec-kit-author';
+ p.acceptance_criteria.push(metadata('AC-019','normative'));t.acceptance_criteria.push('AC-019');t.red.criteria_to_tests['AC-019']=na('AC-019');
+ expectValid(validateProgress(p));expectValid(canPromoteWave(promotion(p),{acceptanceCriteria:p.acceptance_criteria}));
+ for(const mutate of [x=>{delete taskOf(x).red.criteria_to_tests['AC-019'];},x=>{taskOf(x).red.criteria_to_tests['AC-019'].reference='spec.md#AC-016';},x=>{taskOf(x).review.independent=false;}]) {
+  const bad=structuredClone(p);mutate(bad);assert.equal(validateProgress(bad).ok,false);
+ }
+});
+
+test('Review01-05: normative references require the exact AC token',()=>{
+ for(const reference of ['spec.md#AC-0160','spec.md#AC-016-suffix','spec.md#XAC-016','spec.md#AC-016_extra']) {
+  const p=fixture('AC-016','normative');taskOf(p).red.criteria_to_tests['AC-016'].reference=reference;
+  assert.equal(validateProgress(p).ok,false,reference);
+ }
+ const p=fixture('AC-016','normative');taskOf(p).red.criteria_to_tests['AC-016'].reference='contract clause (AC-016)';expectValid(validateProgress(p));
+});
+
+test('Review01-04: Spec Kit evidence requires document basename boundaries',()=>{
+ const p=fixture();taskOf(p).gate_evidence.spec_kit='checked ./specs/specs001-fixture/spec.md#AC-001, ./specs/specs001-fixture/plan.md; tasks.md and contracts/interface-contract.md';expectValid(validateProgress(p));
+ for(const file of ['spec.md','plan.md','tasks.md','interface-contract.md']) for(const replacement of [`not-${file}`,`${file}.bak`]) {
+  const bad=fixture();taskOf(bad).gate_evidence.spec_kit=taskOf(bad).gate_evidence.spec_kit.replace(file,replacement);
+  assert.equal(validateProgress(bad).ok,false,replacement);
+ }
+});
 test('AC-006: unknown type and incomplete, spoofed or mixed normative proofs fail closed',()=>{
  for(const type of ['unknown','',null]) {const p=fixture('AC-016',type);assert.equal(validateProgress(p).ok,false);}
  for(const field of ['reason','validator','evidence','reference']) {

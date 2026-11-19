@@ -61,11 +61,10 @@
 
 - A tarefa é a unidade de identidade, tentativa, recurso, AC e prova; não se cria
   outro scheduler nem se troca o ID para esconder retry.
-- `acceptance_criteria` persistido deve conter pelo menos um AC. Tarefa que fecha
-  um AC `type: normative` contém **exatamente um AC normativo**; referências a
-  outros critérios ficam na coluna `Supports`, não no array de aceitação. Isso
-  respeita `state.mjs:312–314`, que aceita NA normativo somente quando a tarefa
-  tem um único AC.
+- `acceptance_criteria` persistido deve conter pelo menos um AC. Pela emenda
+  Review09-01 do contrato, uma tarefa normativa pode fechar vários ACs, todos
+  explicitamente `type: normative` e com uma entrada NA exata por AC. Nunca
+  misture behavioral e normative na mesma tarefa; decomponha esses assignments.
 - AC `behavioral` exige RED antes de GREEN, asserção real, smoke descartável ou
   cenário OMP; teste de wording/wiring, mock ou fixture não é equivalência nativa.
 - Onda só promove após integração, review independente e validator com prova atual.
@@ -214,8 +213,9 @@ T-006C é serializada depois de T-006B e T-003. Seu teste permanente é somente
 ownership, e Main é o autor fora destes quatro artefatos. A tarefa não cria
 alias, scheduler, engine de validação ou shim e não altera comandos existentes.
 
-Com `explicit_os_host_tcb` registrado, T-005 pode iniciar GREEN, mas os seis
-PASS LAB não aprovam host/transação; handles/no-replace/quarentena continuam
+Com `explicit_os_host_tcb` registrado, T-005 mantém autorização do candidato,
+mas GREEN dependente exige RED contratual e prova atual da primitive aplicável
+em destino descartável. Os seis PASS LAB não aprovam host/transação; handles/no-replace/quarentena continuam
 obrigatórios e review independente mais prova nativa antecedem a conclusão.
 A captura histórica imutável Node/libuv é somente LAB e inválida como prova de
 produção; ela não substitui a implementação bounded, o consumidor real de
@@ -252,6 +252,7 @@ sequenciais. Tarefas normativas possuem um único AC normativo cada.
 | T-012B | Fechar seis controles de segurança, decisão R-02, fronteira FS/Windows e motivos de bloqueio; manter unknown/PENDING quando sem prova. | AC-019 (normative) | R-01/R-02/R-03/R-04/R-06, CAP-024/026/034 | T-004/T-005/T-007/T-010A/T-011/T-014/T-015 | `docs/functional.md`; `docs/omp-compatibility.md`; `tdd-orchestrator/SOURCE.md` (serial com T-012A) | PV-005/PV-008/PV-011/PV-016; nenhum waiver silencioso | PENDING |
 | T-013A | Preparar artefato aprovado de prontidão pré-publicação para baseline/branch/intake issue/rename/PR e evidência Ship; não afirmar release terminal | AC-001 (normative) | CAP-001/027/038, R-04 | P-004 + T-012A/B + review/validator final | `.git/ship-review-evidence.md`; `implementation-evidence/release-governance/**` | PV-001/PV-016; verifica intake e prontidão, não AC-001 `RELEASE_CONFIRMED` |
 | T-013B | Executar a responsabilidade Ship externa somente após consumir o artefato aprovado de T-013A e todos os gates pré-publicação reais; feature CI, merge e evidência terminal fecham AC-001 e o pacote de AC-016; sem merge local/deploy de host e sem tratar `plan` como prontidão; sem dependência cíclica de AC-001 pós-release | AC-016 (behavioral) | CAP-027/028/029, R-01/R-04, AC-021 | T-013A + T-006C + gates pré-publicação reais + decisão expressa do usuário | `.git/ship-review-evidence.md` (serial com T-013A) | PV-016/PV-018; release terminal `CONFIRMED` ou `PENDING_USER`, nunca inferido; AC-021 só descreve steps `NOT_EXECUTED` | PENDING |
+| T-013C | Conferir e registrar a confirmação terminal observada de T-013B; fechar AC-001 somente com receipt `CONFIRMED`, mantendo-o aberto em `PENDING_USER` ou ausência de prova. Conferência documental separada do assignment comportamental, sem nova publicação | AC-001 (normative) | CAP-028/029, R-04 | T-013B terminal observado | `implementation-evidence/release-governance/**` (serial com T-013A/B) | PV-016; revisão semântica independente do receipt e hash/revisão atuais; não é gate pré-publicação | PENDING |
 
 T-014 e T-015 antecedem T-012A/B e T-013A/B; nenhuma PR, auto-merge ou
 release começa antes da suíte pertinente descoberta, métricas, review e
@@ -266,7 +267,12 @@ contrato 0.2/no-SHA é histórica. A baseline de autenticação é histórica, n
 RED nem retry técnico. NATIVE-09 exige retry técnico elegível separado dos
 fallbacks; NATIVE-10 exige pacote integrado e retorno aceito.
 
-T-013A cria artefato aprovado de prontidão pré-publicação. T-013B é a
+T-013A cria artefato aprovado de prontidão pré-publicação, mas não fecha AC-001.
+T-013C é owner da conferência terminal de AC-001 após T-013B: registre o receipt
+observado `CONFIRMED`; `PENDING_USER` mantém AC-001 aberto. Esse assignment
+normativo é separado do comportamental AC-016 e não inventa teste de runtime.
+Nenhuma dessas instruções reexecuta tarefas históricas.
+T-013B é a
 responsabilidade Ship externa: consome esse artefato e todos os gates
 pré-publicação reais; feature CI, merge e evidência terminal fecham AC-001 e o
 pacote de AC-016, sem dependência cíclica de AC-001 pós-release.
@@ -377,4 +383,3 @@ PV-011/PV-012/PV-017/PV-018.
   status corrente nem prova Native integrada.
 - Contratos e requisitos relacionados: [spec.md](./spec.md),
   [plan.md](./plan.md) e [interface-contract.md](./contracts/interface-contract.md).
-

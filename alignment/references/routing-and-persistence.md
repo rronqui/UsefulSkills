@@ -92,7 +92,13 @@ Diante de decisão material sem resposta, preserve a fronteira real não vazia
 e `status: "BLOCKED"` em qualquer rota; nunca fabrique um fast-close vazio.
 Respostas persistidas são a sequência ordenada, não estado transitório:
 acrescente à cópia (`nextResponses = [...persisted.responses, newResponse]`),
-valide rodada estritamente posterior e `question_id` novo, e recalcule
+valide rodada estritamente posterior e `question_id` novo; isso não basta:
+reconstrua a fronteira pendente selada e confira o par exato question_id/texto
+NFC e a rodada realmente apresentada nessa fronteira, na mesma request/run.
+Pergunta inventada, downstream, substituída ou ainda não selada bloqueia antes
+da escrita. Respostas da mesma rodada são anexadas em um lote da fronteira;
+parciais preservam a pendência. Nunca derive a pergunta da própria resposta.
+Depois recalcule
 canonical/digest, frontier, closure e status antes de publicar o sucessor.
 
 Ao retomar, leia o caminho do handoff, valide toda a cadeia, identidade
@@ -119,4 +125,3 @@ exato e hash do novo registro selado. Compreensão complexa usa o
 [leitor independente](comprehension-review.md). Ambiguidade conceitual usa
 [domínio](domain-modeling.md); instruções de agentes usam
 [escrita](writing-for-agents.md). Não encadear todos por formalidade.
-

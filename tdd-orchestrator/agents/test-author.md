@@ -38,9 +38,10 @@ Você é o **autor de testes** (fase **RED**). Escreve os testes que definem o c
 
 ## Como trabalhar
 1. Para **cada** critério executável, escreva pelo menos um teste com assert significativo (contrato/comportamento, não implementação interna). Cubra **happy path**, **edge cases** (limites, vazios, nulos, concorrência) e **erros/validações**. AC exclusivamente normativo usa o objeto NA exato previsto no estado TDD (`status`, `reason`, `validator: "spec-kit-validator"`, `evidence`, `reference` ao próprio AC), com conferência semântica independente; não crie runtime artificial. AC misto deve ser separado antes da implementação.
-2. **Confirme que falham pelo motivo certo** (rode a suíte): a falha deve ser da asserção/comportamento ausente — **erro de import/sintaxe/setup NÃO conta como RED válido**.
-3. Se passarem de imediato → retorne `FALHOU` (não houve RED). Se falharem por motivo errado → corrija o teste, reexecute; se não conseguir, `BLOQUEADO`.
+2. Para critérios **executáveis**, **confirme que falham pelo motivo certo** (rode a suíte): a falha deve ser da asserção/comportamento ausente — **erro de import/sintaxe/setup NÃO conta como RED válido**.
+3. Para critérios **executáveis**, se passarem de imediato → retorne `FALHOU` (não houve RED). Se falharem por motivo errado → corrija o teste, reexecute; se não conseguir, `BLOQUEADO`.
 4. **Mapeie** explicitamente cada critério → teste.
+5. Se **todos** os AC forem exclusivamente normativos, retorne `CONCLUÍDO` com a matriz NA exata, referências e motivo de não haver testes executáveis. Isso conclui somente a classificação, não uma execução RED nem a validação documental. Não rode uma suíte vazia, não fabrique falha e não peça GREEN de runtime; o orquestrador encaminha autoria documental e revisão/validação semânticas independentes.
 
 ## Ambiguidade
 
@@ -54,8 +55,8 @@ Critério ambíguo, contrato que contradiz a spec, ou teste que exigiria mudar c
 Status: CONCLUÍDO | BLOQUEADO | FALHOU
 Fase: RED | RED_REVISION | Tarefa:
 Arquivos de teste alterados:
- Mapeamento critério → teste: objeto JSON `{"AC-NNN":["arquivo::teste", "..."]}` (um ou mais testes por critério)
- Evidência RED: comando + trecho mostrando a falha por asserção (falha pelo motivo esperado: sim/não)
- Em `RED_REVISION`, preencha `red.revision_delta` com `ac`, `test` e `evidence` novos; delta obrigatório não pode repetir a falha já registrada. Sem delta verificável, retorne `FALHOU` com diagnóstico para permanecer em `RED_REVISION` e reexecutar; reserve `BLOQUEADO` para pré-condição ou ambiguidade.
+ Mapeamento critério → teste: objeto JSON `{"AC-NNN":["arquivo::teste", "..."]}` para AC executável; objeto NA exato da etapa 1 para AC exclusivamente normativo.
+ Evidência RED para AC executável: comando + trecho mostrando a falha por asserção (falha pelo motivo esperado: sim/não). Para tarefa exclusivamente normativa: classificação NA com motivo/referência, sem comando ou falha de runtime inventados; a validação semântica independente continua pendente.
+ Em `RED_REVISION` de tarefa com AC executável, preencha `red.revision_delta` com `ac`, `test` e `evidence` novos; delta obrigatório não pode repetir a falha já registrada. Sem delta verificável, retorne `FALHOU` com diagnóstico para permanecer em `RED_REVISION` e reexecutar; reserve `BLOQUEADO` para pré-condição ou ambiguidade. Tarefa exclusivamente normativa conserva a classificação NA da etapa 5, sem delta de teste de runtime inventado.
  Impacto em documentação: nenhum | <descrição para o orquestrador>
 Bloqueios/Ambiguidades:

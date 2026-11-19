@@ -213,14 +213,18 @@ function validateCriterionTypes(acceptanceCriteria, errors) {
 
 function isNormativeTask(task, acceptanceCriteria = []) {
   return Array.isArray(task?.acceptance_criteria)
-    && task.acceptance_criteria.length === 1
-    && isNormativeCriterion(task.acceptance_criteria[0], acceptanceCriteria)
-    && task.red?.criteria_to_tests?.[task.acceptance_criteria[0]]?.status === "NA";
+    && task.acceptance_criteria.length > 0
+    && task.acceptance_criteria.every((ac) => isNormativeCriterion(ac, acceptanceCriteria)
+      && task.red?.criteria_to_tests?.[ac]?.status === "NA");
 }
 
 function hasCanonicalSpecKitEvidence(evidence) {
   const normalized = String(evidence).replaceAll("\\", "/");
-  return ["spec.md", "plan.md", "tasks.md", "interface-contract.md"].every((file) => normalized.includes(file));
+  // An embedded basename (not-spec.md, spec.md.bak) is not the document.
+  return ["spec.md", "plan.md", "tasks.md", "interface-contract.md"].every((file) => {
+    const escaped = file.replaceAll(".", "\\.");
+    return new RegExp(`(?:^|[\\s/\\x22\\x27\\x60(])${escaped}(?=$|[\\s#\\x22\\x27\\x60),;:])`).test(normalized);
+  });
 }
 function isSpecificGateEvidence(gate, status, evidence) {
   if (!nonEmptyString(evidence)) return false;
@@ -329,7 +333,7 @@ function validateNormativeEntry(entry, ac, path, errors) {
   if (!isObject(entry) || entry.status !== "NA") errors.push(`${path}: exact normative NA object required`);
   for (const field of exact.slice(1)) if (!nonEmptyString(entry?.[field])) errors.push(`${path}.${field}: non-empty value required`);
   if (entry?.validator !== "spec-kit-validator") errors.push(`${path}.validator: must be spec-kit-validator`);
-  if (typeof entry?.reference === "string" && !entry.reference.includes(ac)) errors.push(`${path}.reference: must reference ${ac}`);
+  if (typeof entry?.reference === "string" && !new RegExp(`(?:^|[^A-Za-z0-9_-])${ac}(?=$|[^A-Za-z0-9_-])`).test(entry.reference)) errors.push(`${path}.reference: must reference exact ${ac}`);
 }
 
 export function validateCriteriaMatrix(task, { acceptanceCriteria = [] } = {}) {
@@ -355,7 +359,7 @@ export function validateCriteriaMatrix(task, { acceptanceCriteria = [] } = {}) {
       for (const ac of acceptance) {
         const entry = matrix[ac];
         if (isNormativeCriterion(ac, acceptanceCriteria)) {
-          if (acceptance.length !== 1) errors.push(`criteria_to_tests.${ac}: normative NA is allowed only for an exclusively normative task`);
+          if (!acceptance.every((id) => isNormativeCriterion(id, acceptanceCriteria))) errors.push(`criteria_to_tests.${ac}: normative NA is allowed only for an exclusively normative task`);
           validateNormativeEntry(entry, ac, `criteria_to_tests.${ac}`, errors);
         } else if (!Array.isArray(entry) || entry.length === 0 || Object.keys(entry ?? {}).length !== entry.length) {
           errors.push(`criteria_to_tests.${ac}: executable AC needs a dense non-empty test list`);

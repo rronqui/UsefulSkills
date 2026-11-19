@@ -18,6 +18,13 @@ não está descrito/não importa), sucesso ligado a critérios, cenário normal 
 limite/erro pertinentes, pressupostos e ambiguidades com fonte/impacto. Termos
 comuns de engenharia não exigem glossário artificial. COMPLETE significa leitura
 suficiente, nunca aprovação de código/spec. Lacuna material é INCOMPLETE.
+Antes de consumir o retorno, confira o envelope completo e o conteúdo real:
+`protocol`, papel, instance/run, revisão, context_digest e fontes path/sha256
+devem corresponder ao assignment e às fontes efetivamente observadas. Leitura
+sem conteúdo observado ou recibo válido, schema inválido, metadados divergentes
+ou status INCOMPLETE bloqueiam a promoção dos dependentes; sucesso do transporte
+não supre essas condições. Preserve retorno bruto e diagnóstico sem reclassificar
+INCOMPLETE. Só um novo COMPLETE válido e atual pode resolver a pendência.
 
 O coordenador compara o retorno com intenção documentada. Divergência não faz o
 leitor estar certo automaticamente. O autor documental corrige texto com

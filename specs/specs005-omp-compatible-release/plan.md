@@ -81,8 +81,9 @@ host, não autoriza sibling nem confiança retroativa da filha. Exige `NoProfile
 injeções/PATH/`ComSpec` alternativo, sem bypass, e `FullLanguage` x64 detectado
 ou fail closed.
 `local://ship-native-fs-memory-final-result.json` registra seis PASS somente da
-primitive LAB. T-005 pode iniciar GREEN após este registro, mas implementação,
-review independente e prova nativa continuam necessários. T-007 pode reutilizar
+primitive LAB. O registro permite desenvolver o candidato; T-005 só inicia GREEN
+dependente após RED contratual e prova atual da primitive aplicável em destino
+descartável. Review independente e prova nativa de integração continuam necessários. T-007 pode reutilizar
 o bootstrap apenas para metadata/operações filesystem dos hooks, nunca para
 admitir Git por herança; Git R7 preserva `nlink=1` legado e só habilita extensão
 com release/linkset/proveniência/identidade/ACL/carga exatos comprovados. POSIX
@@ -422,10 +423,10 @@ permanece canônica, sem bump de versão do pacote.
 ## Regras de decomposição e estado
 
 1. Cada tarefa tem `acceptance_criteria` explícito e pelo menos um AC.
-2. Tarefa com AC `type: normative` recebe **exatamente um AC normativo**; nenhum
-   `NA` de state será usado para mascarar AC behavioral. Relações adicionais ficam
-   na matriz de suporte, não no array de aceitação persistido. Essa regra segue o
-   consumidor `state.mjs:312–314` (`acceptance.length === 1`).
+2. Pela emenda Review09-01 do contrato, tarefa normativa recebe um ou vários
+   ACs, todos explicitamente `type: normative`, com uma prova NA exata por AC;
+   nenhum `NA` de state mascara AC behavioral. Tarefas com tipos diferentes são
+   decompostas antes do dispatch; preserve review semântico e gates atuais.
 3. AC behavioral só fecha com asserção real, smoke descartável ou cenário nativo
    pertinente. Teste de prosa, wiring, mock ou fixture não equivale a execução OMP.
 4. RED precede GREEN para mudança comportamental; norma documental recebe revisão
@@ -516,8 +517,9 @@ T-006C é serializada após T-006B e T-003: apenas `ship/bin/ship.mjs`,
 escopo dessa tarefa; Main edita os docs não-spec. A rota não altera comandos
 existentes nem assinatura, wire, schema, modelo ou perfil público existente.
 
-Com a decisão `explicit_os_host_tcb` registrada, T-005 pode iniciar GREEN,
-mas os seis PASS LAB não aprovam host/transação; handles/ancestrais pinados,
+Com a decisão `explicit_os_host_tcb` registrada, T-005 mantém a autorização do
+candidato; GREEN dependente exige RED contratual e prova atual da primitive
+aplicável em destino descartável. Os seis PASS LAB não aprovam host/transação; handles/ancestrais pinados,
 no-replace e quarentena continuam obrigatórios, e a conclusão exige review
 independente da implementação e prova nativa. Para T-006A, o artefato Node/libuv
 é somente LAB; a capacidade Linux efetiva deve ser provada antes do release.
@@ -550,6 +552,7 @@ exclusiva de T-012A/B.
 | T-012B | seis controles de segurança, decisão R-02 e fechamento de limites | AC-019 (normative) | T-004/T-005/T-007/T-010A/T-011/T-014/T-015 | `docs/functional.md`; `docs/omp-compatibility.md`; `tdd-orchestrator/SOURCE.md` (serial com T-012A) |
 | T-013A | criar artefato aprovado de prontidão pré-publicação para baseline/branch/intake issue/rename/PR e evidência Ship, sem afirmar release terminal | AC-001 (normative) | P-004 + T-012A/B + review/validator final | `.git/ship-review-evidence.md`; `implementation-evidence/release-governance/**` |
 | T-013B | a responsabilidade Ship externa consome o artefato aprovado de T-013A e todos os gates pré-publicação reais; feature CI, merge e evidência terminal fecham a condição final de AC-001 e os requisitos de pacote/AC-016, sem depender ciclicamente de AC-001 pós-release para publicar | AC-016 (behavioral) | T-013A + T-006C + gates pré-publicação reais + decisão explícita do usuário | `.git/ship-review-evidence.md` (serial com T-013A) |
+| T-013C | conferir receipt terminal de T-013B e fechar AC-001 somente com `CONFIRMED`; `PENDING_USER` ou prova ausente mantém aberto, sem publicação adicional | AC-001 (normative) | T-013B terminal observado | `implementation-evidence/release-governance/**` (serial com T-013A/B); revisão semântica independente, fora dos gates pré-publicação |
 
 
 T-014 e T-015 antecedem T-012A/B e T-013A/B; nenhuma PR, auto-merge ou

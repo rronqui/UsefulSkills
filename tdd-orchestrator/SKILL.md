@@ -167,7 +167,7 @@ Os subagentes retornam status próprios. O orquestrador **deve mapear** para os 
 
 | Agente | Status retornado | progress.json | Ação do orquestrador |
 |---|---|---|---|
-| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste`, ou objeto NA exato (`status`, `reason`, `validator: "spec-kit-validator"`, `evidence`, `reference`) para AC exclusivamente normativo | Se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
+| `test-author` | CONCLUÍDO | `red.status: PASS`; valide e normalize `red.criteria_to_tests` como objeto AC→lista não vazia de strings `arquivo::teste`, ou objeto NA exato (`status`, `reason`, `validator: "spec-kit-validator"`, `evidence`, `reference`) para AC exclusivamente normativo | Se **todos** os AC forem exclusivamente normativos e a matriz NA for válida, registre somente a classificação RED (`failing_tests: []`, `failure_reason_expected: false`), GREEN/REFACTOR `SKIPPED` com motivo normativo e encaminhe `DOC → REVIEW → VALIDATE` conforme a exceção normativa; não encaminhe GREEN de runtime. Nos demais casos, se `phase: RED_REVISION`, exija que todos os pares previamente presentes em `red.revision_baseline_tests` permaneçam em `red.criteria_to_tests`, que `red.revision_delta.test` esteja no formato `arquivo::teste`, esteja em `red.criteria_to_tests[ac]`, não apareça em nenhum AC do mapa-base e apareça em `red.failing_tests`; confirme `failure_reason_expected: true` e evidência nova que demonstre a falha de asserção desse teste antes de avançar `GREEN_FIX`; sem delta verificável, permaneça `RED_REVISION` e reexecute; caso contrário, avance `GREEN` somente se a matriz cobrir todos os AC; caso contrário, reexecute RED |
 | `test-author` | FALHOU + `RED_REVISION` sem delta verificável | `red.status: PENDING`; preserve `red.revision_baseline_tests`, restaure `red.criteria_to_tests` ao mapa-base e limpe conjuntamente `red.revision_delta`, `red.failing_tests` e `red.failure_reason_expected` | Permaneça em `RED_REVISION`, incremente `attempt` e reexecute o RED_REVISION; não trate como comportamento já implementado nem como RED inicial |
 | `backend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
 | `frontend-developer` | CONCLUÍDO | `green.status: PASS` (ou `green.tooling_evidence` e `green.tooling_suite_evidence` preenchidos em `TOOLING_FIX`) | Em `TOOLING_FIX`, para qualquer gate cujo `origin` seja `TOOLING`, valide comando completo e trecho PASSOU do gate e da suíte em `green.tooling_evidence`/`green.tooling_suite_evidence`; sem ambos, permaneça `TOOLING_FIX`/BLOQUEADO. Só então avance REFACTOR |
@@ -320,7 +320,7 @@ processo em execução, confira jobs/resultados reais do runtime.
   "contract": { "file": "./specs/<feature>/contracts/interface-contract.md", "version": "0.1.0", "status": "DRAFT|APPROVED|NA", "na_reason": "" },
   "acceptance_criteria": [
     { "id": "AC-001", "type": "behavioral", "desc": "...", "source": "./specs/<feature>/spec.md#secao", "tasks": ["T-001"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" },
-    { "id": "AC-016", "type": "normative", "desc": "...", "source": "./specs/<feature>/spec.md#AC-016", "tasks": ["T-001"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" }
+    { "id": "AC-016", "type": "normative", "desc": "...", "source": "./specs/<feature>/spec.md#AC-016", "tasks": ["T-002"], "status": "PENDING|COVERED|IMPLEMENTED|VALIDATED" }
   ],
   "waves": [
     {
@@ -334,11 +334,31 @@ processo em execução, confira jobs/resultados reais do runtime.
           "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
           "attempt": 0,
           "allowed_write_globs": ["src/backend/**"],
-          "acceptance_criteria": ["AC-001", "AC-016"],
+          "acceptance_criteria": ["AC-001"],
           "implemented_by": "backend-developer",
           "reviewed_by": "peer-reviewer",
           "review": { "status": "PENDING|APPROVED|BLOCKED", "agent": "", "independent": false, "revision": "", "evidence": "" },
-          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": { "AC-001": ["arquivo::teste"], "AC-016": { "status": "NA", "reason": "critério exclusivamente normativo", "validator": "spec-kit-validator", "evidence": "interface-contract.md#invariantes", "reference": "spec.md#AC-016" } }, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
+          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": { "AC-001": ["arquivo::teste"] }, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
+          "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
+          "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
+          "doc_impact": "none|applied",
+          "gates": { "tests": "pending", "traceability": "pending", "spec_kit": "pending", "coverage": "pending", "lint": "pending", "type_check": "pending", "build": "pending", "security": "pending", "contract": "pending", "git_sanity": "pending" },
+          "gate_origins": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
+          "gate_evidence": { "tests": "", "traceability": "", "spec_kit": "", "coverage": "", "lint": "", "type_check": "", "build": "", "security": "", "contract": "", "git_sanity": "" },
+          "blockers": [],
+          "evidence": ""
+        },
+        {
+          "id": "T-002",
+          "title": "Artefatos normativos AC-016",
+          "phase": "PENDING|RED|RED_REVISION|GREEN|GREEN_FIX|TOOLING_FIX|REFACTOR|REFACTOR_FIX|REVIEW|DOC|VALIDATE|DONE|BLOCKED",
+          "attempt": 0,
+          "allowed_write_globs": ["docs/feature/**"],
+          "acceptance_criteria": ["AC-016"],
+          "implemented_by": "spec-kit-author",
+          "reviewed_by": "peer-reviewer",
+          "review": { "status": "PENDING|APPROVED|BLOCKED", "agent": "", "independent": false, "revision": "", "evidence": "" },
+          "red": { "status": "PENDING|PASS", "failing_tests": [], "failure_reason_expected": false, "criteria_to_tests": { "AC-016": { "status": "NA", "reason": "critério exclusivamente normativo", "validator": "spec-kit-validator", "evidence": "interface-contract.md#invariantes", "reference": "spec.md#AC-016" } }, "revision_delta": { "ac": "", "test": "", "evidence": "" }, "revision_baseline_tests": {} },
           "green": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "", "changed_files": [], "tooling_evidence": "", "tooling_suite_evidence": "" },
           "refactor": { "status": "PENDING|PASS|SKIPPED", "reason_if_skipped": "" },
           "doc_impact": "none|applied",
@@ -353,6 +373,14 @@ processo em execução, confira jobs/resultados reais do runtime.
   ]
 }
 ```
+O exemplo separa os tipos: T-001 cobre somente AC-001 executável e T-002
+cobre AC-016 normativo com owner `spec-kit-author`, globs documentais próprios
+e matriz NA exata. Os valores com `|` são alternativas de schema, não provas.
+A autoria documental de T-002 não compartilha o lock de produção de T-001.
+Uma tarefa pode reunir vários ACs normativos, todos classificados explicitamente
+como `normative` e com uma prova NA independente para cada AC. Não reúna AC
+executável e normativo na mesma tarefa; separe-os antes do dispatch.
+
 No início da onda, `review` e `validation` podem estar ausentes. Antes da promoção,
 persista `wave.review` com `status: APPROVED`, `agent: peer-reviewer`,
 `independent: true`, `revision`, `evidence` e `aggregate: {status: APPROVED,
@@ -567,7 +595,7 @@ Sem critério de aceite explícito, **não delegue**.
 
 > Antes da fase 1: recebi o "ok"; **`spec_kit.status = WRITTEN`**; esta tarefa vai como `task` a um **subagente** (eu não codo); começo pela fase **RED**. Sem exceção de "rápido demais para delegar".
 
-Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. `DONE` é o marco pré-integração persistido da tarefa; depois de todas as tarefas da onda atingirem esse marco, a integração roda e a promoção final ocorre somente após review/validation da onda. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
+Fluxo comportamental: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → DONE**. `DONE` é o marco pré-integração persistido da tarefa; depois de todas as tarefas da onda atingirem esse marco, a integração roda e a promoção final ocorre somente após review/validation da onda. Tarefas independentes da mesma onda percorrem o ciclo em paralelo (escopos disjuntos), mas a fase DOC é serializada por onda quando compartilha os artefatos canônicos Spec Kit. A próxima onda só começa após a integração da atual.
 
 > **Estados de revisão/fix.** Quando um agente re-entra uma fase por causa de um bloqueio (via `ROUTE_BLOCK` ou `VALIDATE_GATES`), a fase é tratada como revisão — ex.: `RED_REVISION`, `GREEN_FIX`, `TOOLING_FIX`, `REFACTOR_FIX`. O orquestrador **deve indicar isso no briefing** (campo CONTEXTO) para que o agente saiba que é uma correção, não o ciclo original. Os agentes esperam receber esses nomes em suas pré-condições.
 > Ao iniciar nova entrada em `RED_REVISION`, incremente `attempt`, copie o mapa
@@ -592,8 +620,10 @@ Fluxo nominal: **RED → GREEN → REFACTOR → REVIEW → DOC → VALIDATE → 
 `red.criteria_to_tests` é exatamente um **objeto AC→teste**: suas chaves são todos e somente os `AC-NNN` da tarefa (sem ausentes ou extras), e cada valor é uma lista não vazia de strings no formato `arquivo::teste`, exceto o objeto `NA` normativo. Texto, matriz incompleta ou matriz com AC extra é inválido e mantém a tarefa fora de GREEN.
 Um AC exclusivamente normativo pode usar o seam `NA` somente com o objeto exato `{ status: "NA", reason, validator: "spec-kit-validator", evidence, reference }`: razão/motivo não vazia, `validator` deve ser exatamente `"spec-kit-validator"` (aliases como `"validator"` são rejeitados), evidência documental no contrato/spec e `reference` apontando para o mesmo AC/id; isso não remove a entrada do AC da matriz nem autoriza promoção final sem os demais critérios.
 
+**Exceção de tarefa exclusivamente normativa (um ou vários ACs):** `red.status: PASS` registra a classificação NA, nunca uma suíte executada. Registre GREEN e REFACTOR como `SKIPPED`, ambos com motivo explícito de ausência de implementação/refactor de runtime. Encaminhe a `DOC` para o `spec-kit-author` escrever os artefatos necessários dentro do assignment; depois exija `REVIEW` independente sobre os artefatos atuais e `VALIDATE`, incluindo a conferência semântica `spec-kit-validator`. Não promova DONE nem commite antes dessas provas. Essa ordem documental é a exceção explícita à ordem comportamental abaixo; tarefas com AC executável continuam exigindo RED por asserção.
 
-1. **RED — `test-author`.** Testes que falham cobrindo **todos os critérios** (happy, edge, erro). **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
+
+1. **RED — `test-author`.** Para tarefas com AC executável, testes que falham cobrindo **todos os critérios executáveis** (happy, edge, erro); AC normativo conserva sua entrada NA. **Só passa para GREEN** com `red.failing_tests` preenchido e `failure_reason_expected: true` (falha pela asserção, não por import/setup). Registre `criteria_to_tests`. Tarefa exclusivamente normativa segue a exceção documental acima, sem GREEN de runtime. **Se o `test-author` retornar `FALHOU`** (testes passam de imediato), verifique se o comportamento já está implementado: se sim, registre `green.status: SKIPPED`, `green.reason_if_skipped: "comportamento já implementado"`, `refactor.status: SKIPPED`, `refactor.reason_if_skipped: "sem alteração a refatorar"` e `implemented_by: "existing-code"`, então avance a REVIEW; se não, é teste fraco — reexecute o `test-author` com briefing mais específico.
 2. **GREEN — `backend-developer` e/ou `frontend-developer`.** Implementa o **requisito completo** (a menor solução que atende **todos** os critérios). O dev reconfirma o vermelho antes de codar. Critério sem teste → para e devolve ao `test-author`. **Testes são read-only.**
 3. **REFACTOR — `refactorer`.** Mantém tudo verde. Se nada relevante a refatorar, registre `refactor.status: SKIPPED` + `reason_if_skipped` — nunca cosmético, nunca silencioso.
 4. **REVIEW — `peer-reviewer`** (≠ `implemented_by`). Entregue **só o diff isolado pelos `allowed_write_globs` da tarefa** (`git diff HEAD -- <globs>`) + tarefa (id/título, `implemented_by` e `reviewed_by`) + `spec.md`, `plan.md`, `tasks.md`/critérios + contrato `interface-contract.md`/versão quando aplicável + `red.criteria_to_tests` (objeto AC→test) + `docs/review-feedback.md` **se existir** no repo (categorias de bugs que escaparam de reviews anteriores), **não o raciocínio do dev**. Quando `implemented_by: existing-code`, trate sempre a tarefa como revisão de implementação existente: leia os arquivos de produção e testes atuais referenciados pelos critérios, independentemente de o diff isolado estar vazio ou conter apenas os testes RED; não bloqueie por ausência de patch de produção.
@@ -639,6 +669,7 @@ stateDiagram-v2
         RED --> RED_CHECK : rodar testes
         RED_CHECK --> RED : falha por import-setup, faltam testes ou matriz AC->teste inválida/incompleta
         RED_CHECK --> GREEN : falham por ASSERCAO e matriz AC->teste válida
+        RED_CHECK --> DOC : todos AC normativos e matriz NA válida, GREEN/REFACTOR SKIPPED
         RED_CHECK --> RED : testes passam sem comportamento implementado
         RED_CHECK --> REVIEW : passam de imediato, comportamento ja implementado e matriz AC->teste válida
         RED_REVISION --> GREEN_FIX : teste de regressao falha por ASSERCAO
@@ -659,7 +690,8 @@ stateDiagram-v2
         %% ---------- REVIEW ----------
         state REVIEW_VEREDITO <<choice>>
         REVIEW --> REVIEW_VEREDITO : emitir veredito
-        REVIEW_VEREDITO --> DOC : APROVADO
+        REVIEW_VEREDITO --> DOC : APROVADO em tarefa comportamental
+        REVIEW_VEREDITO --> VALIDATE : APROVADO normativo, documentos atuais escritos em DOC
         REVIEW_VEREDITO --> ROUTE_BLOCK : BLOQUEADO
 
         %% ---------- Roteamento de bloqueio por origem ----------
@@ -675,7 +707,8 @@ stateDiagram-v2
         DOC --> DOC_CHECK : delegar atualizacao da spec ao spec-kit-author, confirmar disco e checar contrato
         DOC_CHECK --> RED : contrato mudou — aprovado pelo usuario (volta a RED para ajustar)
         DOC_CHECK --> BLOCKED : contrato mudou — NAO aprovado (escalar ao usuario)
-        DOC_CHECK --> VALIDATE : spec em disco e coerente com a entrega
+        DOC_CHECK --> VALIDATE : tarefa comportamental, spec em disco e coerente
+        DOC_CHECK --> REVIEW : tarefa normativa, documentos escritos e revisão independente pendente
 
         note right of DOC_CHECK
             Caminho normal — VALIDATE

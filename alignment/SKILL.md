@@ -13,8 +13,18 @@ respostas e bloqueios do protocolo.
 Para complexidade/passagem/pressuposto material, use [compreensão](references/comprehension-review.md)
 com [requirements-reader](agents/requirements-reader.md): quando essa leitura
 independente for necessária, delegue pela mesma ferramenta nativa `task`, com
-`agent: "requirements-reader"`, fontes/revisão e critérios explícitos; recolha
-o resultado antes de fechar o entendimento. O leitor não entrevista o usuário,
+`agent: "requirements-reader"`, conforme o schema efetivamente exposto. Antes
+do dispatch, leia o perfil e o schema dinâmico: forneça finalidade, critérios,
+`run_id`, `source_revision`, `context_digest` e fontes documentais explícitas
+com path/sha256 vinculados aos bytes atuais. Registre instance/dispatch/job e
+parent conforme metadados reais disponíveis; não invente parâmetros task nem
+campos do runtime. Se structured/output schema não for exposto, preserve o
+retorno bruto e valide o mesmo envelope do perfil no consumidor, sem declarar
+contenção ou structured inexistentes. Recolha e valide o retorno completo,
+papel/identidade, revisão/contexto/fontes, conteúdo observado e status COMPLETE
+antes de fechar o entendimento dependente. INCOMPLETE ou prova ausente mantém
+os dependentes bloqueados; não promova por sucesso do transporte.
+O leitor não entrevista o usuário,
 escreve a spec ou aprova código. Reutilize prova atual equivalente; pedido simples
 completo usa fast-close sem filho obrigatório.
 Leia [domínio](references/domain-modeling.md) só com ambiguidade conceitual e
@@ -191,6 +201,16 @@ type AlignmentResponse = {
 Valide tipo, `round` inteiro >= 1 e as três strings não vazias antes de aceitar
 uma resposta. Ao retomar, a nova rodada deve ser estritamente posterior à
 última rodada persistida e seu `question_id` não pode já existir no histórico.
+Ineditismo não autoriza responder uma pergunta arbitrária: antes de anexar,
+reconstrua a fronteira pendente a partir do registro selado e do pedido. Exija
+que `question_id` identifique exatamente uma pergunta dessa fronteira, que
+`question` corresponda ao texto NFC persistido e que `round` seja a rodada
+real apresentada para essa fronteira. Recuse pergunta inventada, downstream,
+de outro request/run ou texto substituído, mesmo com id novo. Se a apresentação
+ocorreu depois do último checkpoint, sele-a primeiro; nunca derive a pergunta
+pendente da própria resposta recebida. Respostas da mesma rodada chegam como
+um lote da fronteira apresentada e o lote sucessor tem rodada posterior ao
+histórico; preserve respostas parciais e a fronteira restante sem fechar.
 Resposta ausente, vazia, fora de ordem, duplicada ou inválida mantém
 `status: "BLOCKED"`, retorna `E_ALIGNMENT_BLOCKED` e deixa toda a sequência
 durável intacta; nunca aceite nem descarte uma resposta silenciosamente.
