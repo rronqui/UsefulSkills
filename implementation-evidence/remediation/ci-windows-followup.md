@@ -63,3 +63,25 @@ the actual diagnostic passed admission: its metadata and binding probes exited
 zero in 3005 ms and 722 ms. The subsequent Git query returned 1 because the
 optional hooks configuration was absent, which the installer already accepts.
 No timeout or trust check has been relaxed; hosted evidence is still pending.
+
+The full hosted suite on `f14c572b1b174ec7cacb723173a6063bc15ee7e2`
+reached tests and recorded 1323 passed, two failed and 46 platform/capability
+skips (1371 total). Ubuntu and security passed. The stdin wrapper case took
+109336 ms, exceeding its 90-second test budget; it invokes three independently
+checked wrappers. Its test-only Windows budget is now 180 seconds. The native
+PowerShell probe remains bounded at 30 seconds.
+
+The rollback race's real watcher previously had no startup handshake. The
+fixture now requires its ready signal after an initial observation poll before
+starting the native transaction, bounded at ten seconds. A watcher that fails
+to become ready is terminated and fails the test. Publication detection still
+requires changed target bytes and transaction/stage evidence; no missing marker
+or unobserved publication is accepted. Missing-marker assertions include the
+child's error/stdout/stderr to diagnose any distinct subsequent failure.
+
+Luna at medium effort implemented these bounded test-fixture changes. Both
+affected Windows cases passed with the real Git 2.54.0 installation: two passed
+in 84.29 seconds; 42 other cases were excluded by the directed selector rather
+than certified as platform skips. Coordinator review retained all assertions
+and added termination on readiness timeout. Syntax/diff checks passed. The
+complete hosted matrix must validate the resulting candidate.

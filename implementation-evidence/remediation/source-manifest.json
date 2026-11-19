@@ -5,7 +5,7 @@
     "implementation-evidence/remediation/",
     "implementation-evidence/release-governance/"
   ],
-  "manifest_sha256": "468decfd083dd0d7cb1cd8ec0a0d56ff2c9333d9a0353e242e6337aace32985b",
+  "manifest_sha256": "631f9f4cfa8429ae044ec52f4e46fa610eff1de425c948861f27e28e8916e8ce",
   "files": [
     {
       "path": ".commitlintrc.json",
@@ -744,8 +744,8 @@
     },
     {
       "path": "scripts/install-hooks.test.mjs",
-      "bytes": 67061,
-      "sha256": "423269671b2e2e73112ffcb5f0404af2c0e27fa6f7149865d6c2473480c80921"
+      "bytes": 67977,
+      "sha256": "3434421883977391069dd40228498f9e7820a45e923bdd6d06845396d81a4f66"
     },
     {
       "path": "scripts/install-transaction.test.mjs",

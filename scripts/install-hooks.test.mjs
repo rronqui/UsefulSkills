@@ -392,6 +392,7 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
   const payload = join(fixture, `${token}.payload`);
   const before = join(fixture, `${token}.before`);
   const marker = join(fixture, `${token}.marker`);
+  const ready = join(fixture, `${token}.ready`);
   const attacker = join(fixture, `${token}.attacker.cjs`);
   const preload = join(fixture, `${token}.preload.cjs`);
   const expectedTarget = physicalParentAndName(target);
@@ -407,6 +408,7 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       `const payload = path.resolve(${JSON.stringify(payload)});`,
       `const before = path.resolve(${JSON.stringify(before)});`,
       `const marker = path.resolve(${JSON.stringify(marker)});`,
+      `const ready = path.resolve(${JSON.stringify(ready)});`,
       "const arm = () => {",
       "  try {",
       "    fs.writeFileSync(target, fs.readFileSync(payload));",
@@ -420,6 +422,7 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       "  arm();",
       "} else {",
       "  let stageSeen = false;",
+      "  let initialized = false;",
       "  const deadline = Date.now() + 30000;",
       "  const poll = () => {",
       "    if (Date.now() >= deadline) {",
@@ -439,6 +442,10 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       "    if (targetChanged && (stageSeen || transactionSeen)) {",
       "      arm();",
       "      return;",
+      "    }",
+      "    if (!initialized) {",
+      "      fs.writeFileSync(ready, 'ready\\n');",
+      "      initialized = true;",
       "    }",
       "    setTimeout(poll, 1);",
       "  };",
@@ -492,6 +499,12 @@ function createRollbackRace(fixture, target, transactionHome, consumerBytes) {
       "        env: childEnvironment(),",
       "        stdio: 'ignore',",
       "      });",
+      "      if (watcher.error) throw watcher.error;",
+      "      const readyDeadline = Date.now() + 10000;",
+      `      while (!fs.existsSync(${JSON.stringify(ready)}) && watcher.exitCode === null && Date.now() < readyDeadline) {`,
+      "        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);",
+      "      }",
+      `      if (!fs.existsSync(${JSON.stringify(ready)})) { if (watcher.exitCode === null) watcher.kill(); throw new Error('AC008 rollback race watcher failed to become ready'); }`,
       "    }",
       "    const result = Reflect.apply(realSpawnSync, this, arguments);",
       "    if (watcher && watcher.exitCode === null) watcher.kill();",
@@ -621,7 +634,7 @@ describe("install-hooks + wrappers gerados", () => {
     expectChildExit(libera, 0);
     const vazia = runHook(dir, "pre-push", { input: "" });
     expect(vazia.status).toBe(0);
-  });
+  }, process.platform === "win32" ? 180_000 : undefined);
 
   it("sem git no diretório: não instala nada (nem cria .git falso)", () => {
     const noGit = mkdtempSync(join(tmpdir(), "hooks-nogit-"));
@@ -1306,9 +1319,9 @@ describe("AC-008 CAS de hooks com CLI Git real", () => {
       const consumerBytes = Buffer.from("edição do consumidor durante rollback\n");
       const race = createRollbackRace(fixture, target, fixture, consumerBytes);
       const result = runRealInstallWithPreload(fixture, race.preload);
-      expect(existsSync(race.marker)).toBe(true);
+      const output = `error=${result.error?.stack ?? result.error?.message ?? "none"}\nstdout=${result.stdout ?? ""}\nstderr=${result.stderr ?? ""}`;
+      expect(existsSync(race.marker), output).toBe(true);
       const marker = readFileSync(race.marker, "utf8").trim();
-      const output = `${result.stdout || ""}${result.stderr || ""}`;
 
       if (process.platform === "win32" && marker === "attacker-failed:EBUSY") {
         expectChildExit(result, 0);
