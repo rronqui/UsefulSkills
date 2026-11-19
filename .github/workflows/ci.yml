@@ -78,6 +78,45 @@ jobs:
           Write-Host "Installed pinned Git: $(& $pinnedGit --version)"
           if ((& $pinnedGit --version) -ne 'git version 2.54.0.windows.1') { throw 'Unexpected Git version' }
           'C:\Program Files\Git\cmd' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Diagnose Windows Git trust probe
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $source = @'
+          import fs from "node:fs";
+          import path from "node:path";
+          import crypto from "node:crypto";
+          import os from "node:os";
+          import { spawnSync as nativeSpawnSync } from "node:child_process";
+          import { createGitSession } from "./scripts/lib/git-trust-source.mjs";
+          import { windowsHostPath } from "./tdd-orchestrator/lib/fs-transaction/index.mjs";
+
+          const tracedSpawnSync = (file, args, options) => {
+            const started = Date.now();
+            const result = nativeSpawnSync(file, args, options);
+            if (/\\powershell\.exe$/i.test(file)) {
+              const stderr = String(result?.stderr ?? "").replace(/[\r\n\t]+/g, " ").slice(0, 1024);
+              console.error(JSON.stringify({
+                event: "git-trust-native-query",
+                status: result?.status ?? null,
+                errorCode: result?.error?.code ?? null,
+                signal: result?.signal ?? null,
+                elapsedMs: Date.now() - started,
+                stderr,
+              }));
+            }
+            return result;
+          };
+          const session = createGitSession({ fs, path, crypto, os, spawnSync: tracedSpawnSync, platform: process.platform, env: process.env, windowsHostPath });
+          const result = session.run(["config", "--local", "--null", "--get-all", "core.hooksPath"], { cwd: process.cwd() });
+          if (result?.error) {
+            console.error(JSON.stringify({ event: "git-trust-admission", code: result.error.code, reason: result.error.reason, message: result.error.message }));
+            process.exitCode = 1;
+          } else {
+            console.log(JSON.stringify({ event: "git-trust-admission", status: result?.status ?? null }));
+          }
+          '@
+          $source | node --input-type=module
       - run: npm ci
       - run: npm test
   # Keep the existing required check name as the aggregate gate. It must not

@@ -48,3 +48,18 @@ acceptable required check even while the PR matrix was pending or failing.
 Push CI now runs only on the discovered default branch, `main`; pull requests
 still run security, both platform suites and the same aggregate `quality`.
 The merge gate must be assessed from that complete PR workflow.
+
+On `1db4564dcc70b43d55e0d9e530f2674ce13eed80`, Windows preparation
+successfully installed and selected Git 2.54.0.windows.1. `npm ci` then failed
+in its hook preparation with the generic Windows metadata validation error,
+approximately 30 seconds after invoking the bounded probe. Timeout remains a
+hypothesis, not an established cause. The aggregate correctly failed.
+
+A CI-only diagnostic now wraps the real `spawnSync` dependency of the existing
+factory. It preserves arguments, environment, limits and returned results, and
+records only status/error code/signal/elapsed time and bounded stderr. It does
+not log the environment or metadata stdout. On the development Windows host,
+the actual diagnostic passed admission: its metadata and binding probes exited
+zero in 3005 ms and 722 ms. The subsequent Git query returned 1 because the
+optional hooks configuration was absent, which the installer already accepts.
+No timeout or trust check has been relaxed; hosted evidence is still pending.

@@ -5,7 +5,7 @@
     "implementation-evidence/remediation/",
     "implementation-evidence/release-governance/"
   ],
-  "manifest_sha256": "48aa46d93feb2f6a90d02c0edd23cfcde0c0568a375c344eb266a8883066da2c",
+  "manifest_sha256": "468decfd083dd0d7cb1cd8ec0a0d56ff2c9333d9a0353e242e6337aace32985b",
   "files": [
     {
       "path": ".commitlintrc.json",
@@ -34,8 +34,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 5007,
-      "sha256": "9cbef3c7bda16f8374f3787ec3178dc984b43c3750b5a907f8333b4ab3a1a3f5"
+      "bytes": 6976,
+      "sha256": "88f45e512467da80c5c275304bcb97ba3f860969ee288a877a99a9784da7e848"
     },
     {
       "path": ".github/workflows/release-please.yml",
