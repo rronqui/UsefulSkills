@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-11-19T17:17:03.117Z",
+  "recorded_at": "2026-11-19T18:19:07.3294546Z",
   "plan": {
     "path": "implementation-evidence/remediation/plan.md",
     "sha256": "f9a8ca8dfca2bf2b899280dcdbbfdc00a06ec06c44cc0e479914bdf2c44164a5",
@@ -9,7 +9,7 @@
   "total": 59,
   "corrected": 58,
   "not_applicable": 1,
-  "candidate_validation": "IN_PROGRESS; local disposition is not release approval",
+  "candidate_validation": "Source dispositions and local/native validations are scoped evidence. Delivery is governed by required GitHub checks and release-please at PR #48; this file is not release approval.",
   "model_selection_policy": "Before each assignment assess complexity, risk, context, rework cost and select the least costly capable model; escalate only with concrete justification.",
   "findings": [
     {

@@ -50,3 +50,60 @@ Targeted native completion, 2026-11-19:
 - A model-free reconsumption of the original, hash-verified route inspection inputs through the current route consumer reproduced those FAIL verdicts. An independent comparison found the actual six source files, before/after preservation records and captured installed overlays equal to the current candidate. It did not rewrite the erroneous source artifact or waive its check. External artifact `retained-lifecycle-evaluation.json`, SHA-256 `f90c44ca78f395a0f32af16dee63c77a6c6d7aa3b02ddcfd64dda934b90da5f5`, status PARTIAL_NATIVE_EVIDENCE_ONLY.
 
 Minimal driver correction after those observations: fresh route receipts now fingerprint the current source files; historical retained-capture pins remain unchanged. The Native09 peer Root receives the actual absolute first-receipt location and an explicit dispatch/yield scope that avoids unrelated guessed reads. Directed native-evidence validation: 42 passed, including fresh artifact preparation against actual current files. These driver corrections do not change the original native outcomes or supply missing runtime proof.
+
+The attempted model-free correction of the three otherwise successful historical route receipts produced a separate derived source receipt, leaving the original bytes intact. The current consumer refused its noncanonical path; this is preserved as FAIL, not bypassed. External artifact `retained-lifecycle-source-receipt-evaluation.json`, SHA-256 `669f184690e9efbb190c8f5442db08f8ccfe55117ffe26fd29d26d89d7674ebd`. Fresh route sessions were therefore required with their own run/revision/nonce, reader context, initial/resume digests and canonical artifacts.
+
+The shared private route descriptor now states its documentary comprehension purpose explicitly (`reading_purpose`), including scope, acceptance criteria, scenarios, limits and unresolved documentary ambiguities. It does not prescribe COMPLETE, readiness or code approval. The current-source receipt test also verifies this descriptor field and unchanged context/source bindings; the directed native-evidence suite remains 42 passing tests. The historical `ALIGNMENT_RETAINED_SOURCE` constant remains unchanged.
+
+Native10 source comparison is separate from that older alignment-pin defect. For each of the five files below, the original run's frozen-package manifest, `frozen-source-v2` file and captured installed file are byte-identical; only the later workspace differs:
+
+| Changed file | Material limit of the retained Native10 proof |
+| --- | --- |
+| `deep-review/SOURCE.md` | Provenance wording clarified; no READ of this file was observed in Native10. |
+| `tdd-orchestrator/SOURCE.md` | Provenance/source wording clarified; no READ of this file was observed in Native10. |
+| `ship/SKILL.md` | Linux backup prerequisite changed from `python3` on PATH to a protected system installation. Root read the older file twice; Native10 did not exercise Linux backup. |
+| `ship/bin/lib.mjs` | Protected interpreter/ancestry and loader-environment checks were added only to `requireBackupPrerequisites`. The quality-consumer function is unchanged; its current implementation can be re-executed separately. No model READ of this file was observed. |
+| `ship/bin/ship.test.mjs` | Linux prerequisite regression/mocking changes; no model READ or execution of this test file was observed in Native10. |
+
+The audit correlated 74 successful package READ events over 32 distinct source files. Every observed hash matches the captured package; only the two Root READs of `ship/SKILL.md` (host workflow ordinals 27439 and 27449) differ from the current workspace. All exact old/current hashes and READ bindings are retained in external artifact `native10-package-drift-comparison.json`, SHA-256 `946334da34f5b926c115abdd94be00120a7e22bc65314f8f5880b267247c05f3`. This establishes the admissible shared scope and does not promote the captured package to current whole-Native approval.
+
+The fresh canonical route group `28d63bcb-6e3f-49e8-aea1-06c23e0a1884` completed PASS with process exit 0 on 2026-11-19, 17:43:37Z–18:02:22Z. SHORT_LOCAL passed 70 checks, FULL_LOCAL 129, SHORT_GIT 77 and FULL_GIT 300, including actual A/B resume and collision controls. Package/spec source fingerprints were unchanged. External artifact `native-routes-only-28d63bcb-6e3f-49e8-aea1-06c23e0a1884/evidence.json`, SHA-256 `2d6593f67d424f3a4ccb1648dfdbcf9f0a549891fc6030e387bda242c2f8ab27`. These are distinct fresh native sessions, not replacement verdicts for the earlier failed routes.
+
+Current consumers then revalidated the retained Native10 witness and each fresh route's exact inspection input. Native10's six profiles passed, execution completed, current file-backed Ship quality accepted the original proof digest, and Retro/opt-out passed. The independent route binding verifies the actual unchanged alignment/profile/protocol bytes and workload revision; it does not invent a historical run identity. External artifact `retained-native10-current-routes-evaluation.json`, SHA-256 `0671b8f294409c399677957cffd7f7cdb6dc2fabfe8e12f13455f9e32f6c0079`. This is model-free scoped reconsumption; whole-Native candidate approval remains false. Its lifecycle verdict is PENDING_NATIVE solely at FAILURE/RESUME while the technical retry below is incomplete.
+
+Native09 continuation `6f83c39d-d080-48fc-8b2c-9ee2afce1f9f` retained the genuine sealed first failure and backend repair, resumed the host observation counter after ordinal 47204, and obtained an accepted independent native peer APROVADO over the repaired subject. The subsequent second-validator Root was blocked at TASK START because its payload did not literally match the approved agent/task/solutionSpace strings. The guard retained no accepted dispatch or validator terminal; it also did not retain the rejected strings, so the exact differing field cannot be diagnosed from these bytes. External artifact `native09-continuation-6f83c39d-d080-48fc-8b2c-9ee2afce1f9f.json`, SHA-256 `e1be81a752e4a6d70466423d0f342479f4917e898f3343d1c53ae64efd872abc`, remains BLOCKED. The peer capture is independently sealed at SHA-256 `b10a95dd5bfb6ec4f896c460c95549b6624a7b8097f95b75474df42970a304b5`. The immutable installed package, contract and repaired application hashes remained unchanged.
+
+A separate adapter is prepared, without model execution, to retain the accepted first/repair/peer bytes and continue only the missing second-validator phase above host ordinal 48243. The accepted route group used nine Root sessions and eight reader executions; Native09 continuation used two Root sessions and one observed peer execution, with the second child unaccepted. This totals 20 observed sessions/executions, not 20 API inferences. The minimal proposed continuation adds one Root and one validator, for 22 total if authorized. Root uses inherited `openai-codex/gpt-6.1-sol`; the project validator profile remains Sol/high with its Astra fallback. No cheaper override, new review workload, global setting or profile change was introduced. Physical serving stays unverified where runtime metadata does not expose it.
+
+The portable consolidated gate checklist and complete old/current source hashes are in `native-runtime-validation-20261119.json`. Its PENDING_NATIVE status is intentional until the missing authentic retry terminal and execution/resume consumption are accepted.
+Final Native09 continuation, 2026-11-19: the additional second-only Root
+`91c7cdb1-8484-47e3-b78a-37b47869bc8b` was also blocked before an accepted
+validator dispatch. Its original artifact remains BLOCKED, SHA-256
+`e4a8476777258b17fb35bc9215aa3af94978bcaa38a65f59a214644d3e4990de`.
+Model-free diagnosis found the operational prompt had been copied from a
+4096-byte report preview and its embedded JSON was incomplete. The original
+constructor rebuilt the complete 4579-byte prompt; the approved task compared
+identically, and its JSON parsed before any further model execution. This
+corrected only the lab continuation adapter. The exact rejected differing
+field was not retained and is not inferred.
+
+The resulting final continuation `9f7d7f65-d04c-4afc-86a2-ff25761ca76c`
+completed PASS: an actual second validator terminal and the real execution
+consumer accepted the retry and resume. The sealed first failure, backend
+repair, peer, interface contract and installed package remained unchanged.
+External artifact `native09-continuation-9f7d7f65-d04c-4afc-86a2-ff25761ca76c.json`,
+SHA-256 `f1e7683e149fab15245960cd69b540f9a02e0e16b2f488db2d85930b299126b1`.
+
+Final model-free Native10/route/retry reconsumption passed with no uncovered
+phase, current delivery-quality acceptance, completed execution and Retro PASS.
+External artifact `retained-native10-current-routes-evaluation.json`, SHA-256
+`88692a63554cc4f1192d4504b3522244fde29ec98a12a695376787c4c69db0c9`.
+The previous derived PENDING evaluation is retained separately as
+`retained-native10-before-final-retry.json` with its original hash above.
+The fresh-route and continuation workload observed 13 Root sessions and ten
+child executions; API inference totals were not exposed. This count excludes
+earlier profile/fallback and original lifecycle attempts. No expensive
+orchestration subagent was reopened for the final two lab continuations.
+All declared applicable Native gates now have accepted scope. The five-file
+Native10 package delta and unknown physical serving limits remain explicit;
+`whole_native_approval` remains false.

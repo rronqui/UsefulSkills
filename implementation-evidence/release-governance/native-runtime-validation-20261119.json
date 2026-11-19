@@ -1,0 +1,236 @@
+{
+  "schema": "native-runtime-validation-scope-v1",
+  "generated_at": "2026-11-19T18:11:17.837Z",
+  "status": "ACCEPTED_SCOPED_RUNTIME_EVIDENCE",
+  "whole_native_approval": false,
+  "platform": "win32",
+  "runtime": {
+    "version": "18.18.6",
+    "binary_sha256": "dfb15c27cb2ea192a94761c26aa5cd4eed54b1e0a5a85c02938ab07d769bc8f7",
+    "global_config_changed": false,
+    "root_model": "inherited openai-codex/gpt-6.1-sol",
+    "child_model": "project profile gpt-6.1-sol; gpt-6-astra fallback; high thinking",
+    "physical_model_serving": "unverified where runtime did not expose actual serving model"
+  },
+  "source_scope": {
+    "native10_capture_run": "11b15a93-f0f1-41c8-a220-541af561cdca",
+    "native10_witness_sha256": "9583958e4f99b054ffec16a23f9cf8883ebac76cbf0a988fd599fe1ffdd5f93b",
+    "comparisons": "For each listed delta, original frozen-package manifest SHA equals frozen-source-v2 SHA and installed Native10 package SHA. Current workspace differs. Historical ALIGNMENT_RETAINED_SOURCE constants are a different earlier snapshot and were not altered.",
+    "observed_package_reads": 74,
+    "distinct_observed_package_sources": 32,
+    "all_observed_reads_match_captured_package": true,
+    "changed_files": [
+      {
+        "source": "deep-review/SOURCE.md",
+        "destination": "skills/deep-review/SOURCE.md",
+        "captured": "77c668f3dfdba840fb67c9e696985d86773c244462cdb28fd5b297cb161c28f4",
+        "captured_bytes": 4629,
+        "frozen_v2": "77c668f3dfdba840fb67c9e696985d86773c244462cdb28fd5b297cb161c28f4",
+        "installed": "77c668f3dfdba840fb67c9e696985d86773c244462cdb28fd5b297cb161c28f4",
+        "current": "ff3fa116d91baafb412155fd07137c2c160fc54476496b2f20490f8f29c877cd",
+        "current_bytes": 4646,
+        "actual_reads": [],
+        "material_limit": "Provenance wording clarified; no READ of this file observed in retained Native10."
+      },
+      {
+        "source": "ship/bin/lib.mjs",
+        "destination": "skills/ship/bin/lib.mjs",
+        "captured": "6b0fa61dd76b2ed3113d0bf00aa7a01c0e5cc61700f2ecd5fe0f35def0dac1f8",
+        "captured_bytes": 16153,
+        "frozen_v2": "6b0fa61dd76b2ed3113d0bf00aa7a01c0e5cc61700f2ecd5fe0f35def0dac1f8",
+        "installed": "6b0fa61dd76b2ed3113d0bf00aa7a01c0e5cc61700f2ecd5fe0f35def0dac1f8",
+        "current": "44a3335402b435f9d15dff52601fd41229f8178a7f2519e8634987aeec936921",
+        "current_bytes": 17176,
+        "actual_reads": [],
+        "material_limit": "Only requireBackupPrerequisites changed: protected system interpreter, trusted ancestry and minimal loader environment. Native10 quality-consumer function is unchanged; current consumer is re-executed separately. No model READ of this file observed."
+      },
+      {
+        "source": "ship/bin/ship.test.mjs",
+        "destination": "skills/ship/bin/ship.test.mjs",
+        "captured": "f9643c1f3fdddfbc65a5a2582de6b5d662526f1c63f06ec0aa695a425640c0bb",
+        "captured_bytes": 107501,
+        "frozen_v2": "f9643c1f3fdddfbc65a5a2582de6b5d662526f1c63f06ec0aa695a425640c0bb",
+        "installed": "f9643c1f3fdddfbc65a5a2582de6b5d662526f1c63f06ec0aa695a425640c0bb",
+        "current": "730e6d8b2842d802d245443172b5085e78a2b8780e4d219f0f7ee0bfa33c7ade",
+        "current_bytes": 108956,
+        "actual_reads": [],
+        "material_limit": "Linux protected-interpreter regression/mocking changes. No model READ or execution of this test file observed in Native10."
+      },
+      {
+        "source": "ship/SKILL.md",
+        "destination": "skills/ship/SKILL.md",
+        "captured": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+        "captured_bytes": 24849,
+        "frozen_v2": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+        "installed": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+        "current": "31c81e023361e51414936af2ce8aa6c0b78269f90c6e5d9a67f09ced9d26f741",
+        "current_bytes": 24863,
+        "actual_reads": [
+          {
+            "source": "ship/SKILL.md",
+            "actor": "Root",
+            "path": ".omp/skills/ship/SKILL.md",
+            "observed": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+            "captured": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+            "current": "31c81e023361e51414936af2ce8aa6c0b78269f90c6e5d9a67f09ced9d26f741",
+            "tool_call_id": "call_b1978aab28ce4c37a499b405fea1e352|fc_0b9234e0ff2c336a016aff2f7e180887d296bbdd952031afa6",
+            "host_workflow_ordinal": 27439
+          },
+          {
+            "source": "ship/SKILL.md",
+            "actor": "Root",
+            "path": ".omp/skills/ship/SKILL.md",
+            "observed": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+            "captured": "e7bfd351bd7c78a27cfd9e722c106d919ff0697baf551171e741129c36ec7609",
+            "current": "31c81e023361e51414936af2ce8aa6c0b78269f90c6e5d9a67f09ced9d26f741",
+            "tool_call_id": "call_eb7e20088a384e5c9b45e38cb2cbbcb8|fc_0b9234e0ff2c336a016aff2f81fd7887d28a9ed2fb55180b93",
+            "host_workflow_ordinal": 27449
+          }
+        ],
+        "material_limit": "Linux backup prerequisite changed from python3 on PATH to protected system installation. Root read the captured older text twice. Native10 did not exercise Linux backup."
+      },
+      {
+        "source": "tdd-orchestrator/SOURCE.md",
+        "destination": "skills/tdd-orchestrator/SOURCE.md",
+        "captured": "90720554c2dd1975c085b054292c47520b7ea3003e54fb491bc04de12186edf7",
+        "captured_bytes": 4887,
+        "frozen_v2": "90720554c2dd1975c085b054292c47520b7ea3003e54fb491bc04de12186edf7",
+        "installed": "90720554c2dd1975c085b054292c47520b7ea3003e54fb491bc04de12186edf7",
+        "current": "707a40e9777053de8d58e3e123d6354e48f0a5b12ba2eb404afeb2fcd9cf07dd",
+        "current_bytes": 4888,
+        "actual_reads": [],
+        "material_limit": "Provenance/source wording clarified; no READ of this file observed in retained Native10."
+      }
+    ]
+  },
+  "gates": {
+    "discovery_profiles": "ACCEPTED_SCOPED_RETAINED_TERMINALS",
+    "deep_review": "ACCEPTED_SCOPED_RETAINED_TERMINALS",
+    "tdd_positive": "ACCEPTED_SCOPED_RETAINED_TERMINAL",
+    "tdd_negative": "PASS",
+    "malformed_rejection": "PASS_REAL_ROOT_CONTROLLED_HELPER",
+    "nominal_peer_malformed": "NO_TERMINAL_NOT_CLAIMED_PASS",
+    "fallback06": "PASS",
+    "native_routes": "PASS",
+    "native09_retry": "PASS",
+    "native10": "PASS",
+    "delivery_quality": "PASS_CURRENT_CONSUMER",
+    "native_retro": "PASS"
+  },
+  "artifacts": [
+    {
+      "locator": "external-artifact:ship-native-fallback-0a70470c-526c-43b6-8503-6d9783c7faeb/evidence.json",
+      "sha256": "05d776037b53f621d5654d8cd308ebad3a3c44d740f1db1e101982603199422f",
+      "scope": "Real Root + controlled malformed helper, 34 reads; protocol accepts valid peer and rejects malformed input",
+      "status": "PASS"
+    },
+    {
+      "locator": "external-artifact:ship-native-profile-070d2e2c-059b-46de-b8cf-b5cab05559d4/evidence.json",
+      "sha256": "74cdbc95cf70e0bd3230af9641ed6418fd2066d1d237737efcc563e9e6cc7252",
+      "scope": "Original profile batch timed out; retained completed terminals only",
+      "status": "BLOCKED"
+    },
+    {
+      "locator": "external-artifact:retained-profile-terminal-evaluation.json",
+      "sha256": "3127e36db01030ab3828c6165f6cdbc09182aee6a3879b3cf4170b99531686cc",
+      "scope": "Current consumers accept genuine twelve profiles, two deep returns/aggregate and positive peer, with thirteen source hashes preserved",
+      "status": "ACCEPTED_SCOPED_RECONSUMPTION"
+    },
+    {
+      "locator": "external-artifact:native-peer-negative-088dac5e-4ae8-412b-bb2d-80645e9637da.json",
+      "sha256": "f1a73958de53b6aa195bab94cd2d568aa2be7b56ce5e4fc4ba843ec61d613c54",
+      "scope": "Genuine negative peer BLOQUEADO accepted; thirteen dependencies, fixture and binary preserved",
+      "status": "PASS"
+    },
+    {
+      "locator": "external-artifact:ship-native-fallback-bb8dc0d5-6023-4c36-b2a5-55374520a059/evidence.json",
+      "sha256": "4ad02cef0ec3b0e4601f9aa5f2a7110b31f63de6cb7927d2607dcdab9f000e9f",
+      "scope": "Targeted NATIVE06, disabled deep and two genuine peers, 31 reads",
+      "status": "PASS"
+    },
+    {
+      "locator": "external-artifact:ship-native-lifecycle-11b15a93-f0f1-41c8-a220-541af561cdca/evidence.json",
+      "sha256": "ecbe16b194d2e38a3c091d7a3e78534bfb4b1e6bc7fc68a2654fecd330b582e4",
+      "scope": "Original lifecycle outcome preserved; erroneous canonical source artifact and missing Native09 completion",
+      "status": "PENDING_NATIVE"
+    },
+    {
+      "locator": "external-artifact:native09-continuation-6f83c39d-d080-48fc-8b2c-9ee2afce1f9f.json",
+      "sha256": "e1be81a752e4a6d70466423d0f342479f4917e898f3343d1c53ae64efd872abc",
+      "scope": "Retains original first failure/repair; genuine peer accepted; second Root blocked before accepted dispatch by literal task guard",
+      "status": "BLOCKED"
+    },
+    {
+      "locator": "external-artifact:native10-package-drift-comparison.json",
+      "sha256": "946334da34f5b926c115abdd94be00120a7e22bc65314f8f5880b267247c05f3",
+      "scope": "Captured Native10 package vs frozen-v2 vs current workspace, including actual READ bindings",
+      "status": "SOURCE_SCOPE_ONLY"
+    },
+    {
+      "locator": "external-artifact:native-routes-only-28d63bcb-6e3f-49e8-aea1-06c23e0a1884/evidence.json",
+      "sha256": "2d6593f67d424f3a4ccb1648dfdbcf9f0a549891fc6030e387bda242c2f8ab27",
+      "scope": "Four new canonical native routes; actual resume and collision; independent sessions from retained Native10",
+      "status": "PASS"
+    },
+    {
+      "locator": "external-artifact:retained-native10-current-routes-evaluation.json",
+      "sha256": "88692a63554cc4f1192d4504b3522244fde29ec98a12a695376787c4c69db0c9",
+      "scope": "Current consumers over genuine six-role Native10 capture with independently accepted native routes; no new models",
+      "status": "PASS_SCOPED_RECONSUMPTION"
+    },
+    {
+      "locator": "external-artifact:native09-continuation-9f7d7f65-d04c-4afc-86a2-ff25761ca76c.json",
+      "sha256": "f1e7683e149fab15245960cd69b540f9a02e0e16b2f488db2d85930b299126b1",
+      "scope": "Genuine technical retry continuation, retaining sealed prior phases and actual second validator PASS through execution/resume consumer",
+      "status": "PASS"
+    },
+    {
+      "locator": "external-artifact:native09-continuation-91c7cdb1-8484-47e3-b78a-37b47869bc8b.json",
+      "sha256": "e4a8476777258b17fb35bc9215aa3af94978bcaa38a65f59a214644d3e4990de",
+      "status": "BLOCKED",
+      "scope": "Additional Root stopped by literal guard before validator dispatch; preserved original attempt."
+    },
+    {
+      "locator": "external-artifact:retained-native10-before-final-retry.json",
+      "sha256": "0671b8f294409c399677957cffd7f7cdb6dc2fabfe8e12f13455f9e32f6c0079",
+      "status": "PENDING_NATIVE",
+      "scope": "Prior scoped reconsumption retained before accepted final Native09 terminal."
+    },
+    {
+      "locator": "external-artifact:native09-complete-prompt-prepared.json",
+      "sha256": "91cec46bc2c64f3873c285b04f119397c99c451f5a41b6bac5e77bed88661974",
+      "status": "PREPARED_WITHOUT_MODELS",
+      "scope": "Constructor reconstruction and valid JSON, exact task and evidence seals checked before final execution."
+    }
+  ],
+  "limits": [
+    "Retained original FAIL/BLOCKED/PENDING outcomes are never rewritten.",
+    "Model-free reconsumption is not a new native run.",
+    "Independent route sessions supply verified source/revision binding, not invented historical identities.",
+    "Whole-Native approval for the current package is not claimed by source equivalence.",
+    "The native evidence above covers Windows; OS-specific Linux installer/deploy tests are maintained separately."
+  ],
+  "execution_budget": {
+    "routes": {
+      "root_sessions": 9,
+      "child_executions": 8
+    },
+    "native09_continuations": {
+      "root_sessions": 4,
+      "observed_child_executions": 2
+    },
+    "total_observed": 23,
+    "api_inferences": "Not observed as aggregate; agent sessions can contain multiple READ/RPC/model turns.",
+    "cost_decision": "Retained genuine first failure, backend repair and accepted peer. Final pair executed directly by coordinating automation without reopening a model subagent. Runtime profile models preserved by contract.",
+    "scope": "Fresh four-route group and Native09 continuations only; earlier discovery, deep/fallback and original lifecycle attempts excluded."
+  },
+  "adapter_correction": {
+    "prior_prompt_bytes": 4096,
+    "complete_prompt_bytes": 4579,
+    "approved_task_sha256": "435695aec0f48cf94f9ec2461fc4a23a207cbeb731f1fe1101febfa0b85eb311",
+    "rebuilt_task_identical": true,
+    "prompt_json_valid": true,
+    "constructor_source_sha256": "f19c627ccbc3520cb89ad9d2368583f1f58d927c242dd4c426aa90612cc78d75",
+    "scope": "A truncated report preview was used as operational prompt by the continuation adapter. Rebuilt using the original constructor and exact approved task; original evidence and strict guard remain unchanged. The rejected differing field was not captured and is not inferred."
+  }
+}
