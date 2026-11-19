@@ -116,8 +116,9 @@
     "retained_routes": 4,
     "retained_route_assertions_pass": 576,
     "current_131_runtime_inputs_unchanged": true,
-    "whole_native_approved": true,
-    "original_raw_payloads_immutable": true
+    "whole_native_approved": false,
+    "original_raw_payloads_immutable": true,
+    "retained_approval_scope": "Historical Native approvals apply only to their exact captured sources and runtime. Equality of a derived subset does not renew whole-package approval for the current candidate."
   },
   "actual_qa": {
     "windows": {
@@ -262,5 +263,6 @@
     "ActualfeaturePR/qualityCIandterminaldecisionboundtoactualPR/head/checks; notcircularlocalprerequisites",
     "Actualauthorizedsquashmerge/release-pleasePR/tag/release; nolocalmerge/deploy"
   ],
-  "acceptance_boundary": "Packet documents local readiness, not authorization or Task/Goal100/featureCI/remote effect. AC001 remains globallyopen until external terminal delivery completed. T010B futureCI/T013B publication are not circular prerequisites for local T013A."
+  "acceptance_boundary": "Packet documents local readiness, not authorization or Task/Goal100/featureCI/remote effect. AC001 remains globallyopen until external terminal delivery completed. T010B futureCI/T013B publication are not circular prerequisites for local T013A.",
+  "current_candidate_approval": "PENDING fresh candidate validation; historical local readiness is not current release approval"
 }

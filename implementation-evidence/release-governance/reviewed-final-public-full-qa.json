@@ -33,7 +33,7 @@
     "platforms": [
       {
         "platform": "windows",
-        "path": "C:/Users/Ricar/AppData/Local/Temp/goal47-reviewed-final-tdsR1l/windows-qa/reviewed-final-windows-qa.json",
+        "path": "reviewed-final-windows-qa.json",
         "validator": "ReviewedFinalWindowsQa47",
         "sha256": "2a69c8b04331e6efd47fb758e6532e794d9b11f996603c05d4f43b3e4c2b9634",
         "total": 1280,
@@ -71,7 +71,7 @@
       },
       {
         "platform": "linux",
-        "path": "/var/tmp/goal47-reviewed-final-d31a5919-a0d9-42e6-9e4b-404da50aa1a3/reviewed-final-linux-qa.json",
+        "path": "reviewed-final-linux-qa.json",
         "validator": "ReviewedFinalLinuxQa47",
         "sha256": "e5cebdafc78c30908fff56b86600a59331aaaf2857ab495d5f647ebf29a0a716",
         "total": 1280,
@@ -105,7 +105,7 @@
         "security_scope": "Manual guard inspection and scoped secret pattern scan; not universal security proof",
         "validator_overall": "FALHOU",
         "overall_reason": "Tests PASS; global traceability lacks current Native/delivery evidence.",
-        "retained_copy": "C:/Users/Ricar/AppData/Local/Temp/goal47-reviewed-final-tdsR1l/reviewed-final-linux-qa-retained.json",
+        "retained_copy": "reviewed-final-linux-qa-retained.json",
         "retained_copy_sha256": "e5cebdafc78c30908fff56b86600a59331aaaf2857ab495d5f647ebf29a0a716"
       }
     ],
@@ -432,12 +432,12 @@
       },
       {
         "platform": "linux",
-        "ref": "scripts/install.test.mjs::install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/goal47-reviewed-final-d31a5919-a0d9-42e6-9e4b-404da50aa1a3/.test-temp/install-device-XVDtfy/device: Operation not permitted\n)",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
         "status": "skipped"
       },
       {
         "platform": "linux",
-        "ref": "scripts/install.test.mjs::install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/goal47-reviewed-final-d31a5919-a0d9-42e6-9e4b-404da50aa1a3/.test-temp/install-block-device-Bffd0x/device: Operation not permitted\n)",
+        "ref": "scripts/install.test.mjs::install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
         "status": "skipped"
       },
       {
@@ -814,5 +814,6 @@
       "path": ".omp/state/release-47/proofs/final-reviewed-package-and-platform-cohort.json",
       "sha256": "6adb7d5ce0cd50108e52e1fc28e6f17a37639410fa1f4b27efa40d9a4aed092e"
     }
-  ]
+  ],
+  "report_locator_semantics": "Report filenames are portable retained-artifact locators, not repository files. Existing sha256 binds the original report. Raw reports are not bundled; host-private paths in diagnostic titles were redacted without claiming a rerun."
 }

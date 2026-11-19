@@ -1,0 +1,429 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-19T17:17:03.117Z",
+  "plan": {
+    "path": "implementation-evidence/remediation/plan.md",
+    "sha256": "f9a8ca8dfca2bf2b899280dcdbbfdc00a06ec06c44cc0e479914bdf2c44164a5",
+    "execution_authorization": "Subsequent explicit user instruction to implement this exact plan in T3; original planning document retained."
+  },
+  "total": 59,
+  "corrected": 58,
+  "not_applicable": 1,
+  "candidate_validation": "IN_PROGRESS; local disposition is not release approval",
+  "model_selection_policy": "Before each assignment assess complexity, risk, context, rework cost and select the least costly capable model; escalate only with concrete justification.",
+  "findings": [
+    {
+      "id": "Review01-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "`execution.mjs` recusa RUNNING da onda atual com revisão/staticDigest antigo por E_HISTORY. Mantém ocupação mesmo stale ou com terminal posterior inválido, conservando o ajuste local anterior. `execution.test.mjs`: tabela de revisão e digest antigos, writer conflitante bloqueado e tarefa independente pronta; regressões de lock existentes preservadas.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review01-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "O ramo POSIX `verify` compara `desiredHash(operation)`, que inclui `content`, com o hash capturado do destino. Regressão positiva com content idêntico readonly, negativa com content diferente e regressão anterior de origem alterada após o plano. Windows e Linux reais exercitados.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review01-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "`sourceScopes: []` agora nega operações de leitura de `source` nos dois backends. O padrão Windows já negava; POSIX passa a negar também. Operações com bytes `content` não leem uma origem e continuam funcionando. Todos os consumidores de instalação fornecem escopos explícitos. Teste confirma ausência de publicação e de diretório transacional após rejeição.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review01-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "Evidência Spec Kit exige limites de basename para spec.md, plan.md, tasks.md e interface-contract.md; `not-spec.md`/`.bak` não satisfazem o gate. `state-evolution.test.mjs`: nomes canônicos e paths/anchors positivos, prefixo e sufixo inválidos por documento.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review01-05",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "Referência normativa exige token exato AC-NNN, não substring. `state-evolution.test.mjs`: rejeita AC-0160, XAC-016 e sufixos de identificador, preserva referência delimitada válida.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review02-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Inspeção dos componentes de `core.hooksPath` ocorre antes de `path.resolve`. Symlink/junction ou componente ausente seguido de `..` falha fechado, preservando os destinos possíveis. `..` com componentes anteriores existentes e sem links continua aceito. Não se afirma que o destino lexical seja o destino efetivo do Git no caso ambíguo.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review02-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Skills, agentes e NOTICE usam hash/equality também no planejamento Windows. Arquivos iguais recebem `verify`, sem classificação artificial como atualização. O backend Windows abre os destinos inicialmente para leitura; somente os divergentes são reabertos para escrita, com identidade/hash revalidados. POSIX não exige W_OK para verify. Reinstalação de arquivo readonly preserva inode, mtime, modo e conteúdo nos dois OS.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review02-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "O tamanho de `lstat` é limitado antes de `readFileSync` da fonte do hook; a checagem pós-leitura e a detecção de mudança permanecem. Fixture de 8 MiB + 1 é recusada antes da instalação de qualquer wrapper/sidecar.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review03-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Parser new rejeita opções/posicionais não consumidos antes de efeitos.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review03-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "body-file duplicado bloqueia antes de ler arquivos/publicar.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review03-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Uma unidade exige include-component-in-tag=false; múltiplas exigem true.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review03-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "SemVer incluindo prerelease/build respeita piso initial-version, sem alterar versão do pacote.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review03-05",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Python de sistema protegido e isolado >=3.8 resolvido antes de stop e rechecado para backup direto; preflight negativo e backup real Linux passaram. Ensaio descartável comprovou deploy/rollback com DB e snapshots preservados.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review04-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "`review-context.mjs` rejects errored Root TASK END before importing embedded results and requires its correlated START. The valid inline-result control remains accepted.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Review assignments retain actual Root `toolCallId`; terminals retain actual `parentToolCallId` from the Root result channel or native lifecycle/progress metadata. Missing, conflicting or foreign dispatch parents block approval.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Review progress success status is checked independently of observed zero exit. Explicit error/aborted metadata survives capture and blocks the terminal. Statusless inline SingleResult remains supported with observed zero exit, while progress requires a success status.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Generic profile, deep-review and peer consumers check unique actual Root assignment, parent dispatch, role and project source. Nested task snapshots cannot supply Root authority themselves; a later authentic Root END can bind the identical retained snapshot. Old captures lacking the required parent metadata fail closed.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-05",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Peer progress must pass the existing observed-terminal success consumer before its successful yield is consumed. Schema/yield rejection of the intentionally malformed control remains explicitly classified as rejection, never successful work.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-06",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "SingleResult and progress sanitizers preserve `isError` and `aborted`. Absent flags remain unknown; explicit failure blocks acceptance.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review04-07",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Offline peer input is opened once, checked as a bounded regular file with `fstat`, and read through a size-limited buffer before JSON parsing. A file exceeding the existing 64 MiB logical-envelope limit is refused before allocation/materialization.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review05-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Root READ success requires actual returned text content in addition to non-error transport metadata. Empty/status-only envelopes do not prove source inspection.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review05-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Retry terminal role must match the definition's expected first/second validator and `agentSource` must be project. Existing job/instance and host provenance checks remain required.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review05-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Root READ END without an open START of the same tool/call is rejected immediately, including orphan ENDs after earlier valid reads.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review05-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrected; source consumer verified",
+      "evidence": "Malformed finding entries retain invalid placeholders through capture and typed assembly, allowing downstream validation to reject them. A terminal object cannot mask malformed earlier typed findings.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review06-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "whole_native_approved histórico não promove o candidato; escopo restrito às fontes capturadas explicitado.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review06-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "Ledger de plataforma usa filenames e hashes retidos; paths privados removidos inclusive de diagnósticos. JSON parse válido.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review06-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "QA público usa locators portáveis com semântica de disponibilidade; hashes e resultados históricos preservados.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review07-01",
+      "disposition": "corrected",
+      "verification_scope": "Native consumer corrected; source integration verified",
+      "evidence": "Immediately before final lifecycle/delivery evaluation, rerun the actual file-backed Ship quality consumer and compare its proof digest with the original decision. Context or receipt/source replacement blocks delivery. The shared `quality.mjs` proof revalidation is owned by the main integration task.",
+      "ledger": "implementation-evidence/release-governance/remediation-native.md"
+    },
+    {
+      "id": "Review07-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "T-013C é conferência normativa executável separada após T-013B: receipt CONFIRMED fecha AC-001, PENDING_USER mantém aberto. Matriz spec, plan e tasks incluem owner/dependência/globs; não há dependência pre-release da confirmação pós-release nem assignment misto AC-001/AC-016. Não se publicou nem reexecutou histórico.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review07-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "AC-005 e instruções atuais em plan/tasks exigem RED contratual antes da prova atual de primitive aplicável e essa prova antes do GREEN dependente. LAB não aprova host/transação. Registro de changelog histórico permanece como histórico; nenhuma evidência de execução foi inventada.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review07-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "NOTICE tem escritor único T-006; T-005 apenas lê/distribui e sua prova NOTICE espera o resultado de T-006. Demais caminhos disjuntos conservam paralelismo. Tarefas históricas não foram reabertas/executadas.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review08-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "APROVADO com P0/P1 rejeitado; BLOQUEADO válido preservado; protocolo e regressões positivas verdes.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review08-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "Lista de exports inclui aggregateReviewInstances com assignments; API existente e testes do consumidor.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review08-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "SOURCE e AMENDMENTS relacionam FastAPI/Vue aos mesmos paths no commit OpenAI fixado. A licença do próprio security-best-practices foi obtida nesse commit e comparada à cópia local após somente normalização CRLF/LF. Avisos de modificação foram adicionados aos dois arquivos sem mudar receitas. Recibo registra Git blob SHA recomputado, SHA-256, bytes, licença e modificações por arquivo.",
+      "ledger": "implementation-evidence/release-governance/remediation-provenance.md"
+    },
+    {
+      "id": "Review09-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "Emenda explícita e delimitada no contrato specs005 permite >=1 ACs todos normativos, com NA exato por AC; state, plan/tasks e SKILL concordam. Tarefa mista permanece inválida. Teste de vários ACs valida DONE e promoção, rejeita prova ausente/AC trocado/review não independente; matriz mista negativa já existente continua verde.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review09-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "validator diferencia rastreabilidade executável e a conferência da matriz NA normativa, exige classificação, prova atual e validator canônico. Não afirma execução de suíte vazia. Regras locais de state mantêm gates e review obrigatórios; testes normativos e negativos passaram.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review09-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "Diagrama inclui RED_CHECK → DOC para classificação NA, DOC → REVIEW independente e REVIEW → VALIDATE para artefatos normativos atuais; fluxo comportamental mantém REVIEW → DOC. A instrução de classificação anterior em test-author foi preservada. Não se testa frase literal.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review09-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado semanticamente pelo consumidor",
+      "evidence": "Exemplo de schema agora separa tarefa T-001 behavioral de T-002 normative, com links inversos e globs próprios. JSON extraído e parseado, suas duas matrizes passaram em validateCriteriaMatrix real e links AC/tarefa/globs foram conferidos.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review09-05",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "CLI normaliza contextPath absoluto relativo à raiz pelo mesmo processo do report, conservando confinement de readQualityContext/validateQualityReportFile. Novo teste aceita contexto absoluto interno em delivery, compara diagnóstico planning relativo/absoluto sem promover fixture delivery, rejeita absoluto externo e verifica bytes preservados.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review09-06",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "Recipe distingue SQL PREPARE/EXECUTE de protocolo e configuração do PgBouncer; revisão semântica com documentação primária.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review09-07",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "SeqScan, buffers e filtro descritos como observações para investigar, sem diagnóstico automático de índice/memória.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review09-08",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado no escopo estático",
+      "evidence": "URI privada não é necessária para auditar a observação React: fontes públicas fixadas, Git blob SHA, SHA-256, inventário da árvore completa e comparação atual dos nove arquivos estão no recibo versionado. Ambos SOURCE distinguem a alegação histórica de peer sem transcript retido e a revisão atual independente da reescrita histórica. Sem copyright inventado, licença inferida ou afirmação universal de ausência de cópia.",
+      "ledger": "implementation-evidence/release-governance/remediation-provenance.md"
+    },
+    {
+      "id": "Review10-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "Perfil, comprehension-review e entrypoint exigem COMPLETE válido com identidade/fontes/conteúdo observado; INCOMPLETE ou leitura sem conteúdo/recibo válido bloqueia dependentes, preserva retorno bruto e não promove por sucesso de transporte. Solução mantém natureza instrucional de alignment e não cria framework novo.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review10-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "Entry point e routing exigem identidade/request/run, pergunta/texto NFC e rodada exatos da fronteira selada. ID inédito é necessário mas insuficiente; perguntas downstream/inventadas/substituídas bloqueiam antes da escrita. Respostas em lote e parciais conservam histórico/fronteira.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review10-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado por revisão semântica",
+      "evidence": "Delegação requirements-reader exige descoberta de perfil/schema, finalidade/critérios, run/revisão/context_digest e fontes path/hash atuais, correlação observada de instância/dispatch/job e retorno bruto. Somente campos realmente disponíveis são enviados; schema não exposto não vira structured ou sandbox presumido.",
+      "ledger": "implementation-evidence/release-governance/remediation-state-alignment.md"
+    },
+    {
+      "id": "Review11-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "Manifesto de bootstrap inclui mesmos campos obrigatórios de qualidade.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review11-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido localmente",
+      "evidence": "CI quality executa Gitleaks fixado com checksum e npm audit high; matriz Windows/Linux Node22 fixado e npm ci. Execução hospedada integra entrega final.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review11-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado localmente",
+      "evidence": "CI valida referência de fechamento contra issue real da API, rejeita PR/não existente/placeholders; exceção release-please exige origem, autor, branch, título e label.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review12-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Atribuições indexadas sensíveis removidas de stdout e trace; diagnósticos preservados.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review12-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "YAML explícito escalar encerra estado; diagnóstico indentado posterior preservado.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review13-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Cada spawn posterior da sessão Windows admitida recolhe e valida novamente o inventário completo: wrapper, Git, aliases, DLLs, ancestrais, ACLs e resolução do loader. A closure é comparada com a admissão inicial, além da observação independente do candidato. Mudança de hash de Git/DLL ou identidade de ancestral bloqueia antes do segundo spawn. Casos rodam na fonte e no factory materializado no pre-push.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review13-02",
+      "disposition": "not_applicable_with_evidence",
+      "verification_scope": "Improcedente com evidência",
+      "evidence": "Os dois nomes excepcionados pelo coletor, `secur32.dll` e `ucrtbase.dll`, são carregados no Git fixado por `INIT_PROC_ADDR`; o helper usa `LoadLibraryExA` com `LOAD_LIBRARY_SEARCH_SYSTEM32`. Uma DLL no diretório da aplicação não precede esses carregamentos. Não se implementou um bloqueio com base nessa hipótese falsa. Imports com busca padrão continuam sujeitos às verificações existentes; KnownDLLs e ACLs do ambiente são observados pelo probe real. Veja as fontes imutáveis abaixo.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review13-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "A validação de refs aceita Unicode e caracteres legítimos de Git mantendo restrições estruturais de refs e tuplas somente leitura. Nomes remotos hierárquicos também são aceitos. Não há interpolação em shell: o spawn mantém argv, `shell:false`, stdout, stderr, input e status. Operação Git Windows real confirmou refs com Unicode, aspas, ponto-e-vírgula, dólar e parênteses.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review13-04",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Todos os probes PowerShell da admissão têm timeout de 30 s e maxBuffer de 4 MiB. Timeout retorna erro terminal controlado de confiança, sem executar Git nem escrever no candidato. A fonte única regenerou o guard do pre-push; `generate-git-trust.mjs --check` passou.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review14-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Quarentena POSIX usa `linkSync` exclusivo, valida identidade/hash de ambos os aliases e só depois remove o nome original. `EEXIST` preserva a entrada estrangeira. Recuperação remove apenas o alias próprio comprovado quando a falha precede o unlink. A seam determinística já existente cria a reserva estrangeira após o ENOENT; Linux confirma preservação de bytes e identidade do destino e da reserva. Regressões anteriores de pivot/rollback permanecem verdes.",
+      "ledger": "implementation-evidence/release-governance/remediation-filesystem-git.md"
+    },
+    {
+      "id": "Review15-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "AWS STS sintético em stdout e trace; regras de scanner e redaction cobrem ASIA/AKIA.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review15-02",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Expressão determinística documentada exercitada com ambiente falso, taxa zero, amostra insuficiente e taxa abaixo do limiar.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review15-03",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido e verificado",
+      "evidence": "Leitura de bullet termina no próximo bullet ou heading; testes não consomem instrução de outra operação.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    },
+    {
+      "id": "Review16-01",
+      "disposition": "corrected",
+      "verification_scope": "Corrigido",
+      "evidence": "ship.config ativa policy 1, report e contexto independente; CLI quality positivo e rejeições.",
+      "ledger": "implementation-evidence/release-governance/remediation-root.md"
+    }
+  ]
+}

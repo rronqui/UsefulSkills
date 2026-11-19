@@ -339,14 +339,14 @@
     {
       "platform": "linux",
       "path": "scripts/install.test.mjs",
-      "full_name": "install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-native22-a94ee5e8/project/.test-temp/install-device-mfPaRP/device: Operation not permitted\n)",
+      "full_name": "install.mjs preflight detecta device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
       "status": "skipped",
       "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
     },
     {
       "platform": "linux",
       "path": "scripts/install.test.mjs",
-      "full_name": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: /var/tmp/usefulskills-native22-a94ee5e8/project/.test-temp/install-block-device-ynRSS7/device: Operation not permitted\n)",
+      "full_name": "install.mjs preflight detecta block device no destino sem substituí-lo — skip: mknod indisponível (mknod: [temporary-fixture] Operation not permitted\n)",
       "status": "skipped",
       "reason_scope": "Explicitplatform/capabilitygate; rawtitlepreservedverbatimnotTEST_REFencoded"
     },
@@ -367,12 +367,12 @@
   ],
   "report_bindings": {
     "windows": {
-      "path": "C:/Users/Ricar/AppData/Local/Temp/usefulskills-audit-CdmZsI/native22-windows-qa-HtTrnm/vitest-windows.json",
+      "path": "vitest-windows.json",
       "sha256": "edff16cf4ee9f936e79250ca2dbb189b24a4c167a236443781db443a3d1a96b3",
       "memo": ".omp/state/release-47/proofs/native22-current-full-qa-actual.json"
     },
     "linux": {
-      "path": "/var/tmp/usefulskills-native22-a94ee5e8/reports/vitest.json",
+      "path": "vitest.json",
       "sha256": "b460a224e66b690c9c38c78071d919a26b2f670030842a54a29da2803b736c03",
       "memo": ".omp/state/release-47/proofs/native22-linux-full-qa-actual.json"
     }
@@ -390,5 +390,6 @@
     "AftercaptureGoal-onlyprivateearlyprobeP1fixtureauthorityneutralizationpassed56Source-onlycases;runtime/configuredunitfilesunchanged;Native22frozenSourceuntouched",
     "Prior214-file1237-caseledgerandCRLFfixturehistoryarchivedinnative22-platform-ledger-before-current-update.json;fixture_correctionaboveishistorical",
     "Native22integratedexecutionstillpending;notNative09/10/E2E/security/wholeAC017/releaseapproval;independentconsolidationreviewpending"
-  ]
+  ],
+  "report_locator_semantics": "Report filenames are portable retained-artifact locators, not repository files. Existing sha256 binds the original report. Raw reports are not bundled; host-private paths in diagnostic titles were redacted without claiming a rerun."
 }
